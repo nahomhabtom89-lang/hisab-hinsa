@@ -123,5 +123,5 @@ If unrecognizable: {"error": "Cannot identify this transaction. Please rephrase.
 
   } catch (err) {
     return res.status(500).json({ error: err.message });
-  }
+  } 
 }
