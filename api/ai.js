@@ -14,90 +14,88 @@ export default async function handler(req, res) {
 
     let systemText = "";
     if (mode === "advisor") {
-      systemText = `You are an expert construction accounting advisor for a company in Juba, South Sudan. You speak both Tigrinya and English. Reply in the same language the user uses. Here is the current company financial data:\n${context || ""}. Give clear, practical accounting advice. Be concise.`;
+      systemText = `You are an expert construction accounting advisor for a company in Juba, South Sudan. You speak both Tigrinya and English fluently. Always reply in the same language the user writes in. Here is the current company financial data:\n${context || ""}\nGive clear, practical, specific accounting advice. Be concise and helpful.`;
     } else {
-      systemText = `You are a construction accounting AI for a company in Juba, South Sudan. You understand Tigrinya and English. Parse the user's description of a financial transaction and return ONLY a JSON object:
+      systemText = `You are an expert construction accounting AI for a company in Juba, South Sudan. You understand Tigrinya and English perfectly.
+
+Your job: parse ANY financial transaction and return PERFECTLY correct double-entry bookkeeping JSON.
+
+Return ONLY this JSON, no markdown, no explanation, no extra text:
 {
   "type": "transaction type",
   "date": "YYYY-MM-DD",
   "amount": number_in_USD,
   "currency": "USD or SSP",
-  "description": "short description in Tigrinya and English",
+  "description": "clear description in Tigrinya and English",
   "entries": [
     {"account": "Account Name", "type": "asset|liability|equity|revenue|expense", "debit": number_or_0, "credit": number_or_0}
   ]
 }
-Rules: Total debits MUST equal total credits. Use proper double-entry bookkeeping. Common accounts: Cash, Accounts Receivable, Accounts Payable, Contract Revenue, Salary Expense, Construction Materials, Work in Progress, Petty Cash, Fuel Expense, Equipment, Subcontractor Expense. If currency is SSP convert to USD at 1300 SSP = 1 USD. Return ONLY the JSON, no markdown, no explanation.`;
+
+CRITICAL ACCOUNTING RULES:
+1. Debits MUST always equal Credits exactly
+2. PAYING cash = Credit Cash, Debit what you got
+3. RECEIVING cash = Debit Cash, Credit Revenue or Liability
+4. Prepaid rent/insurance (advance payment) = Debit Prepaid Rent (asset), Credit Cash
+5. Buy materials cash = Debit Construction Materials (asset), Credit Cash
+6. Buy materials credit = Debit Construction Materials (asset), Credit Accounts Payable
+7. Pay salary = Debit Salary Expense, Credit Cash
+8. Client pays us = Debit Cash, Credit Contract Revenue
+9. We bill client = Debit Accounts Receivable, Credit Contract Revenue
+10. Buy equipment cash = Debit Equipment (asset), Credit Cash
+11. Loan received = Debit Cash, Credit Loan Payable
+12. Loan repayment = Debit Loan Payable, Credit Cash
+13. Pay subcontractor = Debit Subcontractor Expense, Credit Cash
+14. Buy fuel = Debit Fuel Expense, Credit Cash
+15. Owner invests = Debit Cash, Credit Owner Capital
+16. SSP currency: divide by 1300 for USD
+17. "paid for X months in advance" = Prepaid asset not expense
+
+Today: ${new Date().toISOString().split('T')[0]}`;
     }
 
-    // Try Gemini first, then fallback to groq (free)
-    let result = await tryGemini(GEMINI_KEY, systemText, prompt);
-    if (!result) result = await tryGroq(systemText, prompt);
-    if (!result) return res.status(500).json({ error: "ኩሉ AI ጌጋ ኣሎ — All AI services failed. Please try again." });
+    const body = JSON.stringify({
+      contents: [{ role: "user", parts: [{ text: systemText + "\n\nUser: " + prompt }] }],
+      generationConfig: { temperature: 0.1, maxOutputTokens: 1024 }
+    });
 
-    return res.status(200).json({ result });
+    const models = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-1.5-flash", "gemini-pro"];
+
+    for (const model of models) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+      
+      // Try all 3 auth methods
+      const attempts = [
+        { headers: { "Content-Type": "application/json", "x-goog-api-key": GEMINI_KEY } },
+        { url: url + `?key=${GEMINI_KEY}`, headers: { "Content-Type": "application/json" } },
+        { headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GEMINI_KEY}` } },
+      ];
+
+      for (const attempt of attempts) {
+        try {
+          const r = await fetch(attempt.url || url, {
+            method: "POST",
+            headers: attempt.headers,
+            body
+          });
+          if (r.ok) {
+            const d = await r.json();
+            const text = d?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+            console.log(`Success: model=${model}`);
+            return res.status(200).json({ result: text });
+          }
+          const errText = await r.text();
+          console.error(`Failed model=${model} status=${r.status}:`, errText.substring(0, 150));
+        } catch (e) {
+          console.error(`Exception model=${model}:`, e.message);
+        }
+      }
+    }
+
+    return res.status(500).json({ error: "ኩሉ ፈተነ ጌጋ — All attempts failed. Check logs." });
 
   } catch (err) {
     console.error("Handler error:", err);
     return res.status(500).json({ error: "Internal server error", details: err.message });
   }
-}
-
-async function tryGemini(key, system, prompt) {
-  const models = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-pro"];
-  const body = JSON.stringify({
-    contents: [{ role: "user", parts: [{ text: system + "\n\nUser: " + prompt }] }],
-    generationConfig: { temperature: 0.3, maxOutputTokens: 1024 }
-  });
-
-  for (const model of models) {
-    try {
-      // Try API key style
-      if (!key.startsWith("AQ.")) {
-        const r = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
-          { method: "POST", headers: { "Content-Type": "application/json" }, body }
-        );
-        if (r.ok) {
-          const d = await r.json();
-          return d?.candidates?.[0]?.content?.parts?.[0]?.text || null;
-        }
-      }
-      // Try Bearer style
-      const r2 = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-        { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${key}` }, body }
-      );
-      if (r2.ok) {
-        const d = await r2.json();
-        return d?.candidates?.[0]?.content?.parts?.[0]?.text || null;
-      }
-      const err = await r2.text(); console.error(`Gemini ${model} failed:`, err.substring(0, 200));
-    } catch (e) { console.error(`Gemini ${model} error:`, e.message); }
-  }
-  return null;
-}
-
-async function tryGroq(system, prompt) {
-  // Groq is free - no key needed for basic usage via their public endpoint
-  // Using Groq free tier with llama
-  try {
-    const GROQ_KEY = process.env.GROQ_KEY;
-    if (!GROQ_KEY) { console.log("No GROQ_KEY set, skipping groq"); return null; }
-    const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
-      body: JSON.stringify({
-        model: "llama-3.1-8b-instant",
-        messages: [{ role: "system", content: system }, { role: "user", content: prompt }],
-        temperature: 0.3, max_tokens: 1024
-      })
-    });
-    if (r.ok) {
-      const d = await r.json();
-      return d?.choices?.[0]?.message?.content || null;
-    }
-    const err = await r.text(); console.error("Groq failed:", err.substring(0, 200));
-  } catch (e) { console.error("Groq error:", e.message); }
-  return null;
 }
