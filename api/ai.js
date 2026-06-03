@@ -13,7 +13,6 @@ export default async function handler(req, res) {
     if (!GEMINI_KEY) return res.status(500).json({ error: "GEMINI_KEY not set" });
 
     let systemText = "";
-    let userText = prompt;
 
     if (mode === "advisor") {
       systemText = `You are an expert construction accounting advisor for a company in Juba, South Sudan.
@@ -41,26 +40,39 @@ Rules:
 - Return ONLY the JSON, no markdown, no explanation`;
     }
 
-    const geminiBody = {
-      system_instruction: { parts: [{ text: systemText }] },
-      contents: [{ role: "user", parts: [{ text: userText }] }],
-      generationConfig: { temperature: 0.3, maxOutputTokens: 1024 }
-    };
+    // Try models in order until one works
+    const models = [
+      "gemini-2.0-flash",
+      "gemini-1.5-flash",
+      "gemini-1.5-flash-latest",
+      "gemini-pro"
+    ];
 
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
-      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(geminiBody) }
-    );
+    let lastError = "";
+    for (const model of models) {
+      const geminiBody = {
+        system_instruction: { parts: [{ text: systemText }] },
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.3, maxOutputTokens: 1024 }
+      };
 
-    if (!geminiRes.ok) {
-      const errText = await geminiRes.text();
-      console.error("Gemini error:", errText);
-      return res.status(geminiRes.status).json({ error: `Gemini API error ${geminiRes.status}`, details: errText });
+      const geminiRes = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`,
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(geminiBody) }
+      );
+
+      if (geminiRes.ok) {
+        const data = await geminiRes.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        console.log(`Success with model: ${model}`);
+        return res.status(200).json({ result: text });
+      }
+
+      lastError = await geminiRes.text();
+      console.error(`Model ${model} failed:`, lastError);
     }
 
-    const data = await geminiRes.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-    return res.status(200).json({ result: text });
+    return res.status(500).json({ error: "All Gemini models failed", details: lastError });
 
   } catch (err) {
     console.error("Handler error:", err);
