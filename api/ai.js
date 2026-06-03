@@ -40,39 +40,63 @@ Rules:
 - Return ONLY the JSON, no markdown, no explanation`;
     }
 
-    // Try models in order until one works
-    const models = [
-      "gemini-2.0-flash",
-      "gemini-1.5-flash",
-      "gemini-1.5-flash-latest",
-      "gemini-pro"
-    ];
+    const fullPrompt = systemText + "\n\nUser: " + prompt;
 
-    let lastError = "";
-    for (const model of models) {
-      const geminiBody = {
-        system_instruction: { parts: [{ text: systemText }] },
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.3, maxOutputTokens: 1024 }
-      };
+    // AQ. keys use a different auth method - Bearer token in header
+    // AIzaSy keys use ?key= query param
+    let geminiRes;
+    const models = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-pro"];
 
-      const geminiRes = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`,
-        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(geminiBody) }
-      );
+    const geminiBody = {
+      contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
+      generationConfig: { temperature: 0.3, maxOutputTokens: 1024 }
+    };
 
-      if (geminiRes.ok) {
-        const data = await geminiRes.json();
-        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-        console.log(`Success with model: ${model}`);
-        return res.status(200).json({ result: text });
+    if (GEMINI_KEY.startsWith("AQ.") || GEMINI_KEY.startsWith("ya29.")) {
+      // OAuth Bearer token style
+      for (const model of models) {
+        geminiRes = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${GEMINI_KEY}`
+            },
+            body: JSON.stringify(geminiBody)
+          }
+        );
+        if (geminiRes.ok) break;
+        const err = await geminiRes.text();
+        console.error(`Bearer model ${model} failed:`, err);
+        geminiRes = null;
       }
-
-      lastError = await geminiRes.text();
-      console.error(`Model ${model} failed:`, lastError);
+    } else {
+      // Standard API key style (AIzaSy...)
+      for (const model of models) {
+        geminiRes = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(geminiBody)
+          }
+        );
+        if (geminiRes.ok) break;
+        const err = await geminiRes.text();
+        console.error(`API key model ${model} failed:`, err);
+        geminiRes = null;
+      }
     }
 
-    return res.status(500).json({ error: "All Gemini models failed", details: lastError });
+    if (!geminiRes || !geminiRes.ok) {
+      const errText = geminiRes ? await geminiRes.text() : "All models failed";
+      return res.status(500).json({ error: "Gemini API failed", details: errText });
+    }
+
+    const data = await geminiRes.json();
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    return res.status(200).json({ result: text });
 
   } catch (err) {
     console.error("Handler error:", err);
