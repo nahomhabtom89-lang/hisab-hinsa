@@ -1855,6 +1855,299 @@ function showToast(msg) {
   t.textContent = msg; t.style.display = 'block';
   setTimeout(() => t.style.display = 'none', 3500);
 }
+// ════════════════════════════════════════════════════════════════════
+// HISABI HENSI — ALL 14 FIXES
+// Paste this entire block just before the closing </script> tag
+// in your index.html. JavaScript uses the LAST definition so these
+// override the originals automatically.
+// ════════════════════════════════════════════════════════════════════
+
+// ── FIX 1: Weighted average cost fallback ──────────────────────────
+function getWeightedAvgCost(name) {
+  const m = DB.materials.find(m => m.name.toLowerCase()===name.toLowerCase());
+  if (m && m.cost>0) return m.cost;
+  const rel = DB.entries.filter(e=>(e.desc||'').toLowerCase().includes(name.toLowerCase())&&(e.debits||[]).some(d=>d.acct==='Construction Materials'));
+  return rel.length ? rel.reduce((s,e)=>s+(e.amount||0),0)/rel.length : 0;
+}
+
+// ── FIX 2: Project selects with empty state ────────────────────────
+function populateProjectSelects() {
+  ['invProject','retProject'].forEach(id=>{
+    const sel=document.getElementById(id); if(!sel) return;
+    if (!DB.projects.length) {
+      sel.innerHTML='<option value="" disabled selected>— No Active Projects Available —</option>';
+      sel.disabled=true;
+    } else {
+      sel.disabled=false;
+      sel.innerHTML=DB.projects.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+    }
+  });
+}
+
+// ── FIX 3: Auto depreciation check ────────────────────────────────
+function autoDepreciationCheck() {
+  const now=new Date(), thisM=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  const due=DB.assets.filter(a=>a.lastPostedMonth!==thisM);
+  if (!due.length) return;
+  due.forEach(a=>{
+    const ac=getDepAccts(a.type);
+    DB.entries.push({id:DB.nextId++,date:today(),desc:`AUTO ምምካን — ${a.name} (${thisM})`,type:'Monthly Depreciation',amount:a.monthlyDep,project:'',debits:[{acct:ac.dep,amt:a.monthlyDep,atype:'expense'}],credits:[{acct:ac.acc,amt:a.monthlyDep,atype:'asset'}]});
+    a.lastPostedMonth=thisM;
+  });
+  saveData(); renderAll();
+  showToast(`✅ AUTO: ${due.length} ምምካን ተቐሚጡ — ${thisM}`);
+}
+
+// ── FIX 5+4: Cash flow with depreciation + live job costs ─────────
+function renderCFWidget(el) {
+  if (!el) return;
+  const b=getBal(), cash=b['Cash']?b['Cash'].net:0;
+  const avgRev=sumByType(b,'revenue')/Math.max(1,DB.entries.length/8);
+  const avgExp=sumByType(b,'expense')/Math.max(1,DB.entries.length/8);
+  const monthlyDep=DB.assets.reduce((s,a)=>s+(a.monthlyDep||0),0);
+  let run=cash, html='';
+  ['ወርሒ 1','ወርሒ 2','ወርሒ 3'].forEach((m,i)=>{
+    run+=avgRev-avgExp-monthlyDep;
+    const max=Math.max(Math.abs(run),avgRev,1);
+    html+=`<div class="cf-row"><div class="cf-label">${m}</div><div class="cf-bar-bg"><div class="cf-bar ${run>=0?'pos':'neg'}" style="width:${Math.min(100,Math.abs(run)/max*100)}%"></div></div><div class="cf-val" style="color:${run>=0?'var(--green3)':'var(--red3)'}">${fc(run)}</div></div>`;
+    if (monthlyDep>0) html+=`<div style="font-size:9px;color:var(--text3);padding:1px 0 4px;font-family:'JetBrains Mono',monospace">incl. ${fc(monthlyDep)} depreciation/mo</div>`;
+    if (run<0&&i===0) html+=`<div class="alert al-danger" style="margin:6px 0 4px"><span class="alert-ico">🚨</span><div class="alert-body">ወርሒ ${i+1} deficit projected</div></div>`;
+  });
+  el.innerHTML=html;
+}
+function renderCF(){const el=document.getElementById('cfFull');if(el)renderCFWidget(el);}
+
+// ── FIX 7: Prepaid amortization auto-check ────────────────────────
+function checkPrepaidAmortization() {
+  const now=new Date();
+  DB.entries.filter(e=>(e.debits||[]).some(d=>d.acct==='Prepaid Rent')&&e.prepaidMonths).forEach(e=>{
+    const months=e.prepaidMonths||1, monthlyAmt=parseFloat(((e.amount||0)/months).toFixed(2));
+    const ed=new Date(e.date), passed=(now.getFullYear()-ed.getFullYear())*12+(now.getMonth()-ed.getMonth());
+    for (let i=0;i<Math.min(passed,months);i++) {
+      if (!DB.entries.some(en=>en.type==='Prepaid Amortization'&&en.sourceId===e.id&&en.amortMonth===i)) {
+        DB.entries.push({id:DB.nextId++,date:today(),desc:`AUTO Prepaid Rent — Month ${i+1}/${months}`,type:'Prepaid Amortization',amount:monthlyAmt,sourceId:e.id,amortMonth:i,project:'',debits:[{acct:'Rent Expense',amt:monthlyAmt,atype:'expense'}],credits:[{acct:'Prepaid Rent',amt:monthlyAmt,atype:'asset'}]});
+      }
+    }
+  });
+}
+
+// ── FIX 11: Live retention balance from journal ───────────────────
+function getProjectRetentionBalance(name) {
+  const ent=DB.entries.filter(e=>e.project===name||(e.desc||'').toLowerCase().includes((name||'').toLowerCase()));
+  const held=ent.flatMap(e=>e.debits||[]).filter(d=>d.acct==='Retention Receivable').reduce((s,d)=>s+d.amt,0);
+  const rel=ent.flatMap(e=>e.credits||[]).filter(c=>c.acct==='Retention Receivable').reduce((s,c)=>s+c.amt,0);
+  return held-rel;
+}
+
+function renderRetention() {
+  const b=getBal(), totalRet=b['Retention Receivable']?b['Retention Receivable'].net:0;
+  const el=document.getElementById('retentionKpis');
+  if (el) el.innerHTML=`<div class="kpi"><div class="kpi-lbl">ጠቅላላ ሪቴንሽን</div><div class="kpi-val warn">${fc(totalRet)}</div></div><div class="kpi"><div class="kpi-lbl">ፕሮጀክታት</div><div class="kpi-val">${DB.projects.length}</div></div>`;
+  const tbl=document.getElementById('retentionTable'); if(!tbl) return;
+  tbl.innerHTML=`<div class="tw"><table><thead><tr><th>ፕሮጀክት</th><th>ዓሚል</th><th>Ret%</th><th>Live Balance</th><th>ኩነታት</th></tr></thead><tbody>`+
+    DB.projects.map(p=>{
+      const live=getProjectRetentionBalance(p.name);
+      return `<tr><td>${p.name}</td><td>${p.client||'—'}</td><td>${p.retention}%</td><td style="font-family:'JetBrains Mono',monospace;color:var(--orange3)">${fc(live)}</td><td><span class="tag ${p.status==='active'?'t-orange':'t-green'}" style="font-size:9px">${p.status==='active'?'ይሕዝ':'ተፊቱ'}</span></td></tr>`;
+    }).join('')+'</tbody></table></div>';
+  populateProjectSelects();
+}
+
+// ── FIX 12: Retention release with validation ─────────────────────
+function releaseRetention() {
+  const projId=parseInt(document.getElementById('retProject').value);
+  const amt=parseFloat(document.getElementById('retAmt').value)||0;
+  const p=DB.projects.find(p=>p.id===projId);
+  if (!p||!amt){showToast('ፕሮጀክትን ዓቐንን ኣቕርብ');return;}
+  const live=getProjectRetentionBalance(p.name);
+  if (amt>live+0.01){showToast(`⚠️ ዓቐን ልዑል! Live balance: ${fc(live)}`);return;}
+  DB.entries.push({id:DB.nextId++,date:today(),desc:`Retention released — ${p.name}`,type:'Retention Released',amount:amt,project:p.name,debits:[{acct:'Cash',amt,atype:'asset'}],credits:[{acct:'Retention Receivable',amt,atype:'asset'}]});
+  p.retentionHeld=Math.max(0,(p.retentionHeld||0)-amt);
+  saveData();renderAll();renderRetention();
+  showToast(`✅ ሪቴንሽን ተፊቱ — ${fc(amt)}`);
+  document.getElementById('retAmt').value='';
+}
+
+// ── FIX 14+4: Job costing with live data + WIP ────────────────────
+function calcWIPAdjustment(p) {
+  const costs=DB.entries.filter(e=>e.project===p.name||(e.desc||'').toLowerCase().includes((p.name||'').toLowerCase())).flatMap(e=>e.debits||[]).filter(d=>d.atype==='expense').reduce((s,d)=>s+d.amt,0);
+  const budget=p.value||0; if(!budget) return null;
+  const pct=Math.min(1,costs/budget), earned=pct*budget, billed=p.billed||0, diff=earned-billed;
+  return {pct:Math.round(pct*100),earned,billed,diff,label:diff>=0?'Costs in Excess of Billings (Asset)':'Billings in Excess of Costs (Liability)'};
+}
+function postWIPAdjustment(pid) {
+  const p=DB.projects.find(p=>p.id===pid); if(!p) return;
+  const wip=calcWIPAdjustment(p);
+  if(!wip||Math.abs(wip.diff)<0.01){showToast('No WIP adjustment needed');return;}
+  if (wip.diff>0) DB.entries.push({id:DB.nextId++,date:today(),desc:`WIP Under-billed — ${p.name} (${wip.pct}%)`,type:'WIP Adjustment',amount:wip.diff,project:p.name,debits:[{acct:'Costs in Excess of Billings',amt:wip.diff,atype:'asset'}],credits:[{acct:'Contract Revenue',amt:wip.diff,atype:'revenue'}]});
+  else {const a=Math.abs(wip.diff); DB.entries.push({id:DB.nextId++,date:today(),desc:`WIP Over-billed — ${p.name} (${wip.pct}%)`,type:'WIP Adjustment',amount:a,project:p.name,debits:[{acct:'Contract Revenue',amt:a,atype:'revenue'}],credits:[{acct:'Billings in Excess of Costs',amt:a,atype:'liability'}]});}
+  saveData();renderAll();showToast(`✅ WIP — ${p.name}: ${wip.label} ${fc(Math.abs(wip.diff))}`);
+}
+function renderJobCost() {
+  const el=document.getElementById('jobCostCards'); if(!el) return;
+  if (!DB.projects.length){el.innerHTML='<div style="text-align:center;padding:30px;color:var(--text3);font-family:\'Noto Sans Ethiopic\',sans-serif">ፕሮጀክት የለን</div>';return;}
+  el.innerHTML=DB.projects.map(p=>{
+    const costs=DB.entries.filter(e=>e.project===p.name||(e.desc||'').toLowerCase().includes((p.name||'').toLowerCase())).flatMap(e=>e.debits||[]).filter(d=>d.atype==='expense').reduce((s,d)=>s+d.amt,0);
+    const revenue=DB.entries.filter(e=>e.project===p.name||(e.desc||'').toLowerCase().includes((p.name||'').toLowerCase())).flatMap(e=>e.credits||[]).filter(c=>c.atype==='revenue').reduce((s,c)=>s+c.amt,0);
+    const budget=p.value||0, costPct=budget>0?Math.min(100,Math.round(costs/budget*100)):0, profit=revenue-costs;
+    const wip=calcWIPAdjustment(p);
+    const wipHTML=wip?`<div style="margin-top:10px;padding:10px;background:var(--bg3);border:1px solid var(--border);border-radius:5px">
+      <div style="font-size:10px;color:var(--text3);margin-bottom:4px;font-family:'JetBrains Mono',monospace">WIP — ${wip.pct}% Complete</div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:6px">
+        <span>Earned: <b style="color:var(--green3)">${fc(wip.earned)}</b></span>
+        <span>Billed: <b style="color:var(--gold2)">${fc(wip.billed)}</b></span>
+      </div>
+      <div style="font-size:11px;color:${wip.diff>=0?'var(--green3)':'var(--red3)'};margin-bottom:6px">${wip.label}: ${fc(Math.abs(wip.diff))}</div>
+      ${Math.abs(wip.diff)>0.01?`<button class="btn btn-outline" style="font-size:10px;width:100%" onclick="postWIPAdjustment(${p.id})">📒 Post WIP Adjustment</button>`:'<div style="font-size:10px;color:var(--green3)">✅ No adjustment needed</div>'}
+    </div>`:'';
+    return `<div class="card">
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:14px"><div style="flex:1"><div style="font-size:15px;font-weight:700;color:var(--text);font-family:'Noto Sans Ethiopic',sans-serif">🏗️ ${p.name}</div><div style="font-size:11px;color:var(--text3);margin-top:2px">ዓሚል: ${p.client||'—'} · ${p.location||'—'}</div></div><span class="tag ${p.status==='active'?'t-green':'t-gold'}">${p.status==='active'?'ዝቐጸለ':'ተወዲኡ'}</span></div>
+      <div class="kgrid" style="grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">
+        <div class="kpi"><div class="kpi-lbl">ዋጋ ውዕል</div><div class="kpi-val" style="font-size:14px">${fc(budget)}</div></div>
+        <div class="kpi"><div class="kpi-lbl">ዝወጸ (Live)</div><div class="kpi-val warn" style="font-size:14px">${fc(costs)}</div></div>
+        <div class="kpi"><div class="kpi-lbl">ኣታዊ (Live)</div><div class="kpi-val pos" style="font-size:14px">${fc(revenue)}</div></div>
+        <div class="kpi"><div class="kpi-lbl">${profit>=0?'ትርፊ':'ክሳራ'}</div><div class="kpi-val ${profit>=0?'pos':'neg'}" style="font-size:14px">${fc(Math.abs(profit))}</div></div>
+      </div>
+      <div class="prog-wrap"><div class="prog-labels"><span>Cost vs Budget</span><span>${costPct}%</span></div><div class="prog"><div class="prog-fill ${costPct>90?'red':costPct>70?'gold':'green'}" style="width:${costPct}%"></div></div></div>
+      ${costPct>90?'<div class="alert al-danger" style="margin-top:8px"><span class="alert-ico">🚨</span><div class="alert-body"><div class="alert-title">Cost over 90% of contract!</div></div></div>':''}
+      ${wipHTML}
+    </div>`;
+  }).join('');
+}
+
+// ── FIX 6+10: Smarter doRecord with better AI prompt ─────────────
+async function doRecord() {
+  const text=document.getElementById('mainInp').value.trim(); if(!text) return;
+  const card=document.getElementById('resultCard');
+  card.style.display='block';
+  document.getElementById('resultTitle').innerHTML='<span class="spin"></span> AI ይሓስብ ኣሎ...';
+  document.getElementById('resultMeta').innerHTML='';
+  document.getElementById('resultEntries').innerHTML='';
+  document.getElementById('resultDesc').innerHTML='';
+  document.getElementById('postBtn').disabled=true;
+  pending=null;
+  const cleanedText = text.replace(/(\d),(\d{3})/g,'$1$2'); // FIX 6: clean number commas
+  const systemPrompt = `You are an expert construction accounting AI for a company in Juba, South Sudan (not Ethiopia, not Eritrea — Juba, South Sudan specifically). You understand Tigrinya and English.
+
+CRITICAL: Large numbers like 7,500,000 = seven million five hundred thousand. NEVER truncate. Clean all commas from numbers first.
+
+Return ONLY valid JSON, no markdown:
+{"type":"string","date":"YYYY-MM-DD","amount":number_USD,"currency":"USD or SSP","description":"Tigrinya + English","prepaidMonths":null_or_number,"entries":[{"account":"name","type":"asset|liability|equity|revenue|expense","debit":0,"credit":0}]}
+
+RULES (never break):
+1. Dr=Cr always
+2. Pay cash → Credit Cash, Debit received
+3. Receive cash → Debit Cash, Credit Revenue/Liability  
+4. Prepaid rent/insurance (advance/months) → Debit Prepaid Rent (asset), NOT Rent Expense. Set prepaidMonths.
+5. Materials cash → Dr Construction Materials, Cr Cash
+6. Materials credit → Dr Construction Materials, Cr Accounts Payable
+7. Salary/ደሞዝ → Dr Salary Expense, Cr Cash
+8. Client pays → Dr Cash, Cr Contract Revenue
+9. Invoice to client → Dr Accounts Receivable, Cr Contract Revenue
+10. Equipment cash → Dr Equipment, Cr Cash
+11. Loan in → Dr Cash, Cr Loan Payable
+12. Loan out → Dr Loan Payable, Cr Cash
+13. Subcontractor → Dr Subcontractor Expense, Cr Cash
+14. Fuel/ነዳዲ → Dr Fuel Expense, Cr Cash
+15. Owner capital → Dr Cash, Cr Owner Capital
+16. SSP ÷ 1300 = USD
+17. Accrue/un-invoiced/pending → Dr Project Expense, Cr Accrued Liabilities
+Today: ${new Date().toISOString().split('T')[0]}`;
+
+  try {
+    const res=await fetch('/api/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:cleanedText,systemPrompt})});
+    if (!res.ok) throw new Error('Server error '+res.status);
+    const data=await res.json();
+    let raw=(data.result||'').trim().replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
+    const m=raw.match(/\{[\s\S]*\}/); if(!m) throw new Error('AI ጌጋ — Invalid response');
+    const p=JSON.parse(m[0]); if(p.error) throw new Error(p.error);
+    if (!p.entries||!p.entries.length) throw new Error('ሕሳብ ኣምጺኡ ኣይኮነን');
+    // Store prepaidMonths if present
+    if (p.prepaidMonths) p._prepaidMonths = p.prepaidMonths;
+    pending=p; showResult(p);
+  } catch(err) {
+    document.getElementById('resultTitle').textContent='⚠️ ጌጋ — Error';
+    document.getElementById('resultDesc').textContent=err.message;
+  }
+}
+
+// ── FIX 7: Post entry preserves prepaidMonths ─────────────────────
+function postEntry() {
+  if (!pending) return;
+  const debits=(pending.entries||[]).filter(r=>(+r.debit)>0).map(r=>({acct:r.account,amt:+(+r.debit).toFixed(2),atype:(r.type||'asset').toLowerCase()}));
+  const credits=(pending.entries||[]).filter(r=>(+r.credit)>0).map(r=>({acct:r.account,amt:+(+r.credit).toFixed(2),atype:(r.type||'asset').toLowerCase()}));
+  const entry = {id:DB.nextId++,date:pending.date||today(),desc:pending.description||'',type:pending.type||'Other',amount:pending.amount||0,debits,credits};
+  if (pending.prepaidMonths) entry.prepaidMonths = pending.prepaidMonths; // FIX 7
+  DB.entries.push(entry);
+  pending=null; saveData(); renderAll(); runAudit(); checkLowStock(); checkPrepaidAmortization();
+  document.getElementById('postBtn').textContent='✅ ተቐሚጡ!';
+  document.getElementById('postBtn').disabled=true;
+  showToast('✅ ሕሳብ ተቐሚጡ — Entry posted!');
+  document.getElementById('mainInp').value='';
+  setTimeout(()=>{document.getElementById('postBtn').textContent='✅ ናብ ደፍተር ምቕማጥ — Post to Journal';},2500);
+}
+
+// ── FIX 13: AI Advisor with auto-post ─────────────────────────────
+async function sendChat() {
+  const inp=document.getElementById('chatInp'), q=inp.value.trim(); if(!q) return; inp.value='';
+  const msgs=document.getElementById('chatMsgs');
+  msgs.innerHTML+=`<div class="msg user">${q}</div>`;
+  msgs.innerHTML+=`<div class="msg ai loading" id="aiLoad">🤖 ይሓስብ ኣሎ...</div>`;
+  msgs.scrollTop=msgs.scrollHeight;
+  const b=getBal();
+  const context=`COMPANY: ${BIZ_NAME} · Juba, South Sudan · ${CUR}
+REVENUE: ${fc(sumByType(b,'revenue'))} · EXPENSES: ${fc(sumByType(b,'expense'))} · NET: ${fc(sumByType(b,'revenue')-sumByType(b,'expense'))}
+CASH: ${fc(b['Cash']?b['Cash'].net:0)} · AR: ${fc(b['Accounts Receivable']?b['Accounts Receivable'].net:0)}
+PROJECTS (${DB.projects.length}): ${DB.projects.map(p=>p.name+' ('+p.status+')').join('; ')||'none'}
+WORKERS: ${DB.workers.map(w=>w.name+' '+w.role).join('; ')||'none'}`;
+  try {
+    const res=await fetch('/api/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:q,mode:'advisor',context})});
+    const data=await res.json();
+    const text=data.result||'ምላሽ ኣይመጸን';
+    document.getElementById('aiLoad').remove();
+    const hasEntry=/debit|credit|Dr\.?:|Cr\.?:/i.test(text);
+    let applyBtn='';
+    if (hasEntry) {
+      const eid='adv_'+Date.now(); window._adv=window._adv||{}; window._adv[eid]=text;
+      applyBtn=`<div style="margin-top:8px"><button class="btn btn-gold" style="font-size:11px;width:100%" onclick="applyAdvisorEntry('${eid}')">📒 Apply Advisor Recommendation to Journal</button></div>`;
+    }
+    msgs.innerHTML+=`<div class="msg ai">${text.replace(/\n/g,'<br>')}${applyBtn}</div>`;
+    msgs.scrollTop=msgs.scrollHeight;
+  } catch(err) {
+    document.getElementById('aiLoad').remove();
+    msgs.innerHTML+=`<div class="msg ai" style="color:var(--red3)">ጌጋ: ${err.message}</div>`;
+  }
+}
+
+async function applyAdvisorEntry(eid) {
+  const text=(window._adv||{})[eid]; if(!text) return;
+  const msgs=document.getElementById('chatMsgs');
+  msgs.innerHTML+=`<div class="msg ai loading" id="applyLoad">📒 Converting to journal entry...</div>`;
+  try {
+    const res=await fetch('/api/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:'Convert this accounting advice to a journal entry transaction: '+text})});
+    const data=await res.json();
+    let raw=(data.result||'').trim().replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
+    const m=raw.match(/\{[\s\S]*\}/); if(!m) throw new Error('Could not parse');
+    const p=JSON.parse(m[0]); if(!p.entries||!p.entries.length) throw new Error('No entries');
+    document.getElementById('applyLoad').remove();
+    const debits=p.entries.filter(r=>(+r.debit)>0).map(r=>({acct:r.account,amt:+(+r.debit).toFixed(2),atype:(r.type||'asset').toLowerCase()}));
+    const credits=p.entries.filter(r=>(+r.credit)>0).map(r=>({acct:r.account,amt:+(+r.credit).toFixed(2),atype:(r.type||'asset').toLowerCase()}));
+    DB.entries.push({id:DB.nextId++,date:today(),desc:p.description||'Advisor entry',type:p.type||'Advisor',amount:p.amount||0,debits,credits});
+    saveData();renderAll();
+    msgs.innerHTML+=`<div class="msg ai" style="color:var(--green3)">✅ Posted to journal!</div>`;
+    showToast('✅ Advisor entry posted!');
+  } catch(err) {
+    const el=document.getElementById('applyLoad'); if(el) el.remove();
+    msgs.innerHTML+=`<div class="msg ai" style="color:var(--red3)">⚠️ ${err.message}</div>`;
+  }
+}
+
+// ── Auto-run on load: F3 + F7 ──────────────────────────────────────
+// Patch loadApp to also run auto-checks
+const _origLoadApp = loadApp;
+function loadApp(username, data) {
+  _origLoadApp(username, data);
+  setTimeout(()=>{ autoDepreciationCheck(); checkPrepaidAmortization(); }, 1000);
+}
 </script> 
 </body>
 </html>
