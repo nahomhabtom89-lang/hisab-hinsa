@@ -609,6 +609,9 @@ function toggleMic(){
 }
 function useChip(el){document.getElementById('mainInp').value=el.textContent;doRecord();}
 // F6+F10: doRecord with smart prompt
+// ═══════════════════════════════════════════════════════
+// REPLACE your existing doRecord() function with this
+// ═══════════════════════════════════════════════════════
 async function doRecord(){
   const rawText=document.getElementById('mainInp').value.trim();if(!rawText)return;
   const text=rawText.replace(/(\d),(\d)/g,'$1$2');
@@ -617,36 +620,19 @@ async function doRecord(){
   document.getElementById('resultTitle').innerHTML='<span class="spin"></span> AI ይሓስብ ኣሎ...';
   ['resultMeta','resultEntries','resultDesc'].forEach(id=>document.getElementById(id).innerHTML='');
   document.getElementById('postBtn').disabled=true;pending=null;
-  const sysP=`You are expert construction accounting AI. Company: Juba, South Sudan (NOT Ethiopia). Tigrinya+English.
-NUMBERS: 7,500,000=7500000 never truncate. Remove commas first.
-Return ONLY JSON no markdown:
-{"type":"str","date":"YYYY-MM-DD","amount":USD_number,"currency":"USD or SSP","description":"ti+en","prepaidMonths":null_or_number,"entries":[{"account":"name","type":"asset|liability|equity|revenue|expense","debit":0,"credit":0}]}
-RULES(never break):
-1.sum debits=sum credits
-2.pay cash->Cr Cash,Dr received
-3.receive cash->Dr Cash,Cr Revenue/Liability
-4.rent/insurance ADVANCE or "for X months"->Dr Prepaid Rent(asset),Cr Cash,prepaidMonths=X NEVER Rent Expense
-5.materials cash->Dr Construction Materials,Cr Cash
-6.materials credit->Dr Construction Materials,Cr Accounts Payable
-7.salary/ደሞዝ->Dr Salary Expense,Cr Cash
-8.client pays->Dr Cash,Cr Contract Revenue
-9.invoice to client->Dr Accounts Receivable,Cr Contract Revenue
-10.equipment->Dr Equipment,Cr Cash or Accounts Payable
-11.loan in->Dr Cash,Cr Loan Payable
-12.loan out->Dr Loan Payable,Cr Cash
-13.subcontractor->Dr Subcontractor Expense,Cr Cash
-14.fuel/ነዳዲ->Dr Fuel Expense,Cr Cash
-15.owner capital->Dr Cash,Cr Owner Capital
-16.SSP/1300=USD
-17.accrue/un-invoiced/pending->Dr Project Expense,Cr Accrued Liabilities
-18.accrue salary->Dr Salary Expense,Cr Accrued Salaries Payable
-19.reverse accrual->Dr Accrued Liabilities,Cr Project Expense
-Today:${today()}`;
+
+  // Send materials inventory to AI so it knows unit costs
+  const materialsContext = DB.materials.map(m=>({name:m.name,qty:m.qty,unit:m.unit,cost:m.cost}));
+
   try{
-    const res=await fetch('/api/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:text,systemPrompt:sysP})});
+    const res=await fetch('/api/ai',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({prompt:text, materials:materialsContext})
+    });
     if(!res.ok)throw new Error('Server error '+res.status);
     const data=await res.json();
-    let raw=(data.result||'').trim().replace(/^\`\`\`json\s*/i,'').replace(/^\`\`\`\s*/,'').replace(/\`\`\`\s*$/,'').trim();
+    let raw=(data.result||'').trim().replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
     const m=raw.match(/\{[\s\S]*\}/);if(!m)throw new Error('Invalid AI response');
     const p=JSON.parse(m[0]);if(p.error)throw new Error(p.error);
     if(!p.entries||!p.entries.length)throw new Error('No entries returned');
@@ -656,6 +642,37 @@ Today:${today()}`;
     document.getElementById('resultDesc').textContent=err.message;
   }
 }
+
+// ═══════════════════════════════════════════════════════
+// REPLACE your existing postEntry() function with this
+// ═══════════════════════════════════════════════════════
+
+  if(!pending)return;
+  const deb=(pending.entries||[]).filter(r=>(+r.debit)>0).map(r=>({acct:r.account,amt:+(+r.debit).toFixed(2),atype:(r.type||'asset').toLowerCase()}));
+  const cred=(pending.entries||[]).filter(r=>(+r.credit)>0).map(r=>({acct:r.account,amt:+(+r.credit).toFixed(2),atype:(r.type||'asset').toLowerCase()}));
+  const entry={id:DB.nextId++,date:pending.date||today(),desc:pending.description||'',type:pending.type||'Other',amount:pending.amount||0,debits:deb,credits:cred};
+  if(pending.prepaidMonths)entry.prepaidMonths=pending.prepaidMonths;
+
+  // FIX: if material usage, deduct from inventory stock
+  if(pending.materialUsage){
+    const mu=pending.materialUsage;
+    const mat=DB.materials.find(m=>m.name.toLowerCase()===(mu.name||'').toLowerCase());
+    if(mat){
+      const oldQty=mat.qty;
+      mat.qty=Math.max(0,mat.qty-(mu.qty||0));
+      console.log(`Stock deducted: ${mat.name} ${oldQty} → ${mat.qty}`);
+    }
+  }
+
+  DB.entries.push(entry);
+  pending=null;saveData();renderAll();runAudit();checkPrepaidAmortization();
+  document.getElementById('postBtn').textContent='✅ Posted!';
+  document.getElementById('postBtn').disabled=true;
+  showToast('✅ Entry posted!');
+  document.getElementById('mainInp').value='';
+  setTimeout(()=>{document.getElementById('postBtn').textContent='✅ ናብ ደፍተር — Post to Journal';},2500);
+}
+
 function showResult(e){
   document.getElementById('resultTitle').textContent='ትንታነ AI';
   document.getElementById('resultType').textContent=(e.type||'—').toUpperCase();
@@ -677,10 +694,21 @@ function postEntry(){
   const cred=(pending.entries||[]).filter(r=>(+r.credit)>0).map(r=>({acct:r.account,amt:+(+r.credit).toFixed(2),atype:(r.type||'asset').toLowerCase()}));
   const entry={id:DB.nextId++,date:pending.date||today(),desc:pending.description||'',type:pending.type||'Other',amount:pending.amount||0,debits:deb,credits:cred};
   if(pending.prepaidMonths)entry.prepaidMonths=pending.prepaidMonths;
+
+  if(pending.materialUsage){
+    const mu=pending.materialUsage;
+    const mat=DB.materials.find(m=>m.name.toLowerCase()===(mu.name||'').toLowerCase());
+    if(mat){
+      mat.qty=Math.max(0,mat.qty-(mu.qty||0));
+    }
+  }
+
   DB.entries.push(entry);
   pending=null;saveData();renderAll();runAudit();checkPrepaidAmortization();
-  document.getElementById('postBtn').textContent='✅ Posted!';document.getElementById('postBtn').disabled=true;
-  showToast('✅ Entry posted!');document.getElementById('mainInp').value='';
+  document.getElementById('postBtn').textContent='✅ Posted!';
+  document.getElementById('postBtn').disabled=true;
+  showToast('✅ Entry posted!');
+  document.getElementById('mainInp').value='';
   setTimeout(()=>{document.getElementById('postBtn').textContent='✅ ናብ ደፍተር — Post to Journal';},2500);
 }
 function deleteEntry(id){if(!confirm('Delete?'))return;DB.entries=DB.entries.filter(e=>e.id!==id);saveData();renderAll();showToast('Deleted');}
