@@ -6,7 +6,7 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   try {
-    const { prompt, mode, context, systemPrompt } = req.body;
+    const { prompt, mode, context, systemPrompt, materials } = req.body;
     if (!prompt) return res.status(400).json({ error: "prompt is required" });
 
     const GROQ_KEY = process.env.GROQ_KEY;
@@ -15,57 +15,56 @@ export default async function handler(req, res) {
     let systemText = "";
 
     if (mode === "advisor") {
-      systemText = `You are an expert construction accounting advisor for a company in Juba, South Sudan (NOT Ethiopia). You speak Tigrinya and English. Reply in the same language the user uses. Here is the company data:\n${context || ""}\nGive clear, practical advice. Be concise.`;
+      systemText = `You are an expert construction accounting advisor for a company in Juba, South Sudan. You speak Tigrinya and English. Reply in the same language the user uses.\nCompany data:\n${context || ""}\nGive clear practical advice.`;
 
     } else if (systemPrompt) {
       systemText = systemPrompt;
 
     } else {
-      systemText = `You are an expert construction accounting AI for a company in Juba, South Sudan (NOT Ethiopia, NOT Eritrea). You understand Tigrinya and English perfectly.
+      // Build materials context for AI
+      const matContext = materials && materials.length > 0
+        ? `\nCURRENT INVENTORY (use these unit costs for material usage):\n${materials.map(m => `- ${m.name}: ${m.qty} ${m.unit} @ $${m.cost}/unit`).join('\n')}`
+        : '';
 
-CRITICAL NUMBER RULE: 7,500,000 = seven million five hundred thousand. NEVER truncate. Remove commas: 7,500,000 = 7500000.
+      systemText = `You are an expert construction accounting AI for a company in Juba, South Sudan. You understand Tigrinya and English.
+
+CRITICAL NUMBER RULE: Numbers like 7,500,000 = 7500000. NEVER use SSP prices as USD. Remove commas first.
+${matContext}
 
 Return ONLY valid JSON — no markdown, no text outside JSON:
-{"type":"string","date":"YYYY-MM-DD","amount":number_USD,"currency":"USD or SSP","description":"Tigrinya + English","prepaidMonths":null,"entries":[{"account":"name","type":"asset|liability|equity|revenue|expense","debit":0,"credit":0}]}
+{"type":"string","date":"YYYY-MM-DD","amount":number_USD,"currency":"USD","description":"description","prepaidMonths":null,"materialUsage":null,"entries":[{"account":"name","type":"asset|liability|equity|revenue|expense","debit":0,"credit":0}]}
 
-MATERIAL USAGE RULE (very important):
-When someone says "used X bags/units of [material] for [project]" — this is consuming inventory, NOT buying.
-- If you know the unit cost: Dr Work in Progress (asset), Cr Construction Materials (asset)
-- If you do NOT know the unit cost: USE amount=1 as placeholder and STILL return valid JSON with Dr Work in Progress, Cr Construction Materials. NEVER return an error for material usage.
-- The amount for material usage = quantity x unit_cost. If unit_cost unknown, use 1 per unit as placeholder.
+MATERIAL USAGE (when someone says "used X bags/units of [material] on project"):
+- Look up the unit cost from CURRENT INVENTORY above
+- amount = quantity x unit_cost
+- Set "materialUsage": {"name": "cement", "qty": 15}  <- so frontend can deduct stock
+- Entry: Dr Work in Progress (asset), Cr Construction Materials (asset)
+- currency is always "USD" for material usage
 
 ACCOUNTING RULES:
-1. Sum of debits = sum of credits ALWAYS
+1. Debits = Credits ALWAYS
 2. Pay cash → Cr Cash, Dr received
 3. Receive cash → Dr Cash, Cr Revenue/Liability
-4. Rent/insurance ADVANCE or "for X months" → Dr Prepaid Rent (asset), Cr Cash. Set prepaidMonths=X. NEVER Rent Expense for advance.
+4. Rent ADVANCE / "for X months" → Dr Prepaid Rent (asset), Cr Cash, prepaidMonths=X
 5. Buy materials cash → Dr Construction Materials, Cr Cash
 6. Buy materials credit → Dr Construction Materials, Cr Accounts Payable
-7. USE/consume materials on site → Dr Work in Progress, Cr Construction Materials
+7. USE materials on site → Dr Work in Progress, Cr Construction Materials. Use inventory cost.
 8. Salary/ደሞዝ → Dr Salary Expense, Cr Cash
 9. Client pays → Dr Cash, Cr Contract Revenue
 10. Invoice to client → Dr Accounts Receivable, Cr Contract Revenue
-11. Equipment cash → Dr Equipment, Cr Cash
+11. Equipment → Dr Equipment, Cr Cash or Accounts Payable
 12. Loan in → Dr Cash, Cr Loan Payable
 13. Loan out → Dr Loan Payable, Cr Cash
 14. Subcontractor → Dr Subcontractor Expense, Cr Cash
-15. Fuel/ነዳዲ → Dr Fuel Expense, Cr Cash
+15. Fuel → Dr Fuel Expense, Cr Cash
 16. Owner capital → Dr Cash, Cr Owner Capital
-17. SSP ÷ ${1300} = USD
-18. Accrue/un-invoiced/pending → Dr Project Expense, Cr Accrued Liabilities
+17. SSP ÷ 1300 = USD (only for SSP transactions, not for material usage)
+18. Accrue/un-invoiced → Dr Project Expense, Cr Accrued Liabilities
 19. Accrue salary unpaid → Dr Salary Expense, Cr Accrued Salaries Payable
-20. Reverse accrual → Dr Accrued Liabilities, Cr Project Expense
-
-ACCOUNTS:
-Assets: Cash, Petty Cash, Accounts Receivable, Retention Receivable, Construction Materials, Prepaid Rent, Prepaid Insurance, Equipment, Vehicles, Work in Progress, Costs in Excess of Billings, Accumulated Depreciation - Equipment
-Liabilities: Accounts Payable, Loan Payable, Retention Payable, Accrued Liabilities, Accrued Salaries Payable, Billings in Excess of Costs
-Equity: Owner Capital, Retained Earnings
-Revenue: Contract Revenue, Other Income
-Expenses: Salary Expense, Subcontractor Expense, Fuel Expense, Rent Expense, Depreciation Expense - Equipment, Repairs and Maintenance Expense, Office Supplies Expense, Miscellaneous Expense, Project Expense
 
 Today: ${new Date().toISOString().split('T')[0]}
 
-IMPORTANT: You MUST always return valid JSON. NEVER return an error message or plain text. If you are unsure about amounts, use a best estimate. If unit cost is unknown for material usage, use quantity x 1 as the amount placeholder.`;
+ALWAYS return valid JSON. NEVER return an error. If unsure about amount, use best estimate.`;
     }
 
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
