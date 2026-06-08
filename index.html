@@ -642,11 +642,7 @@ async function doRecord(){
     document.getElementById('resultDesc').textContent=err.message;
   }
 }
-
-// ═══════════════════════════════════════════════════════
-// REPLACE your existing postEntry() function with this
-// ═══════════════════════════════════════════════════════
-
+  function postEntry(){
   if(!pending)return;
   const deb=(pending.entries||[]).filter(r=>(+r.debit)>0).map(r=>({acct:r.account,amt:+(+r.debit).toFixed(2),atype:(r.type||'asset').toLowerCase()}));
   const cred=(pending.entries||[]).filter(r=>(+r.credit)>0).map(r=>({acct:r.account,amt:+(+r.credit).toFixed(2),atype:(r.type||'asset').toLowerCase()}));
