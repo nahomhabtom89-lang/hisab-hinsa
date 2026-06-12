@@ -98,4 +98,4 @@ ALWAYS return valid JSON. NEVER return an error. If unsure about amount, use bes
     console.error("Handler error:", err);
     return res.status(500).json({ error: "Internal server error", details: err.message });
   }
-}
+} 
