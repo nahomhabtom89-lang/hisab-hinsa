@@ -19,7 +19,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .lf{margin-bottom:14px}.lf label{display:block;font-family:'Noto Sans Ethiopic',sans-serif;font-size:11px;color:var(--text2);margin-bottom:5px}
 .lf input,.lf select{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:10px 13px;font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text);outline:none;transition:border-color .2s}
 .lf input:focus,.lf select:focus{border-color:var(--gold2)}.lf select option{background:var(--bg3)}
-.login-btn{width:100%;padding:13px;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#0a0e17;border:none;border-radius:6px;font-family:'Noto Sans Ethiopic',sans-serif;font-size:15px;font-weight:700;cursor:pointer;margin-top:6px;transition:opacity .15s}.login-btn:hover{opacity:.9}
+.login-btn{width:100%;padding:13px;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#0a0e17;border:none;border-radius:6px;font-family:'Noto Sans Ethiopic',sans-serif;font-size:15px;font-weight:700;cursor:pointer;margin-top:6px}.login-btn:hover{opacity:.9}
 .login-err{font-size:12px;color:var(--red3);text-align:center;margin-top:8px;display:none;font-family:'Noto Sans Ethiopic',sans-serif}
 .login-switch{text-align:center;margin-top:14px;font-size:12px;color:var(--text3);font-family:'Noto Sans Ethiopic',sans-serif}.login-switch a{color:var(--gold2);cursor:pointer}
 #mainApp{display:none}.shell{display:grid;grid-template-columns:240px 1fr;grid-template-rows:56px 1fr;min-height:100vh}
@@ -27,7 +27,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .tb-brand{font-family:'Noto Sans Ethiopic',sans-serif;font-size:16px;font-weight:700;color:var(--gold3);flex:1}
 .tb-biz{font-size:11px;color:var(--text2);font-family:'JetBrains Mono',monospace}
 .tb-cur{display:flex;gap:4px;align-items:center}.cur-btn{padding:4px 10px;border-radius:4px;border:1px solid var(--border2);background:transparent;font-size:11px;cursor:pointer;font-family:'JetBrains Mono',monospace;color:var(--text2);transition:all .15s}.cur-btn.on{background:var(--gold);color:#0a0e17;border-color:var(--gold);font-weight:600}
-.tb-btn{padding:6px 12px;background:transparent;border:1px solid var(--border2);border-radius:5px;color:var(--text2);font-size:11px;cursor:pointer;transition:all .15s;font-family:'JetBrains Mono',monospace}.tb-btn:hover{border-color:var(--gold2);color:var(--gold2)}
+.tb-btn{padding:6px 12px;background:transparent;border:1px solid var(--border2);border-radius:5px;color:var(--text2);font-size:11px;cursor:pointer;font-family:'JetBrains Mono',monospace}.tb-btn:hover{border-color:var(--gold2);color:var(--gold2)}
 .tb-alert{padding:4px 10px;background:rgba(240,112,112,.1);border:1px solid rgba(240,112,112,.3);border-radius:4px;font-size:10px;color:var(--red3);font-family:'JetBrains Mono',monospace;display:none;cursor:pointer}
 .sidebar{grid-column:1;grid-row:2;background:var(--bg2);border-right:1px solid var(--border);padding:16px 10px;overflow-y:auto;position:sticky;top:56px;height:calc(100vh - 56px)}
 .sb-section{margin-bottom:6px}.sb-section-label{font-size:9px;text-transform:uppercase;letter-spacing:.14em;color:var(--text3);padding:6px 10px 4px;font-family:'JetBrains Mono',monospace}
@@ -40,14 +40,13 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .ph{margin-bottom:20px}.ph h1{font-family:'Noto Sans Ethiopic',sans-serif;font-size:20px;font-weight:700;color:var(--text);margin-bottom:3px}.ph p{font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace}
 .card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:16px}
 .card-hdr{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:var(--text2);margin-bottom:14px;display:flex;align-items:center;gap:7px;font-family:'Noto Sans Ethiopic',sans-serif}
-.card-hdr .en{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text3)}
 .kgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:12px;margin-bottom:16px}
 .kpi{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;position:relative;overflow:hidden}
 .kpi::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--gold),var(--gold2))}
 .kpi-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:var(--text3);margin-bottom:6px;font-family:'Noto Sans Ethiopic',sans-serif}
 .kpi-val{font-size:19px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--text);line-height:1.2}
 .kpi-val.pos{color:var(--green3)}.kpi-val.neg{color:var(--red3)}.kpi-val.warn{color:var(--orange3)}
-.kpi-sub{font-size:10px;color:var(--text3);margin-top:4px;font-family:'Noto Sans Ethiopic',sans-serif}
+.kpi-sub{font-size:10px;color:var(--text3);margin-top:4px}
 .alert{border-radius:6px;padding:12px 14px;margin-bottom:12px;font-size:12px;display:flex;align-items:flex-start;gap:10px;border:1px solid;font-family:'Noto Sans Ethiopic',sans-serif}
 .alert-ico{font-size:16px;flex-shrink:0;margin-top:1px}.alert-body{flex:1;line-height:1.5}.alert-title{font-weight:600;margin-bottom:2px}
 .al-warn{background:rgba(176,96,16,.08);border-color:rgba(224,128,32,.3);color:var(--orange3)}.al-danger{background:rgba(139,26,26,.08);border-color:rgba(192,48,42,.3);color:var(--red3)}
@@ -59,8 +58,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .btn{padding:9px 16px;border-radius:5px;border:none;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;font-family:'Noto Sans Ethiopic',sans-serif}
 .btn-gold{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#0a0e17}.btn-gold:hover{opacity:.88}
 .btn-outline{background:transparent;border:1px solid var(--border2);color:var(--text2)}.btn-outline:hover{border-color:var(--gold2);color:var(--gold2)}
-.btn-danger{background:transparent;border:1px solid rgba(192,48,42,.4);color:var(--red3)}.btn-danger:hover{background:rgba(139,26,26,.1)}
-.btn-green{background:linear-gradient(135deg,var(--green),var(--green2));color:#fff}.btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.btn-danger{background:transparent;border:1px solid rgba(192,48,42,.4);color:var(--red3)}.btn-green{background:linear-gradient(135deg,var(--green),var(--green2));color:#fff}.btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 .tw{overflow-x:auto;border:1px solid var(--border);border-radius:6px;margin-bottom:12px}
 table{width:100%;border-collapse:collapse;font-size:12px}
 thead th{background:var(--bg3);color:var(--text2);font-size:9px;text-transform:uppercase;letter-spacing:.1em;padding:10px 12px;text-align:left;white-space:nowrap;border-bottom:1px solid var(--border);font-family:'JetBrains Mono',monospace}
@@ -72,7 +70,7 @@ tbody td{padding:9px 12px;border-bottom:1px solid var(--border);color:var(--text
 .prog-wrap{margin-bottom:8px}.prog-labels{display:flex;justify-content:space-between;font-size:10px;color:var(--text2);margin-bottom:4px;font-family:'JetBrains Mono',monospace}
 .prog{height:5px;background:var(--bg4);border-radius:3px;overflow:hidden}.prog-fill{height:100%;border-radius:3px;transition:width .6s ease}
 .prog-fill.gold{background:linear-gradient(90deg,var(--gold),var(--gold2))}.prog-fill.green{background:linear-gradient(90deg,var(--green),var(--green2))}
-.prog-fill.red{background:linear-gradient(90deg,var(--red2),var(--red3))}.prog-fill.blue{background:linear-gradient(90deg,var(--blue),var(--blue2))}
+.prog-fill.red{background:linear-gradient(90deg,var(--red2),var(--red3))}
 .hero-input-card{background:linear-gradient(135deg,var(--bg2),var(--bg3));border:1px solid var(--border2);border-radius:10px;padding:20px;margin-bottom:16px;position:relative;overflow:hidden}
 .hero-input-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--gold),var(--gold2),var(--gold3))}
 .hero-lbl{font-family:'Noto Sans Ethiopic',sans-serif;font-size:13px;color:var(--text2);margin-bottom:10px;display:flex;align-items:center;gap:8px}
@@ -80,10 +78,10 @@ tbody td{padding:9px 12px;border-bottom:1px solid var(--border);color:var(--text
 .hero-inp{flex:1;background:var(--bg);border:1.5px solid var(--border2);border-radius:6px;padding:12px 14px;font-family:'Noto Sans Ethiopic',sans-serif;font-size:14px;color:var(--text);outline:none;transition:border-color .2s}
 .hero-inp:focus{border-color:var(--gold2)}.hero-inp::placeholder{color:var(--text3)}
 .hero-send{padding:12px 18px;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#0a0e17;border:none;border-radius:6px;font-size:18px;cursor:pointer;font-weight:700;flex-shrink:0}
-.mic-btn{padding:12px 14px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;font-size:18px;cursor:pointer;flex-shrink:0;transition:all .15s}
+.mic-btn{padding:12px 14px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;font-size:18px;cursor:pointer;flex-shrink:0}
 .mic-btn.on{border-color:var(--red3);background:rgba(139,26,26,.2);animation:pulse 1s ease-in-out infinite}
 @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(192,48,42,.4)}50%{box-shadow:0 0 0 8px rgba(192,48,42,0)}}
-.chips{display:flex;gap:6px;flex-wrap:wrap}.chip{padding:5px 12px;border:1px solid var(--border2);border-radius:20px;font-size:11px;color:var(--text3);cursor:pointer;font-family:'Noto Sans Ethiopic',sans-serif;transition:all .15s}.chip:hover{border-color:var(--gold2);color:var(--gold2)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}.chip{padding:5px 12px;border:1px solid var(--border2);border-radius:20px;font-size:11px;color:var(--text3);cursor:pointer;font-family:'Noto Sans Ethiopic',sans-serif}.chip:hover{border-color:var(--gold2);color:var(--gold2)}
 .result-card{display:none;background:var(--bg2);border:1.5px solid var(--gold);border-radius:var(--radius);padding:18px;margin-bottom:16px;animation:fi .3s ease}
 .result-hdr{display:flex;align-items:center;gap:8px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)}.result-hdr h3{font-family:'Noto Sans Ethiopic',sans-serif;font-size:14px;color:var(--text);flex:1}
 .result-type{font-size:10px;padding:3px 10px;background:var(--bg3);color:var(--gold3);border-radius:3px;font-family:'JetBrains Mono',monospace;text-transform:uppercase;border:1px solid rgba(196,154,42,.3)}
@@ -96,7 +94,7 @@ tbody td{padding:9px 12px;border-bottom:1px solid var(--border);color:var(--text
 .chat-inp-row{display:flex;gap:8px}.chat-inp{flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:11px 13px;font-family:'Noto Sans Ethiopic',sans-serif;font-size:13px;color:var(--text);outline:none}.chat-inp:focus{border-color:var(--gold2)}
 .audit-item{display:flex;gap:12px;padding:13px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;margin-bottom:8px}
 .audit-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px}.audit-dot.high{background:var(--red3)}.audit-dot.med{background:var(--orange3)}.audit-dot.low{background:var(--green3)}
-.audit-info{flex:1}.audit-title{font-size:12px;font-weight:600;color:var(--text);margin-bottom:3px;font-family:'Noto Sans Ethiopic',sans-serif}.audit-desc{font-size:11px;color:var(--text2);line-height:1.5}.audit-meta{font-size:10px;color:var(--text3);margin-top:4px;font-family:'JetBrains Mono',monospace}
+.audit-info{flex:1}.audit-title{font-size:12px;font-weight:600;color:var(--text);margin-bottom:3px}.audit-desc{font-size:11px;color:var(--text2);line-height:1.5}.audit-meta{font-size:10px;color:var(--text3);margin-top:4px;font-family:'JetBrains Mono',monospace}
 .invoice-preview{background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:20px;font-family:'JetBrains Mono',monospace;font-size:12px}
 .invoice-preview h2{font-family:'Noto Sans Ethiopic',sans-serif;font-size:16px;color:var(--gold3);margin-bottom:4px}
 .invoice-row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);color:var(--text2)}.invoice-row.total{color:var(--text);font-weight:700;border-top:2px solid var(--gold);border-bottom:none;margin-top:4px;padding-top:8px}
@@ -130,885 +128,72 @@ tbody td{padding:9px 12px;border-bottom:1px solid var(--border);color:var(--text
 </style>
 </head>
 <body>
-<div id="loginScreen">
-  <div class="login-wrap">
-    <div class="login-brand"><span class="logo-icon">🏗️</span><h1>ሒሳቢ ሃንሲ</h1><div class="sub">Hisabi Hensi · Construction Accounting AI · Juba</div></div>
-    <div class="login-card">
-      <h2>ኣቱ / ምዝጋብ — Login / Register</h2>
-      <div class="lf"><label>ስም ተጠቃሚ</label><input id="lu" type="text" placeholder="username" autocomplete="username"/></div>
-      <div class="lf"><label>ምስጢር</label><input id="lp" type="password" placeholder="password" autocomplete="current-password"/></div>
-      <div class="lf" id="regFields" style="display:none"><label>ስም ኩባንያ</label><input id="lb" type="text" placeholder="Riji Construction"/></div>
-      <button class="login-btn" onclick="doLogin()">🔓 ኣቱ — Login</button>
-      <div class="login-err" id="lerr">ስም ወይ ምስጢር ጌጋ</div>
-      <div class="login-switch">ሓድሽ ሕሳብ? <a onclick="toggleReg()">ምዝጋብ</a></div>
-    </div>
-  </div>
-</div>
+<div id="loginScreen"><div class="login-wrap"><div class="login-brand"><span class="logo-icon">🏗️</span><h1>ሒሳቢ ሃንሲ</h1><div class="sub">Hisabi Hensi · Construction Accounting AI · Juba</div></div><div class="login-card"><h2>ኣቱ / ምዝጋብ — Login / Register</h2><div class="lf"><label>ስም ተጠቃሚ</label><input id="lu" type="text" placeholder="username" autocomplete="username"/></div><div class="lf"><label>ምስጢር</label><input id="lp" type="password" placeholder="password" autocomplete="current-password"/></div><div class="lf" id="regFields" style="display:none"><label>ስም ኩባንያ</label><input id="lb" type="text" placeholder="Riji Construction"/></div><button class="login-btn" onclick="doLogin()">🔓 ኣቱ — Login</button><div class="login-err" id="lerr">ስም ወይ ምስጢር ጌጋ</div><div class="login-switch">ሓድሽ ሕሳብ? <a onclick="toggleReg()">ምዝጋብ</a></div></div></div></div>
 <div id="mainApp"><div class="shell">
-  <div class="topbar">
-    <div class="tb-brand">🏗️ ሒሳቢ ሃንሲ</div><div class="tb-biz" id="tbBiz">—</div>
-    <div class="tb-cur"><button class="cur-btn on" id="cur-usd" onclick="setCur('USD')">USD $</button><button class="cur-btn" id="cur-ssp" onclick="setCur('SSP')">SSP £</button></div>
-    <div class="tb-alert" id="tbAlert" onclick="nav('audit',null)">⚠️ <span id="tbAlertTxt">0</span> ጉድለት</div>
-    <button class="tb-btn no-print" onclick="window.print()">🖨️</button>
-    <button class="tb-btn no-print" onclick="doLogout()" style="color:var(--red3)">ምውጻእ</button>
-  </div>
-  <div class="sidebar" id="sidebar">
-    <div class="sb-section">
-      <div class="sb-section-label">ዕለታዊ — Daily</div>
-      <div class="sb-item on" onclick="nav('home',this)"><span class="sb-ico">🎙️</span>ሓድሽ ምዝጋብ<span class="en">Record</span></div>
-      <div class="sb-item" onclick="nav('petty',this)"><span class="sb-ico">💵</span>ንዋት ጥረ<span class="en">Petty Cash</span></div>
-      <div class="sb-item" onclick="nav('mobilemoney',this)"><span class="sb-ico">📱</span>ሞባይል ገንዘብ<span class="en">Mobile Money</span></div>
-      <div class="sb-item" onclick="nav('materials',this)"><span class="sb-ico">🧱</span>ሸቀጥ<span class="en">Materials</span></div>
-      <div class="sb-item" onclick="nav('deliveries',this)"><span class="sb-ico">🚚</span>ምብጻሕ<span class="en">Deliveries</span></div>
-      <div class="sb-item" onclick="nav('workers',this)"><span class="sb-ico">👷</span>ሰራሕተኛ<span class="en">Workers</span></div>
-    </div>
-    <div class="sb-section">
-      <div class="sb-section-label">ፕሮጀክት</div>
-      <div class="sb-item" onclick="nav('projects',this)"><span class="sb-ico">🏗️</span>ፕሮጀክታት<span class="en">Projects</span><span class="sb-badge gold" id="projBadge">0</span></div>
-      <div class="sb-item" onclick="nav('invoice',this)"><span class="sb-ico">🧾</span>ኢንቮይስ<span class="en">Invoice</span></div>
-      <div class="sb-item" onclick="nav('retention',this)"><span class="sb-ico">🔒</span>ሪቴንሽን<span class="en">Retention</span></div>
-    </div>
-    <div class="sb-section">
-      <div class="sb-section-label">ሓላፍ ሒሳቢ</div>
-      <div class="sb-item" onclick="nav('journal',this)"><span class="sb-ico">📒</span>ደፍተር<span class="en">Journal</span><span class="sb-badge" id="jBadge">0</span></div>
-      <div class="sb-item" onclick="nav('ledger',this)"><span class="sb-ico">📗</span>ሌጀር<span class="en">Ledger</span></div>
-      <div class="sb-item" onclick="nav('trial',this)"><span class="sb-ico">⚖️</span>ፈተነ ሚዛን<span class="en">Trial</span></div>
-      <div class="sb-item" onclick="nav('income',this)"><span class="sb-ico">💰</span>ትርፊ/ክሳራ<span class="en">Income</span></div>
-      <div class="sb-item" onclick="nav('balance',this)"><span class="sb-ico">🏛️</span>ሚዛን ሓሳብ<span class="en">Balance</span></div>
-      <div class="sb-item" onclick="nav('cashflow',this)"><span class="sb-ico">📈</span>ትንበያ<span class="en">Forecast</span></div>
-      <div class="sb-item" onclick="nav('jobcost',this)"><span class="sb-ico">🔢</span>ዋጋ ፕሮጀክት<span class="en">Job Cost</span></div>
-    </div>
-    <div class="sb-section">
-      <div class="sb-section-label">AI ሓጋዚ</div>
-      <div class="sb-item" onclick="nav('advisor',this)"><span class="sb-ico">🤖</span>AI ሓጋዚ<span class="en">Advisor</span></div>
-      <div class="sb-item" onclick="nav('audit',this)"><span class="sb-ico">🔍</span>ምርመራ<span class="en">Audit</span><span class="sb-badge" id="auditBadge">0</span></div>
-      <div class="sb-item" onclick="nav('depreciation',this)"><span class="sb-ico">📉</span>ምምካን<span class="en">Depreciation</span></div>
-      <div class="sb-item" onclick="nav('settings',this)"><span class="sb-ico">⚙️</span>ቅጥዒ<span class="en">Settings</span></div>
-    </div>
-  </div>
-  <div class="main">
-    <div class="page on" id="pg-home">
-      <div id="homeAlerts"></div>
-      <div class="hero-input-card">
-        <div class="hero-lbl">🎙️ ሎሚ እንታይ ዓሚልካ? <span style="font-size:10px;color:var(--text3)">(ብትግርኛ ወይ ብእንግሊዝ)</span></div>
-        <div class="hero-inp-row">
-          <button class="mic-btn" id="micBtn" onclick="toggleMic()">🎙️</button>
-          <input class="hero-inp" id="mainInp" placeholder="ደሞዝ 500 USD · cement 50 bags · rent 1000 USD for 6 months · accrue salary 2000..."/>
-          <button class="hero-send" onclick="doRecord()">↗</button>
-        </div>
-        <div class="chips">
-          <div class="chip" onclick="useChip(this)">ደሞዝ ከፈልና</div>
-          <div class="chip" onclick="useChip(this)">ሲሚንቶ ዓደግና</div>
-          <div class="chip" onclick="useChip(this)">ነዳዲ ሸቀጥ</div>
-          <div class="chip" onclick="useChip(this)">ሰብ ስርሒት ከፈልና</div>
-          <div class="chip" onclick="useChip(this)">ዓሚል ቅድሚ ከፈለ</div>
-          <div class="chip" onclick="useChip(this)">Paid rent 6 months advance</div>
-          <div class="chip" onclick="useChip(this)">Bought materials credit</div>
-          <div class="chip" onclick="useChip(this)">Accrue unbilled work</div>
-        </div>
-      </div>
-      <div class="result-card" id="resultCard">
-        <div class="result-hdr"><h3 id="resultTitle">ትንታነ AI</h3><span class="result-type" id="resultType">—</span></div>
-        <div class="meta-grid" id="resultMeta"></div>
-        <div class="tw" id="resultEntries" style="margin-bottom:10px"></div>
-        <div style="font-size:12px;color:var(--text3);font-style:italic;margin-bottom:8px" id="resultDesc"></div>
-        <button class="post-btn" id="postBtn" onclick="postEntry()">✅ ናብ ደፍተር ምቕማጥ — Post to Journal</button>
-      </div>
-      <div class="kgrid" id="homeKpis"></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
-        <div class="card"><div class="card-hdr"><span>📋</span><span>ናይ ሎሚ</span><span class="en">Today</span></div><div id="todayEntries"></div></div>
-        <div class="card"><div class="card-hdr"><span>📈</span><span>3-Month Forecast</span></div><div id="miniCF"></div></div>
-      </div>
-    </div>
-    <div class="page" id="pg-petty">
-      <div class="ph"><h1>💵 ንዋት ጥረ — Petty Cash</h1></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
-        <div class="card"><div class="card-hdr"><span>💵</span><span>Balance</span></div><div style="font-size:32px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--gold3)" id="pettyCashBalance">0</div></div>
-        <div class="card"><div class="card-hdr"><span>➕</span><span>Replenish</span></div><div class="fg"><label>Amount</label><input id="pcRepAmt" type="number" placeholder="500"/></div><button class="btn btn-gold" onclick="replenishPetty()">➕ Replenish</button></div>
-      </div>
-      <div class="card">
-        <div class="card-hdr"><span>💸</span><span>Record Expense</span></div>
-        <div class="fgrid">
-          <div class="fg"><label>Description</label><input id="pcDesc" type="text" placeholder="ቡን / coffee"/></div>
-          <div class="fg"><label>Amount</label><input id="pcAmt" type="number" placeholder="10"/></div>
-          <div class="fg"><label>Category</label><select id="pcCat"><option value="Office Supplies Expense">Office</option><option value="Miscellaneous Expense">Misc</option><option value="Fuel Expense">Fuel</option><option value="Repairs and Maintenance Expense">Repairs</option></select></div>
-        </div>
-        <div class="btn-row"><button class="btn btn-gold" onclick="postPettyExpense()">✅ Record</button></div>
-      </div>
-      <div class="card"><div class="card-hdr"><span>📋</span><span>History</span></div><div id="pettyHistory"></div></div>
-    </div>
-    <div class="page" id="pg-mobilemoney">
-      <div class="ph"><h1>📱 Mobile Money</h1></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
-        <div class="card">
-          <div class="card-hdr"><span>➕</span><span>Add Transaction</span></div>
-          <div class="fg"><label>Network</label><select id="mmNet"><option value="mtn">MTN</option><option value="airtel">Airtel</option></select></div>
-          <div class="fg"><label>Type</label><select id="mmType"><option value="in">Received</option><option value="out">Sent</option></select></div>
-          <div class="fgrid">
-            <div class="fg"><label>Amount</label><input id="mmAmt" type="number" placeholder="500"/></div>
-            <div class="fg"><label>Currency</label><select id="mmCur"><option>USD</option><option>SSP</option></select></div>
-          </div>
-          <div class="fg"><label>Reference</label><input id="mmRef" placeholder="JOHN / TXN123"/></div>
-          <div class="btn-row"><button class="btn btn-gold" onclick="addMobileMoney()">📱 Record</button></div>
-          <div id="mmSt" style="font-size:11px;margin-top:8px"></div>
-        </div>
-        <div class="card">
-          <div class="kgrid" style="grid-template-columns:1fr 1fr;gap:8px">
-            <div class="kpi"><div class="kpi-lbl">MTN In</div><div class="kpi-val pos" id="mtnInVal">0</div></div>
-            <div class="kpi"><div class="kpi-lbl">Airtel In</div><div class="kpi-val pos" id="airtelInVal">0</div></div>
-            <div class="kpi"><div class="kpi-lbl">Out</div><div class="kpi-val neg" id="mmOutVal">0</div></div>
-            <div class="kpi"><div class="kpi-lbl">Net</div><div class="kpi-val" id="mmNetVal">0</div></div>
-          </div>
-        </div>
-      </div>
-      <div class="card"><div class="card-hdr"><span>📋</span><span>History</span></div><div id="mmList"></div></div>
-    </div>
-    <div class="page" id="pg-materials">
-      <div class="ph"><h1>🧱 Materials</h1></div>
-      <div class="card">
-        <div class="card-hdr"><span>➕</span><span>Add Material</span></div>
-        <div class="fgrid">
-          <div class="fg"><label>Name</label><input id="matName" type="text" placeholder="ሲሚንቶ · Cement"/></div>
-          <div class="fg"><label>Category</label><select id="matCat"><option>Cement</option><option>Steel</option><option>Sand</option><option>Gravel</option><option>Timber</option><option>Fuel Stock</option><option>Paint</option><option>Other</option></select></div>
-          <div class="fg"><label>Quantity</label><input id="matQty" type="number" placeholder="100"/></div>
-          <div class="fg"><label>Unit</label><select id="matUnit"><option>bags</option><option>kg</option><option>tons</option><option>liters</option><option>m³</option><option>pieces</option><option>meters</option></select></div>
-          <div class="fg"><label>Unit Cost (leave blank = auto)</label><input id="matCost" type="number" placeholder="25"/></div>
-          <div class="fg"><label>Min Alert</label><input id="matMin" type="number" placeholder="20"/></div>
-        </div>
-        <div class="btn-row"><button class="btn btn-gold" onclick="addMaterial()">➕ Add</button></div>
-        <div id="matAddSt" style="font-size:11px;margin-top:8px"></div>
-      </div>
-      <div class="card">
-        <input style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:8px 12px;font-size:12px;color:var(--text);outline:none;margin-bottom:12px" placeholder="Search..." id="matSearch" oninput="renderMaterials()"/>
-        <div id="matList"></div>
-      </div>
-    </div>
-    <div class="page" id="pg-deliveries">
-      <div class="ph"><h1>🚚 Deliveries</h1></div>
-      <div class="card">
-        <div class="card-hdr"><span>➕</span><span>New Delivery</span></div>
-        <div class="fgrid">
-          <div class="fg"><label>Supplier</label><input id="delSupplier" type="text" placeholder="Supplier name"/></div>
-          <div class="fg"><label>Invoice #</label><input id="delInvNo" type="text" placeholder="INV-001"/></div>
-          <div class="fg"><label>Items</label><input id="delItems" type="text" placeholder="Cement 100 bags"/></div>
-          <div class="fg"><label>Total Value</label><input id="delTotal" type="number" placeholder="5000"/></div>
-          <div class="fg"><label>Payment</label><select id="delPay"><option value="cash">Cash</option><option value="credit">Credit</option></select></div>
-          <div class="fg"><label>Date</label><input id="delDate" type="date"/></div>
-        </div>
-        <div class="btn-row"><button class="btn btn-gold" onclick="addDelivery()">✅ Record</button></div>
-        <div id="delSt" style="font-size:11px;margin-top:8px"></div>
-      </div>
-      <div class="card"><div class="card-hdr"><span>📋</span><span>Received</span></div><div id="deliveryList"></div></div>
-    </div>
-    <div class="page" id="pg-workers">
-      <div class="ph"><h1>👷 Workers & Payroll</h1></div>
-      <div class="card">
-        <div class="card-hdr"><span>➕</span><span>Add Worker</span></div>
-        <div class="fgrid">
-          <div class="fg"><label>Name</label><input id="wkName" type="text" placeholder="Worker name"/></div>
-          <div class="fg"><label>Role</label><select id="wkRole"><option>Mason</option><option>Carpenter</option><option>Electrician</option><option>Plumber</option><option>Labourer</option><option>Driver</option><option>Site Supervisor</option><option>Engineer</option><option>Other</option></select></div>
-          <div class="fg"><label>Monthly Salary</label><input id="wkSalary" type="number" placeholder="500"/></div>
-          <div class="fg"><label>Currency</label><select id="wkCur"><option>USD</option><option>SSP</option></select></div>
-        </div>
-        <div class="btn-row"><button class="btn btn-gold" onclick="addWorker()">➕ Add</button></div>
-        <div id="wkAddSt" style="font-size:11px;margin-top:8px"></div>
-      </div>
-      <div class="card">
-        <div class="card-hdr"><span>💰</span><span>Pay Salary</span></div>
-        <div class="fgrid">
-          <div class="fg"><label>Worker</label><select id="payWorker"></select></div>
-          <div class="fg"><label>Month</label><input id="payMonth" type="month"/></div>
-          <div class="fg"><label>Override Amount</label><input id="payOverride" type="number" placeholder="blank = full salary"/></div>
-        </div>
-        <div class="btn-row"><button class="btn btn-gold" onclick="paySalary()">💰 Pay</button><button class="btn btn-outline" onclick="payAllSalaries()">💰 Pay All</button></div>
-      </div>
-      <div class="card"><div class="card-hdr"><span>👥</span><span>Workers</span></div><div id="workerList"></div></div>
-    </div>
-    <div class="page" id="pg-projects">
-      <div class="ph"><h1>🏗️ Projects</h1></div>
-      <div class="card">
-        <div class="card-hdr"><span>➕</span><span>New Project</span></div>
-        <div class="fgrid">
-          <div class="fg"><label>Project Name</label><input id="pjName" type="text" placeholder="Juba Clinic Construction"/></div>
-          <div class="fg"><label>Client</label><input id="pjClient" type="text" placeholder="Client name"/></div>
-          <div class="fg"><label>Contract Value</label><input id="pjValue" type="number" placeholder="500000"/></div>
-          <div class="fg"><label>Currency</label><select id="pjCur"><option>USD</option><option>SSP</option></select></div>
-          <div class="fg"><label>Location</label><input id="pjLocation" type="text" placeholder="Juba, South Sudan"/></div>
-          <div class="fg"><label>Retention %</label><input id="pjRetention" type="number" placeholder="10" value="10"/></div>
-          <div class="fg"><label>Start</label><input id="pjStart" type="date"/></div>
-          <div class="fg"><label>End</label><input id="pjEnd" type="date"/></div>
-        </div>
-        <div class="btn-row"><button class="btn btn-gold" onclick="addProject()">➕ Add Project</button></div>
-        <div id="projAddSt" style="font-size:11px;margin-top:8px"></div>
-      </div>
-      <div id="projectCards"></div>
-    </div>
-    <div class="page" id="pg-invoice">
-      <div class="ph"><h1>🧾 Invoice</h1></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-        <div class="card">
-          <div class="fg"><label>Project</label><select id="invProject"></select></div>
-          <div class="fg"><label>Invoice #</label><input id="invNo" type="text" placeholder="INV-001"/></div>
-          <div class="fg"><label>Amount</label><input id="invAmt" type="number" placeholder="50000" oninput="previewInvoice()"/></div>
-          <div class="fg"><label>% Complete</label><input id="invPct" type="number" placeholder="30" oninput="previewInvoice()"/></div>
-          <div class="fg"><label>Retention %</label><input id="invRet" type="number" placeholder="10" value="10" oninput="previewInvoice()"/></div>
-          <div class="btn-row"><button class="btn btn-gold" onclick="postInvoice()">✅ Post Invoice</button><button class="btn btn-outline" onclick="window.print()">🖨️</button></div>
-        </div>
-        <div class="card"><div class="card-hdr"><span>👁️</span><span>Preview</span></div><div id="invoicePreview"></div></div>
-      </div>
-    </div>
-    <div class="page" id="pg-retention">
-      <div class="ph"><h1>🔒 Retention Management</h1></div>
-      <div class="kgrid" id="retentionKpis"></div>
-      <div class="card"><div class="card-hdr"><span>📋</span><span>By Project (Live from Journal)</span></div><div id="retentionTable"></div></div>
-      <div class="card">
-        <div class="card-hdr"><span>✅</span><span>Release Retention</span></div>
-        <div class="fgrid">
-          <div class="fg"><label>Project</label><select id="retProject" onchange="updateRetLiveBalance()"></select></div>
-          <div class="fg"><label>Amount to Release</label><input id="retAmt" type="number" placeholder="5000"/></div>
-        </div>
-        <div id="retLiveBalance" style="font-size:12px;color:var(--orange3);margin-bottom:10px;font-family:'JetBrains Mono',monospace;padding:8px;background:var(--bg3);border-radius:5px;display:none"></div>
-        <div class="btn-row"><button class="btn btn-gold" onclick="releaseRetention()">✅ Release</button></div>
-      </div>
-    </div>
-    <div class="page" id="pg-journal">
-      <div class="ph"><h1>📒 General Journal</h1></div>
-      <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap" class="no-print">
-        <input style="flex:1;min-width:160px;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:8px 12px;font-size:12px;color:var(--text);outline:none" placeholder="Search..." id="jSearch" oninput="renderJournal()"/>
-        <input type="date" id="jFrom" style="background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:8px 12px;font-size:12px;color:var(--text);outline:none" onchange="renderJournal()"/>
-        <input type="date" id="jTo" style="background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:8px 12px;font-size:12px;color:var(--text);outline:none" onchange="renderJournal()"/>
-        <button class="btn btn-outline" onclick="clearJFilter()">Clear</button>
-      </div>
-      <div id="jFull"></div>
-    </div>
-    <div class="page" id="pg-ledger"><div class="ph"><h1>📗 General Ledger</h1></div><div id="lFull"></div></div>
-    <div class="page" id="pg-trial"><div class="ph"><h1>⚖️ Trial Balance</h1></div><div id="tFull"></div></div>
-    <div class="page" id="pg-income">
-      <div class="ph"><h1>💰 Income Statement</h1></div>
-      <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
-        <input type="date" id="iFrom" style="background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:8px 12px;font-size:12px;color:var(--text);outline:none" onchange="renderIncome()"/>
-        <input type="date" id="iTo" style="background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:8px 12px;font-size:12px;color:var(--text);outline:none" onchange="renderIncome()"/>
-        <button class="btn btn-outline" onclick="document.getElementById('iFrom').value='';document.getElementById('iTo').value='';renderIncome()">All Time</button>
-      </div>
-      <div id="iFull"></div>
-    </div>
-    <div class="page" id="pg-balance"><div class="ph"><h1>🏛️ Balance Sheet</h1></div><div id="bFull"></div></div>
-    <div class="page" id="pg-cashflow"><div class="ph"><h1>📈 Cash Flow Forecast</h1></div><div class="card"><div class="card-hdr"><span>📈</span><span>3-Month Forecast (incl. depreciation)</span></div><div id="cfFull"></div></div></div>
-    <div class="page" id="pg-jobcost"><div class="ph"><h1>🔢 Job Costing + WIP</h1></div><div id="jobCostCards"></div></div>
-    <div class="page" id="pg-advisor">
-      <div class="ph"><h1>🤖 AI Advisor</h1><p>Ask anything in Tigrinya or English</p></div>
-      <div class="card">
-        <div class="chat-wrap" id="chatMsgs">
-          <div class="msg ai">ሰላም! ኣነ AI ሓጋዚ ሒሳብካ እየ። ብዛዕባ ዝደሊ ሕተተኒ — Hello! Ask me anything about your construction business. If I suggest a journal entry, an "Apply to Journal" button will appear.</div>
-        </div>
-        <div class="chat-inp-row">
-          <input class="chat-inp" id="chatInp" placeholder="ዝደሊ ሕተት... / Ask anything..." onkeydown="if(event.key==='Enter')sendChat()"/>
-          <button class="btn btn-gold" onclick="sendChat()">↗</button>
-        </div>
-      </div>
-    </div>
-    <div class="page" id="pg-audit">
-      <div class="ph"><h1>🔍 Audit Bot</h1></div>
-      <div id="auditFindings"></div>
-      <div class="btn-row no-print"><button class="btn btn-gold" onclick="runAudit()">🔍 Run Audit</button></div>
-    </div>
-    <div class="page" id="pg-depreciation">
-      <div class="ph"><h1>📉 Depreciation</h1><p>Auto-posts on login each month</p></div>
-      <div class="card">
-        <div class="card-hdr"><span>➕</span><span>Add Asset</span></div>
-        <div class="fgrid">
-          <div class="fg"><label>Name</label><input id="aName" type="text" placeholder="Excavator"/></div>
-          <div class="fg"><label>Type</label><select id="aType"><option>Equipment</option><option>Vehicles</option><option>Heavy Machinery</option><option>Building</option></select></div>
-          <div class="fg"><label>Cost</label><input id="aCost" type="number" placeholder="50000"/></div>
-          <div class="fg"><label>Life (years)</label><input id="aLife" type="number" placeholder="10"/></div>
-          <div class="fg"><label>Purchase Date</label><input id="aDate" type="date"/></div>
-        </div>
-        <div class="btn-row"><button class="btn btn-gold" onclick="addAsset()">➕ Add</button></div>
-        <div id="assetAddSt" style="font-size:11px;margin-top:8px"></div>
-      </div>
-      <div class="card"><div class="card-hdr"><span>📋</span><span>Assets</span></div><div id="assetList"></div></div>
-      <div class="card"><div class="card-hdr"><span>📅</span><span>Due This Month</span></div><div id="depDueList"></div></div>
-    </div>
-    <div class="page" id="pg-settings">
-      <div class="ph"><h1>⚙️ Settings</h1></div>
-      <div class="card">
-        <div class="fg"><label>Company Name</label><input id="bizName" type="text"/></div>
-        <div class="fg"><label>SSP/USD Rate</label><input id="sspRate" type="number" placeholder="1300" value="1300"/></div>
-        <div class="btn-row"><button class="btn btn-gold" onclick="saveSettings()">💾 Save</button></div>
-        <div id="settingsSt" style="font-size:11px;margin-top:8px"></div>
-      </div>
-      <div class="card">
-        <div class="fg"><label>Email</label><input id="emailAddr" type="email" placeholder="you@email.com"/></div>
-        <div class="btn-row"><button class="btn btn-gold" onclick="emailReport()">📧 Email Report</button></div>
-        <div id="emailSt" style="font-size:11px;margin-top:8px"></div>
-      </div>
-      <div class="card">
-        <div class="fgrid"><div class="fg"><label>Current Password</label><input id="op" type="password"/></div><div class="fg"><label>New Password</label><input id="np" type="password"/></div></div>
-        <div class="btn-row"><button class="btn btn-gold" onclick="changePw()">Change</button></div>
-        <div id="pwSt" style="font-size:11px;margin-top:8px"></div>
-      </div>
-    </div>
-  </div>
-</div></div>
+<div class="topbar"><div class="tb-brand">🏗️ ሒሳቢ ሃንሲ</div><div class="tb-biz" id="tbBiz">—</div><div class="tb-cur"><button class="cur-btn on" id="cur-usd" onclick="setCur('USD')">USD $</button><button class="cur-btn" id="cur-ssp" onclick="setCur('SSP')">SSP £</button></div><div class="tb-alert" id="tbAlert" onclick="nav('audit',null)">⚠️ <span id="tbAlertTxt">0</span> ጉድለት</div><button class="tb-btn no-print" onclick="window.print()">🖨️</button><button class="tb-btn no-print" onclick="doLogout()" style="color:var(--red3)">ምውጻእ</button></div>
+<div class="sidebar" id="sidebar">
+<div class="sb-section"><div class="sb-section-label">ዕለታዊ — Daily</div>
+<div class="sb-item on" onclick="nav('home',this)"><span class="sb-ico">🎙️</span>ሓድሽ ምዝጋብ<span class="en">Record</span></div>
+<div class="sb-item" onclick="nav('petty',this)"><span class="sb-ico">💵</span>ንዋት ጥረ<span class="en">Petty Cash</span></div>
+<div class="sb-item" onclick="nav('mobilemoney',this)"><span class="sb-ico">📱</span>ሞባይል ገንዘብ<span class="en">Mobile Money</span></div>
+<div class="sb-item" onclick="nav('materials',this)"><span class="sb-ico">🧱</span>ሸቀጥ<span class="en">Materials</span></div>
+<div class="sb-item" onclick="nav('deliveries',this)"><span class="sb-ico">🚚</span>ምብጻሕ<span class="en">Deliveries</span></div>
+<div class="sb-item" onclick="nav('workers',this)"><span class="sb-ico">👷</span>ሰራሕተኛ<span class="en">Workers</span></div></div>
+<div class="sb-section"><div class="sb-section-label">ፕሮጀክት</div>
+<div class="sb-item" onclick="nav('projects',this)"><span class="sb-ico">🏗️</span>ፕሮጀክታት<span class="en">Projects</span><span class="sb-badge gold" id="projBadge">0</span></div>
+<div class="sb-item" onclick="nav('invoice',this)"><span class="sb-ico">🧾</span>ኢንቮይስ<span class="en">Invoice</span></div>
+<div class="sb-item" onclick="nav('retention',this)"><span class="sb-ico">🔒</span>ሪቴንሽን<span class="en">Retention</span></div></div>
+<div class="sb-section"><div class="sb-section-label">ሓላፍ ሒሳቢ</div>
+<div class="sb-item" onclick="nav('journal',this)"><span class="sb-ico">📒</span>ደፍተር<span class="en">Journal</span><span class="sb-badge" id="jBadge">0</span></div>
+<div class="sb-item" onclick="nav('ledger',this)"><span class="sb-ico">📗</span>ሌጀር<span class="en">Ledger</span></div>
+<div class="sb-item" onclick="nav('trial',this)"><span class="sb-ico">⚖️</span>ፈተነ ሚዛን<span class="en">Trial</span></div>
+<div class="sb-item" onclick="nav('income',this)"><span class="sb-ico">💰</span>ትርፊ/ክሳራ<span class="en">Income</span></div>
+<div class="sb-item" onclick="nav('balance',this)"><span class="sb-ico">🏛️</span>ሚዛን ሓሳብ<span class="en">Balance</span></div>
+<div class="sb-item" onclick="nav('cashflow',this)"><span class="sb-ico">📈</span>ትንበያ<span class="en">Forecast</span></div>
+<div class="sb-item" onclick="nav('jobcost',this)"><span class="sb-ico">🔢</span>ዋጋ ፕሮጀክት<span class="en">Job Cost</span></div></div>
+<div class="sb-section"><div class="sb-section-label">AI ሓጋዚ</div>
+<div class="sb-item" onclick="nav('advisor',this)"><span class="sb-ico">🤖</span>AI ሓጋዚ<span class="en">Advisor</span></div>
+<div class="sb-item" onclick="nav('audit',this)"><span class="sb-ico">🔍</span>ምርመራ<span class="en">Audit</span><span class="sb-badge" id="auditBadge">0</span></div>
+<div class="sb-item" onclick="nav('depreciation',this)"><span class="sb-ico">📉</span>ምምካን<span class="en">Depreciation</span></div>
+<div class="sb-item" onclick="nav('settings',this)"><span class="sb-ico">⚙️</span>ቅጥዒ<span class="en">Settings</span></div></div></div>
+<div class="main">
+<div class="page on" id="pg-home">
+<div id="homeAlerts"></div>
+<div class="hero-input-card">
+<div class="hero-lbl">🎙️ ሎሚ እንታይ ዓሚልካ? <span style="font-size:10px;color:var(--text3)">(ብትግርኛ ወይ ብእንግሊዝ)</span></div>
+<div class="hero-inp-row"><button class="mic-btn" id="micBtn" onclick="toggleMic()">🎙️</button><input class="hero-inp" id="mainInp" placeholder="ደሞዝ 500 USD · used 15 bags cement on project A · rent 1000 USD for 6 months..."/><button class="hero-send" onclick="doRecord()">↗</button></div>
+<div class="chips"><div class="chip" onclick="useChip(this)">ደሞዝ ከፈልና</div><div class="chip" onclick="useChip(this)">ሲሚንቶ ዓደግና</div><div class="chip" onclick="useChip(this)">ነዳዲ ሸቀጥ</div><div class="chip" onclick="useChip(this)">ዓሚል ቅድሚ ከፈለ</div><div class="chip" onclick="useChip(this)">Paid rent 6 months advance</div><div class="chip" onclick="useChip(this)">Accrue unbilled work</div></div></div>
+<div class="result-card" id="resultCard"><div class="result-hdr"><h3 id="resultTitle">ትንታነ AI</h3><span class="result-type" id="resultType">—</span></div><div class="meta-grid" id="resultMeta"></div><div class="tw" id="resultEntries" style="margin-bottom:10px"></div><div style="font-size:12px;color:var(--text3);font-style:italic;margin-bottom:8px" id="resultDesc"></div><button class="post-btn" id="postBtn" onclick="postEntry()">✅ ናብ ደፍተር ምቕማጥ — Post to Journal</button></div>
+<div class="kgrid" id="homeKpis"></div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px"><div class="card"><div class="card-hdr"><span>📋</span><span>ናይ ሎሚ</span></div><div id="todayEntries"></div></div><div class="card"><div class="card-hdr"><span>📈</span><span>3-Month Forecast</span></div><div id="miniCF"></div></div></div></div>
+<div class="page" id="pg-petty"><div class="ph"><h1>💵 ንዋት ጥረ — Petty Cash</h1></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px"><div class="card"><div class="card-hdr"><span>💵</span><span>Balance</span></div><div style="font-size:32px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--gold3)" id="pettyCashBalance">0</div></div><div class="card"><div class="card-hdr"><span>➕</span><span>Replenish</span></div><div class="fg"><label>Amount</label><input id="pcRepAmt" type="number" placeholder="500"/></div><button class="btn btn-gold" onclick="replenishPetty()">➕ Replenish</button></div></div><div class="card"><div class="card-hdr"><span>💸</span><span>Record Expense</span></div><div class="fgrid"><div class="fg"><label>Description</label><input id="pcDesc" type="text" placeholder="ቡን / coffee"/></div><div class="fg"><label>Amount</label><input id="pcAmt" type="number" placeholder="10"/></div><div class="fg"><label>Category</label><select id="pcCat"><option value="Office Supplies Expense">Office</option><option value="Miscellaneous Expense">Misc</option><option value="Fuel Expense">Fuel</option><option value="Repairs and Maintenance Expense">Repairs</option></select></div></div><div class="btn-row"><button class="btn btn-gold" onclick="postPettyExpense()">✅ Record</button></div></div><div class="card"><div class="card-hdr"><span>📋</span><span>History</span></div><div id="pettyHistory"></div></div></div>
+<div class="page" id="pg-mobilemoney"><div class="ph"><h1>📱 Mobile Money</h1></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px"><div class="card"><div class="card-hdr"><span>➕</span><span>Add Transaction</span></div><div class="fg"><label>Network</label><select id="mmNet"><option value="mtn">MTN</option><option value="airtel">Airtel</option></select></div><div class="fg"><label>Type</label><select id="mmType"><option value="in">Received</option><option value="out">Sent</option></select></div><div class="fgrid"><div class="fg"><label>Amount</label><input id="mmAmt" type="number" placeholder="500"/></div><div class="fg"><label>Currency</label><select id="mmCur"><option>USD</option><option>SSP</option></select></div></div><div class="fg"><label>Reference</label><input id="mmRef" placeholder="JOHN / TXN123"/></div><div class="btn-row"><button class="btn btn-gold" onclick="addMobileMoney()">📱 Record</button></div><div id="mmSt" style="font-size:11px;margin-top:8px"></div></div><div class="card"><div class="kgrid" style="grid-template-columns:1fr 1fr;gap:8px"><div class="kpi"><div class="kpi-lbl">MTN In</div><div class="kpi-val pos" id="mtnInVal">0</div></div><div class="kpi"><div class="kpi-lbl">Airtel In</div><div class="kpi-val pos" id="airtelInVal">0</div></div><div class="kpi"><div class="kpi-lbl">Out</div><div class="kpi-val neg" id="mmOutVal">0</div></div><div class="kpi"><div class="kpi-lbl">Net</div><div class="kpi-val" id="mmNetVal">0</div></div></div></div></div><div class="card"><div class="card-hdr"><span>📋</span><span>History</span></div><div id="mmList"></div></div></div>
+<div class="page" id="pg-materials"><div class="ph"><h1>🧱 Materials</h1></div><div class="card"><div class="card-hdr"><span>➕</span><span>Add Material</span></div><div class="fgrid"><div class="fg"><label>Name</label><input id="matName" type="text" placeholder="ሲሚንቶ · Cement"/></div><div class="fg"><label>Category</label><select id="matCat"><option>Cement</option><option>Steel</option><option>Sand</option><option>Gravel</option><option>Timber</option><option>Fuel Stock</option><option>Paint</option><option>Other</option></select></div><div class="fg"><label>Quantity</label><input id="matQty" type="number" placeholder="100"/></div><div class="fg"><label>Unit</label><select id="matUnit"><option>bags</option><option>kg</option><option>tons</option><option>liters</option><option>m³</option><option>pieces</option><option>meters</option></select></div><div class="fg"><label>Unit Cost (blank=auto)</label><input id="matCost" type="number" placeholder="25"/></div><div class="fg"><label>Min Alert</label><input id="matMin" type="number" placeholder="20"/></div></div><div class="btn-row"><button class="btn btn-gold" onclick="addMaterial()">➕ Add</button></div><div id="matAddSt" style="font-size:11px;margin-top:8px"></div></div><div class="card"><input style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:8px 12px;font-size:12px;color:var(--text);outline:none;margin-bottom:12px" placeholder="Search..." id="matSearch" oninput="renderMaterials()"/><div id="matList"></div></div></div>
+<div class="page" id="pg-deliveries"><div class="ph"><h1>🚚 Deliveries</h1></div><div class="card"><div class="card-hdr"><span>➕</span><span>New Delivery</span></div><div class="fgrid"><div class="fg"><label>Supplier</label><input id="delSupplier" type="text" placeholder="Supplier name"/></div><div class="fg"><label>Invoice #</label><input id="delInvNo" type="text" placeholder="INV-001"/></div><div class="fg"><label>Items</label><input id="delItems" type="text" placeholder="Cement 100 bags"/></div><div class="fg"><label>Total Value</label><input id="delTotal" type="number" placeholder="5000"/></div><div class="fg"><label>Payment</label><select id="delPay"><option value="cash">Cash</option><option value="credit">Credit</option></select></div><div class="fg"><label>Date</label><input id="delDate" type="date"/></div></div><div class="btn-row"><button class="btn btn-gold" onclick="addDelivery()">✅ Record</button></div><div id="delSt" style="font-size:11px;margin-top:8px"></div></div><div class="card"><div class="card-hdr"><span>📋</span><span>Received</span></div><div id="deliveryList"></div></div></div>
+<div class="page" id="pg-workers"><div class="ph"><h1>👷 Workers & Payroll</h1></div><div class="card"><div class="card-hdr"><span>➕</span><span>Add Worker</span></div><div class="fgrid"><div class="fg"><label>Name</label><input id="wkName" type="text" placeholder="Worker name"/></div><div class="fg"><label>Role</label><select id="wkRole"><option>Mason</option><option>Carpenter</option><option>Electrician</option><option>Plumber</option><option>Labourer</option><option>Driver</option><option>Site Supervisor</option><option>Engineer</option><option>Other</option></select></div><div class="fg"><label>Monthly Salary</label><input id="wkSalary" type="number" placeholder="500"/></div><div class="fg"><label>Currency</label><select id="wkCur"><option>USD</option><option>SSP</option></select></div></div><div class="btn-row"><button class="btn btn-gold" onclick="addWorker()">➕ Add</button></div><div id="wkAddSt" style="font-size:11px;margin-top:8px"></div></div><div class="card"><div class="card-hdr"><span>💰</span><span>Pay Salary</span></div><div class="fgrid"><div class="fg"><label>Worker</label><select id="payWorker"></select></div><div class="fg"><label>Month</label><input id="payMonth" type="month"/></div><div class="fg"><label>Override Amount</label><input id="payOverride" type="number" placeholder="blank=full"/></div></div><div class="btn-row"><button class="btn btn-gold" onclick="paySalary()">💰 Pay</button><button class="btn btn-outline" onclick="payAllSalaries()">💰 Pay All</button></div></div><div class="card"><div class="card-hdr"><span>👥</span><span>Workers</span></div><div id="workerList"></div></div></div>
+<div class="page" id="pg-projects"><div class="ph"><h1>🏗️ Projects</h1></div><div class="card"><div class="card-hdr"><span>➕</span><span>New Project</span></div><div class="fgrid"><div class="fg"><label>Project Name</label><input id="pjName" type="text" placeholder="Juba Clinic Construction"/></div><div class="fg"><label>Client</label><input id="pjClient" type="text" placeholder="Client name"/></div><div class="fg"><label>Contract Value</label><input id="pjValue" type="number" placeholder="500000"/></div><div class="fg"><label>Currency</label><select id="pjCur"><option>USD</option><option>SSP</option></select></div><div class="fg"><label>Location</label><input id="pjLocation" type="text" placeholder="Juba, South Sudan"/></div><div class="fg"><label>Retention %</label><input id="pjRetention" type="number" placeholder="10" value="10"/></div><div class="fg"><label>Start</label><input id="pjStart" type="date"/></div><div class="fg"><label>End</label><input id="pjEnd" type="date"/></div></div><div class="btn-row"><button class="btn btn-gold" onclick="addProject()">➕ Add Project</button></div><div id="projAddSt" style="font-size:11px;margin-top:8px"></div></div><div id="projectCards"></div></div>
+<div class="page" id="pg-invoice"><div class="ph"><h1>🧾 Invoice</h1></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:16px"><div class="card"><div class="fg"><label>Project</label><select id="invProject"></select></div><div class="fg"><label>Invoice #</label><input id="invNo" type="text" placeholder="INV-001"/></div><div class="fg"><label>Amount</label><input id="invAmt" type="number" placeholder="50000" oninput="previewInvoice()"/></div><div class="fg"><label>% Complete</label><input id="invPct" type="number" placeholder="30" oninput="previewInvoice()"/></div><div class="fg"><label>Retention %</label><input id="invRet" type="number" placeholder="10" value="10" oninput="previewInvoice()"/></div><div class="btn-row"><button class="btn btn-gold" onclick="postInvoice()">✅ Post Invoice</button><button class="btn btn-outline" onclick="window.print()">🖨️</button></div></div><div class="card"><div class="card-hdr"><span>👁️</span><span>Preview</span></div><div id="invoicePreview"></div></div></div></div>
+<div class="page" id="pg-retention"><div class="ph"><h1>🔒 Retention Management</h1></div><div class="kgrid" id="retentionKpis"></div><div class="card"><div class="card-hdr"><span>📋</span><span>By Project (Live from Journal)</span></div><div id="retentionTable"></div></div><div class="card"><div class="card-hdr"><span>✅</span><span>Release Retention</span></div><div class="fgrid"><div class="fg"><label>Project</label><select id="retProject" onchange="updateRetLiveBalance()"></select></div><div class="fg"><label>Amount to Release</label><input id="retAmt" type="number" placeholder="5000"/></div></div><div id="retLiveBalance" style="font-size:12px;color:var(--orange3);margin-bottom:10px;font-family:'JetBrains Mono',monospace;padding:8px;background:var(--bg3);border-radius:5px;display:none"></div><div class="btn-row"><button class="btn btn-gold" onclick="releaseRetention()">✅ Release</button></div></div></div>
+<div class="page" id="pg-journal"><div class="ph"><h1>📒 General Journal</h1></div><div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap" class="no-print"><input style="flex:1;min-width:160px;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:8px 12px;font-size:12px;color:var(--text);outline:none" placeholder="Search..." id="jSearch" oninput="renderJournal()"/><input type="date" id="jFrom" style="background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:8px 12px;font-size:12px;color:var(--text);outline:none" onchange="renderJournal()"/><input type="date" id="jTo" style="background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:8px 12px;font-size:12px;color:var(--text);outline:none" onchange="renderJournal()"/><button class="btn btn-outline" onclick="clearJFilter()">Clear</button></div><div id="jFull"></div></div>
+<div class="page" id="pg-ledger"><div class="ph"><h1>📗 General Ledger</h1></div><div id="lFull"></div></div>
+<div class="page" id="pg-trial"><div class="ph"><h1>⚖️ Trial Balance</h1></div><div id="tFull"></div></div>
+<div class="page" id="pg-income"><div class="ph"><h1>💰 Income Statement</h1></div><div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap"><input type="date" id="iFrom" style="background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:8px 12px;font-size:12px;color:var(--text);outline:none" onchange="renderIncome()"/><input type="date" id="iTo" style="background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:8px 12px;font-size:12px;color:var(--text);outline:none" onchange="renderIncome()"/><button class="btn btn-outline" onclick="document.getElementById('iFrom').value='';document.getElementById('iTo').value='';renderIncome()">All Time</button></div><div id="iFull"></div></div>
+<div class="page" id="pg-balance"><div class="ph"><h1>🏛️ Balance Sheet</h1></div><div id="bFull"></div></div>
+<div class="page" id="pg-cashflow"><div class="ph"><h1>📈 Cash Flow Forecast</h1></div><div class="card"><div class="card-hdr"><span>📈</span><span>3-Month Forecast (incl. depreciation)</span></div><div id="cfFull"></div></div></div>
+<div class="page" id="pg-jobcost"><div class="ph"><h1>🔢 Job Costing + WIP</h1></div><div id="jobCostCards"></div></div>
+<div class="page" id="pg-advisor"><div class="ph"><h1>🤖 AI Advisor</h1><p>Ask anything in Tigrinya or English</p></div><div class="card"><div class="chat-wrap" id="chatMsgs"><div class="msg ai">ሰላም! ኣነ AI ሓጋዚ ሒሳብካ እየ። If I suggest a journal entry, an Apply button will appear.</div></div><div class="chat-inp-row"><input class="chat-inp" id="chatInp" placeholder="ዝደሊ ሕተት... / Ask anything..." onkeydown="if(event.key==='Enter')sendChat()"/><button class="btn btn-gold" onclick="sendChat()">↗</button></div></div></div>
+<div class="page" id="pg-audit"><div class="ph"><h1>🔍 Audit Bot</h1></div><div id="auditFindings"></div><div class="btn-row no-print"><button class="btn btn-gold" onclick="runAudit()">🔍 Run Audit</button></div></div>
+<div class="page" id="pg-depreciation"><div class="ph"><h1>📉 Depreciation</h1><p>Auto-posts on login each month</p></div><div class="card"><div class="card-hdr"><span>➕</span><span>Add Asset</span></div><div class="fgrid"><div class="fg"><label>Name</label><input id="aName" type="text" placeholder="Excavator"/></div><div class="fg"><label>Type</label><select id="aType"><option>Equipment</option><option>Vehicles</option><option>Heavy Machinery</option><option>Building</option></select></div><div class="fg"><label>Cost</label><input id="aCost" type="number" placeholder="50000"/></div><div class="fg"><label>Life (years)</label><input id="aLife" type="number" placeholder="10"/></div><div class="fg"><label>Purchase Date</label><input id="aDate" type="date"/></div></div><div class="btn-row"><button class="btn btn-gold" onclick="addAsset()">➕ Add</button></div><div id="assetAddSt" style="font-size:11px;margin-top:8px"></div></div><div class="card"><div class="card-hdr"><span>📋</span><span>Assets</span></div><div id="assetList"></div></div><div class="card"><div class="card-hdr"><span>📅</span><span>Due This Month</span></div><div id="depDueList"></div></div></div>
+<div class="page" id="pg-settings"><div class="ph"><h1>⚙️ Settings</h1></div><div class="card"><div class="fg"><label>Company Name</label><input id="bizName" type="text"/></div><div class="fg"><label>SSP/USD Rate</label><input id="sspRate" type="number" placeholder="1300" value="1300"/></div><div class="btn-row"><button class="btn btn-gold" onclick="saveSettings()">💾 Save</button></div><div id="settingsSt" style="font-size:11px;margin-top:8px"></div></div><div class="card"><div class="fg"><label>Email</label><input id="emailAddr" type="email" placeholder="you@email.com"/></div><div class="btn-row"><button class="btn btn-gold" onclick="emailReport()">📧 Email Report</button></div><div id="emailSt" style="font-size:11px;margin-top:8px"></div></div><div class="card"><div class="fgrid"><div class="fg"><label>Current Password</label><input id="op" type="password"/></div><div class="fg"><label>New Password</label><input id="np" type="password"/></div></div><div class="btn-row"><button class="btn btn-gold" onclick="changePw()">Change</button></div><div id="pwSt" style="font-size:11px;margin-top:8px"></div></div></div>
+</div></div></div>
 <div class="toast" id="toast"></div>
-<script>
-
-const DB={entries:[],nextId:1,assets:[],materials:[],projects:[],workers:[],mobileMoney:[],deliveries:[]};
-let CUR='USD',SSP_RATE=1300,BIZ_NAME='My Company',pending=null,listening=false,recog=null;
-let isReg=false;
-function toggleReg(){isReg=!isReg;document.getElementById('regFields').style.display=isReg?'block':'none';document.querySelector('.login-btn').textContent=isReg?'✅ ምዝጋብ':'🔓 ኣቱ — Login';}
-function getU(){return JSON.parse(localStorage.getItem('hensi_u')||'{}');}
-function setU(u){localStorage.setItem('hensi_u',JSON.stringify(u));}
-function getCU(){return localStorage.getItem('hensi_cu');}
-function setCU(u){localStorage.setItem('hensi_cu',u);}
-function doLogin(){
-  const u=document.getElementById('lu').value.trim(),p=document.getElementById('lp').value,b=document.getElementById('lb')?document.getElementById('lb').value.trim():'';
-  if(!u||!p){showToast('ስም ተጠቃሚን ምስጢርን ኣቕርብ');return;}
-  const users=getU();
-  if(isReg){
-    if(!b){showToast('ስም ኩባንያ ኣቕርብ');return;}
-    if(users[u]){showToast('Username taken');return;}
-    users[u]={pass:btoa(p),biz:b,entries:[],nextId:1,assets:[],materials:[],projects:[],workers:[],mobileMoney:[],deliveries:[],sspRate:1300};
-    setU(users);setCU(u);loadApp(u,users[u]);
-  }else{
-    if(!users[u]||users[u].pass!==btoa(p)){document.getElementById('lerr').style.display='block';return;}
-    document.getElementById('lerr').style.display='none';setCU(u);loadApp(u,users[u]);
-  }
-}
-function doLogout(){localStorage.removeItem('hensi_cu');location.reload();}
-function loadApp(username,data){
-  document.getElementById('loginScreen').style.display='none';
-  document.getElementById('mainApp').style.display='block';
-  BIZ_NAME=data.biz||'My Company';SSP_RATE=data.sspRate||1300;
-  DB.entries=data.entries||[];DB.nextId=data.nextId||1;DB.assets=data.assets||[];
-  DB.materials=data.materials||[];DB.projects=data.projects||[];DB.workers=data.workers||[];
-  DB.mobileMoney=data.mobileMoney||[];DB.deliveries=data.deliveries||[];
-  document.getElementById('tbBiz').textContent=BIZ_NAME;
-  document.getElementById('bizName').value=BIZ_NAME;
-  document.getElementById('sspRate').value=SSP_RATE;
-  document.getElementById('aDate').value=today();
-  document.getElementById('pjStart').value=today();
-  document.getElementById('delDate').value=today();
-  document.getElementById('payMonth').value=today().substring(0,7);
-  populateProjectSelects();renderAll();runAudit();
-  setTimeout(()=>{autoDepreciationCheck();checkPrepaidAmortization();},1000);
-}
-window.addEventListener('load',()=>{const cu=getCU();if(cu){const u=getU();if(u[cu])loadApp(cu,u[cu]);}});
-function saveData(){
-  const cu=getCU();if(!cu)return;const u=getU();
-  u[cu].entries=DB.entries;u[cu].nextId=DB.nextId;u[cu].assets=DB.assets;u[cu].materials=DB.materials;
-  u[cu].projects=DB.projects;u[cu].workers=DB.workers;u[cu].mobileMoney=DB.mobileMoney;u[cu].deliveries=DB.deliveries;
-  u[cu].biz=BIZ_NAME;u[cu].sspRate=SSP_RATE;setU(u);
-}
-document.addEventListener('DOMContentLoaded',()=>{
-  document.getElementById('lp').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
-  document.getElementById('lu').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('lp').focus();});
-  const inp=document.getElementById('mainInp');if(inp)inp.addEventListener('keydown',e=>{if(e.key==='Enter')doRecord();});
-  const ci=document.getElementById('chatInp');if(ci)ci.addEventListener('keydown',e=>{if(e.key==='Enter')sendChat();});
-});
-function setCur(c){CUR=c;document.getElementById('cur-usd').classList.toggle('on',c==='USD');document.getElementById('cur-ssp').classList.toggle('on',c==='SSP');renderAll();}
-function fc(v){const n=+v||0;if(CUR==='SSP')return 'SSP '+(n*SSP_RATE).toLocaleString('en-US',{maximumFractionDigits:0});return '$ '+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
-function today(){return new Date().toISOString().split('T')[0];}
-function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.style.display='block';setTimeout(()=>t.style.display='none',3500);}
-function nav(pg,el){
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
-  document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('on'));
-  const t=document.getElementById('pg-'+pg);if(t)t.classList.add('on');if(el)el.classList.add('on');
-  const map={journal:renderJournal,ledger:renderLedger,trial:renderTrial,income:renderIncome,balance:renderBalance,cashflow:renderCF,jobcost:renderJobCost,audit:runAudit,depreciation:renderDepPage,materials:renderMaterials,workers:renderWorkers,projects:renderProjects,mobilemoney:renderMM,petty:renderPetty,deliveries:renderDeliveries,retention:renderRetention,invoice:renderInvoicePage};
-  if(map[pg])map[pg]();
-}
-function renderAll(){
-  renderHome();renderJournal();renderLedger();renderTrial();renderIncome();renderBalance();renderCF();
-  renderMaterials();renderMM();renderPetty();renderProjects();renderWorkers();renderDeliveries();
-  renderRetention();renderJobCost();renderDepPage();
-  document.getElementById('jBadge').textContent=DB.entries.length;
-  document.getElementById('projBadge').textContent=DB.projects.filter(p=>p.status==='active').length;
-  populateProjectSelects();
-}
-// ── SINGLE SOURCE OF TRUTH: all layers read from getLedger/getBal ──
-function getLedger(from,to){
-  const a={};
-  DB.entries.forEach(e=>{
-    if(from&&e.date<from)return;if(to&&e.date>to)return;
-    [...(e.debits||[]).map(d=>({...d,side:'dr'})),...(e.credits||[]).map(c=>({...c,side:'cr'}))].forEach(item=>{
-      if(!a[item.acct])a[item.acct]={type:item.atype,rows:[]};
-      a[item.acct].rows.push({date:e.date,desc:e.desc,side:item.side,amt:item.amt});
-    });
-  });
-  return a;
-}
-function getBal(from,to){
-  const a=getLedger(from,to),b={};
-  Object.entries(a).forEach(([acc,data])=>{
-    const dr=data.rows.filter(r=>r.side==='dr').reduce((s,r)=>s+r.amt,0);
-    const cr=data.rows.filter(r=>r.side==='cr').reduce((s,r)=>s+r.amt,0);
-    b[acc]={type:data.type,dr,cr,net:dr-cr};
-  });
-  return b;
-}
-function sumByType(b,type){return Object.entries(b).filter(([,v])=>v.type===type).reduce((s,[,v])=>s+Math.abs(v.net),0);}
-// F11: live retention from journal
-function getRetBal(name){
-  const ent=DB.entries.filter(e=>e.project===name||(e.desc||'').toLowerCase().includes((name||'').toLowerCase()));
-  const held=ent.flatMap(e=>e.debits||[]).filter(d=>d.acct==='Retention Receivable').reduce((s,d)=>s+d.amt,0);
-  const rel=ent.flatMap(e=>e.credits||[]).filter(c=>c.acct==='Retention Receivable').reduce((s,c)=>s+c.amt,0);
-  return held-rel;
-}
-// F4: live costs/revenue from journal per project
-function getProjCosts(name){return DB.entries.filter(e=>e.project===name||(e.desc||'').toLowerCase().includes((name||'').toLowerCase())).flatMap(e=>e.debits||[]).filter(d=>d.atype==='expense').reduce((s,d)=>s+d.amt,0);}
-function getProjRevenue(name){return DB.entries.filter(e=>e.project===name||(e.desc||'').toLowerCase().includes((name||'').toLowerCase())).flatMap(e=>e.credits||[]).filter(c=>c.atype==='revenue').reduce((s,c)=>s+c.amt,0);}
-// F14: WIP
-function calcWIP(p){
-  const costs=getProjCosts(p.name),budget=p.value||0;if(!budget)return null;
-  const pct=Math.min(1,costs/budget),earned=pct*budget,billed=p.billed||0,diff=earned-billed;
-  return{pct:Math.round(pct*100),earned,billed,diff,label:diff>=0?'Costs in Excess of Billings (Asset)':'Billings in Excess of Costs (Liability)'};
-}
-function postWIPAdjustment(pid){
-  const p=DB.projects.find(p=>p.id===pid);if(!p)return;
-  const wip=calcWIP(p);if(!wip||Math.abs(wip.diff)<0.01){showToast('No WIP adjustment needed');return;}
-  if(wip.diff>0)DB.entries.push({id:DB.nextId++,date:today(),desc:`WIP Under-billed — ${p.name} (${wip.pct}%)`,type:'WIP Adjustment',amount:wip.diff,project:p.name,debits:[{acct:'Costs in Excess of Billings',amt:wip.diff,atype:'asset'}],credits:[{acct:'Contract Revenue',amt:wip.diff,atype:'revenue'}]});
-  else{const a=Math.abs(wip.diff);DB.entries.push({id:DB.nextId++,date:today(),desc:`WIP Over-billed — ${p.name} (${wip.pct}%)`,type:'WIP Adjustment',amount:a,project:p.name,debits:[{acct:'Contract Revenue',amt:a,atype:'revenue'}],credits:[{acct:'Billings in Excess of Costs',amt:a,atype:'liability'}]});}
-  saveData();renderAll();showToast(`✅ WIP posted — ${p.name}`);
-}
-// F3: auto depreciation
-function autoDepreciationCheck(){
-  const now=new Date(),thisM=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
-  const due=DB.assets.filter(a=>a.lastPostedMonth!==thisM);if(!due.length)return;
-  due.forEach(a=>{
-    const ac=getDepAccts(a.type);
-    DB.entries.push({id:DB.nextId++,date:today(),desc:`AUTO ምምካን — ${a.name} (${thisM})`,type:'Monthly Depreciation',amount:a.monthlyDep,project:'',debits:[{acct:ac.dep,amt:a.monthlyDep,atype:'expense'}],credits:[{acct:ac.acc,amt:a.monthlyDep,atype:'asset'}]});
-    a.lastPostedMonth=thisM;
-  });
-  saveData();renderAll();showToast(`✅ AUTO: ${due.length} depreciation posted`);
-}
-// F7: prepaid amortization
-function checkPrepaidAmortization(){
-  const now=new Date();let changed=false;
-  DB.entries.filter(e=>(e.debits||[]).some(d=>d.acct==='Prepaid Rent')&&e.prepaidMonths).forEach(e=>{
-    const months=e.prepaidMonths||1,monthlyAmt=parseFloat(((e.amount||0)/months).toFixed(2));
-    const ed=new Date(e.date),passed=(now.getFullYear()-ed.getFullYear())*12+(now.getMonth()-ed.getMonth());
-    for(let i=0;i<Math.min(passed,months);i++){
-      if(!DB.entries.some(en=>en.type==='Prepaid Amortization'&&en.sourceId===e.id&&en.amortMonth===i)){
-        DB.entries.push({id:DB.nextId++,date:today(),desc:`AUTO Prepaid Rent — Month ${i+1}/${months}`,type:'Prepaid Amortization',amount:monthlyAmt,sourceId:e.id,amortMonth:i,project:'',debits:[{acct:'Rent Expense',amt:monthlyAmt,atype:'expense'}],credits:[{acct:'Prepaid Rent',amt:monthlyAmt,atype:'asset'}]});
-        changed=true;
-      }
-    }
-  });
-  if(changed){saveData();renderAll();}
-}
-// Voice
-function toggleMic(){
-  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){showToast('Chrome/Edge only');return;}
-  if(listening){recog.stop();return;}
-  recog=new SR();recog.lang='ti-ET';recog.continuous=false;recog.interimResults=true;
-  recog.onstart=()=>{listening=true;document.getElementById('micBtn').classList.add('on');};
-  recog.onresult=e=>{document.getElementById('mainInp').value=Array.from(e.results).map(r=>r[0].transcript).join('');};
-  recog.onend=()=>{listening=false;document.getElementById('micBtn').classList.remove('on');const t=document.getElementById('mainInp').value.trim();if(t.length>2)doRecord();};
-  recog.onerror=()=>{listening=false;document.getElementById('micBtn').classList.remove('on');};
-  try{recog.start();}catch(e){showToast('Mic error');}
-}
-function useChip(el){document.getElementById('mainInp').value=el.textContent;doRecord();}
-// F6+F10: doRecord with smart prompt
-// ═══════════════════════════════════════════════════════
-// REPLACE your existing doRecord() function with this
-// ═══════════════════════════════════════════════════════
-async function doRecord(){
-  const rawText=document.getElementById('mainInp').value.trim();if(!rawText)return;
-  const text=rawText.replace(/(\d),(\d)/g,'$1$2');
-  const card=document.getElementById('resultCard');
-  card.style.display='block';
-  document.getElementById('resultTitle').innerHTML='<span class="spin"></span> AI ይሓስብ ኣሎ...';
-  ['resultMeta','resultEntries','resultDesc'].forEach(id=>document.getElementById(id).innerHTML='');
-  document.getElementById('postBtn').disabled=true;pending=null;
-
-  // Send materials inventory to AI so it knows unit costs
-  const materialsContext = DB.materials.map(m=>({name:m.name,qty:m.qty,unit:m.unit,cost:m.cost}));
-
-  try{
-    const res=await fetch('/api/ai',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({prompt:text, materials:materialsContext})
-    });
-    if(!res.ok)throw new Error('Server error '+res.status);
-    const data=await res.json();
-    let raw=(data.result||'').trim().replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
-    const m=raw.match(/\{[\s\S]*\}/);if(!m)throw new Error('Invalid AI response');
-    const p=JSON.parse(m[0]);if(p.error)throw new Error(p.error);
-    if(!p.entries||!p.entries.length)throw new Error('No entries returned');
-    pending=p;showResult(p);
-  }catch(err){
-    document.getElementById('resultTitle').textContent='⚠️ Error';
-    document.getElementById('resultDesc').textContent=err.message;
-  }
-}
-  function postEntry(){
-  if(!pending)return;
-  const deb=(pending.entries||[]).filter(r=>(+r.debit)>0).map(r=>({acct:r.account,amt:+(+r.debit).toFixed(2),atype:(r.type||'asset').toLowerCase()}));
-  const cred=(pending.entries||[]).filter(r=>(+r.credit)>0).map(r=>({acct:r.account,amt:+(+r.credit).toFixed(2),atype:(r.type||'asset').toLowerCase()}));
-  const entry={id:DB.nextId++,date:pending.date||today(),desc:pending.description||'',type:pending.type||'Other',amount:pending.amount||0,debits:deb,credits:cred};
-  if(pending.prepaidMonths)entry.prepaidMonths=pending.prepaidMonths;
-
-  // FIX: if material usage, deduct from inventory stock
-  if(pending.materialUsage){
-    const mu=pending.materialUsage;
-    const mat=DB.materials.find(m=>m.name.toLowerCase()===(mu.name||'').toLowerCase());
-    if(mat){
-      const oldQty=mat.qty;
-      mat.qty=Math.max(0,mat.qty-(mu.qty||0));
-      console.log(`Stock deducted: ${mat.name} ${oldQty} → ${mat.qty}`);
-    }
-  }
-
-  DB.entries.push(entry);
-  pending=null;saveData();renderAll();runAudit();checkPrepaidAmortization();
-  document.getElementById('postBtn').textContent='✅ Posted!';
-  document.getElementById('postBtn').disabled=true;
-  showToast('✅ Entry posted!');
-  document.getElementById('mainInp').value='';
-  setTimeout(()=>{document.getElementById('postBtn').textContent='✅ ናብ ደፍተር — Post to Journal';},2500);
-}
-
-function showResult(e){
-  document.getElementById('resultTitle').textContent='ትንታነ AI';
-  document.getElementById('resultType').textContent=(e.type||'—').toUpperCase();
-  document.getElementById('resultMeta').innerHTML=`<div class="meta-box"><div class="meta-lbl">Date</div><div class="meta-val">${e.date||today()}</div></div><div class="meta-box"><div class="meta-lbl">Amount</div><div class="meta-val">${fc(e.amount||0)}</div></div><div class="meta-box"><div class="meta-lbl">Currency</div><div class="meta-val">${e.currency||'USD'}</div></div>${e.prepaidMonths?`<div class="meta-box"><div class="meta-lbl">Prepaid Months</div><div class="meta-val">${e.prepaidMonths} mo</div></div>`:''}`;
-  const deb=(e.entries||[]).filter(r=>(+r.debit)>0),cred=(e.entries||[]).filter(r=>(+r.credit)>0);
-  let rows='';
-  deb.forEach(d=>{rows+=`<tr><td><span class="tag t-blue" style="font-size:9px">Dr</span> ${d.account}<br><small style="color:var(--text3);font-size:9px">${d.type}</small></td><td style="font-family:'JetBrains Mono',monospace;color:var(--blue3)">${fc(+d.debit)}</td><td></td></tr>`;});
-  cred.forEach(c=>{rows+=`<tr><td style="padding-left:16px"><span class="tag t-green" style="font-size:9px">Cr</span> ${c.account}<br><small style="color:var(--text3);font-size:9px">${c.type}</small></td><td></td><td style="font-family:'JetBrains Mono',monospace;color:var(--green3)">${fc(+c.credit)}</td></tr>`;});
-  const tD=deb.reduce((s,r)=>s+(+r.debit),0),tC=cred.reduce((s,r)=>s+(+r.credit),0),ok=Math.abs(tD-tC)<0.02;
-  rows+=`<tr style="background:var(--bg3)"><td style="font-size:10px;color:var(--text3)">Total ${ok?'✅':'⚠️ UNBALANCED'}</td><td style="font-family:'JetBrains Mono',monospace;color:var(--blue3)">${fc(tD)}</td><td style="font-family:'JetBrains Mono',monospace;color:var(--green3)">${fc(tC)}</td></tr>`;
-  document.getElementById('resultEntries').innerHTML=`<table><thead><tr><th>Account</th><th>Debit</th><th>Credit</th></tr></thead><tbody>${rows}</tbody></table>`;
-  document.getElementById('resultDesc').textContent=e.description||'';
-  document.getElementById('postBtn').disabled=!ok;
-  if(!ok)showToast('⚠️ Debits ≠ Credits');
-}
-function postEntry(){
-  if(!pending)return;
-  const deb=(pending.entries||[]).filter(r=>(+r.debit)>0).map(r=>({acct:r.account,amt:+(+r.debit).toFixed(2),atype:(r.type||'asset').toLowerCase()}));
-  const cred=(pending.entries||[]).filter(r=>(+r.credit)>0).map(r=>({acct:r.account,amt:+(+r.credit).toFixed(2),atype:(r.type||'asset').toLowerCase()}));
-  const entry={id:DB.nextId++,date:pending.date||today(),desc:pending.description||'',type:pending.type||'Other',amount:pending.amount||0,debits:deb,credits:cred};
-  if(pending.prepaidMonths)entry.prepaidMonths=pending.prepaidMonths;
-
-  if(pending.materialUsage){
-    const mu=pending.materialUsage;
-    const mat=DB.materials.find(m=>m.name.toLowerCase()===(mu.name||'').toLowerCase());
-    if(mat){
-      mat.qty=Math.max(0,mat.qty-(mu.qty||0));
-    }
-  }
-
-  DB.entries.push(entry);
-  pending=null;saveData();renderAll();runAudit();checkPrepaidAmortization();
-  document.getElementById('postBtn').textContent='✅ Posted!';
-  document.getElementById('postBtn').disabled=true;
-  showToast('✅ Entry posted!');
-  document.getElementById('mainInp').value='';
-  setTimeout(()=>{document.getElementById('postBtn').textContent='✅ ናብ ደፍተር — Post to Journal';},2500);
-}
-function deleteEntry(id){if(!confirm('Delete?'))return;DB.entries=DB.entries.filter(e=>e.id!==id);saveData();renderAll();showToast('Deleted');}
-function renderHome(){
-  const b=getBal(),tR=sumByType(b,'revenue'),tX=sumByType(b,'expense'),net=tR-tX;
-  const cash=b['Cash']?b['Cash'].net:0,wip=b['Work in Progress']?b['Work in Progress'].net:0;
-  const ar=b['Accounts Receivable']?b['Accounts Receivable'].net:0,ret=b['Retention Receivable']?b['Retention Receivable'].net:0;
-  document.getElementById('homeKpis').innerHTML=`
-    <div class="kpi"><div class="kpi-lbl">Cash</div><div class="kpi-val ${cash>=0?'pos':'neg'}">${fc(cash)}</div></div>
-    <div class="kpi"><div class="kpi-lbl">${net>=0?'ትርፊ':'ክሳራ'}</div><div class="kpi-val ${net>=0?'pos':'neg'}">${fc(Math.abs(net))}</div></div>
-    <div class="kpi"><div class="kpi-lbl">WIP</div><div class="kpi-val warn">${fc(wip)}</div></div>
-    <div class="kpi"><div class="kpi-lbl">AR</div><div class="kpi-val">${fc(ar)}</div></div>
-    <div class="kpi"><div class="kpi-lbl">Retention (Live)</div><div class="kpi-val">${fc(ret)}</div></div>
-    <div class="kpi"><div class="kpi-lbl">Active Projects</div><div class="kpi-val">${DB.projects.filter(p=>p.status==='active').length}</div></div>`;
-  const tList=[...DB.entries].reverse().filter(e=>e.date===today()).slice(0,6);
-  document.getElementById('todayEntries').innerHTML=tList.length?tList.map(e=>`<div style="display:flex;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);align-items:center"><div style="flex:1;font-size:12px;color:var(--text)">${e.desc||'—'}</div><div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--gold2)">${fc(e.amount)}</div><button style="padding:2px 6px;background:transparent;border:1px solid rgba(192,48,42,.3);border-radius:3px;color:var(--red3);font-size:9px;cursor:pointer" onclick="deleteEntry(${e.id})">✕</button></div>`).join(''):'<div style="font-size:12px;color:var(--text3);text-align:center;padding:16px">No entries today</div>';
-  renderCFWidget(document.getElementById('miniCF'));
-  const alerts=[];
-  const low=DB.materials.filter(m=>m.min>0&&m.qty<=m.min);
-  if(low.length)alerts.push(`<div class="alert al-warn"><span class="alert-ico">⚠️</span><div class="alert-body"><div class="alert-title">Low Stock</div>${low.map(m=>m.name+': '+m.qty).join(', ')}</div></div>`);
-  document.getElementById('homeAlerts').innerHTML=alerts.join('');
-}
-// F5: CF with depreciation
-function renderCFWidget(el){
-  if(!el)return;
-  const b=getBal(),cash=b['Cash']?b['Cash'].net:0;
-  const avgRev=sumByType(b,'revenue')/Math.max(1,DB.entries.length/8);
-  const avgExp=sumByType(b,'expense')/Math.max(1,DB.entries.length/8);
-  const monthlyDep=DB.assets.reduce((s,a)=>s+(a.monthlyDep||0),0);
-  let run=cash,html='';
-  ['Month 1','Month 2','Month 3'].forEach((m,i)=>{
-    run+=avgRev-avgExp-monthlyDep;
-    const max=Math.max(Math.abs(run),avgRev,1);
-    html+=`<div class="cf-row"><div class="cf-label">${m}</div><div class="cf-bar-bg"><div class="cf-bar ${run>=0?'pos':'neg'}" style="width:${Math.min(100,Math.abs(run)/max*100)}%"></div></div><div class="cf-val" style="color:${run>=0?'var(--green3)':'var(--red3)'}">${fc(run)}</div></div>`;
-    if(monthlyDep>0)html+=`<div style="font-size:9px;color:var(--text3);padding:1px 0 4px;font-family:'JetBrains Mono',monospace">incl. ${fc(monthlyDep)} dep/mo</div>`;
-    if(run<0&&i===0)html+=`<div class="alert al-danger" style="margin:4px 0"><span class="alert-ico">🚨</span><div class="alert-body">Month ${i+1} deficit projected</div></div>`;
-  });
-  el.innerHTML=html;
-}
-function renderCF(){const el=document.getElementById('cfFull');if(el)renderCFWidget(el);}
-function clearJFilter(){['jSearch','jFrom','jTo'].forEach(id=>document.getElementById(id).value='');renderJournal();}
-function renderJournal(){
-  const el=document.getElementById('jFull');if(!el)return;
-  const q=(document.getElementById('jSearch')||{}).value||'',from=(document.getElementById('jFrom')||{}).value||'',to=(document.getElementById('jTo')||{}).value||'';
-  let list=DB.entries.filter(e=>{if(from&&e.date<from)return false;if(to&&e.date>to)return false;if(q&&!(e.desc||'').toLowerCase().includes(q.toLowerCase()))return false;return true;});
-  if(!list.length){el.innerHTML='<div style="text-align:center;padding:30px;color:var(--text3)">No entries</div>';return;}
-  let rows='';
-  list.forEach(e=>{
-    (e.debits||[]).forEach((d,i)=>{rows+=`<tr><td style="font-size:10px;white-space:nowrap;color:var(--text3)">${i===0?e.date:''}</td><td style="font-size:9px;color:var(--text3)">${i===0?'#'+e.id:''}</td><td><span class="tag t-blue" style="font-size:9px">Dr</span> ${d.acct}</td><td style="font-family:'JetBrains Mono',monospace;color:var(--blue3)">${fc(d.amt)}</td><td></td><td>${i===0?`<button style="padding:2px 6px;background:transparent;border:1px solid rgba(192,48,42,.3);border-radius:3px;color:var(--red3);font-size:9px;cursor:pointer" onclick="deleteEntry(${e.id})">🗑️</button>`:''}</td></tr>`;});
-    (e.credits||[]).forEach(c=>{rows+=`<tr><td></td><td></td><td style="padding-left:14px"><span class="tag t-green" style="font-size:9px">Cr</span> ${c.acct}</td><td></td><td style="font-family:'JetBrains Mono',monospace;color:var(--green3)">${fc(c.amt)}</td><td></td></tr>`;});
-    rows+=`<tr><td colspan="6" style="font-size:10px;color:var(--text3);padding:3px 12px 8px;border-bottom:1px solid var(--border)">${e.desc||''}</td></tr>`;
-  });
-  el.innerHTML=`<div class="tw"><table><thead><tr><th>Date</th><th>#</th><th>Account</th><th>Debit</th><th>Credit</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`;
-  document.getElementById('jBadge').textContent=DB.entries.length;
-}
-function renderLedger(){
-  const el=document.getElementById('lFull');if(!el)return;
-  const a=getLedger();if(!Object.keys(a).length){el.innerHTML='<div style="text-align:center;padding:30px;color:var(--text3)">No entries</div>';return;}
-  let html='';
-  Object.entries(a).forEach(([acc,data])=>{
-    const dr=data.rows.filter(r=>r.side==='dr').reduce((s,r)=>s+r.amt,0),cr=data.rows.filter(r=>r.side==='cr').reduce((s,r)=>s+r.amt,0),net=dr-cr;
-    const drR=data.rows.filter(r=>r.side==='dr'),crR=data.rows.filter(r=>r.side==='cr');
-    let rows='';
-    for(let i=0;i<Math.max(drR.length,crR.length);i++){
-      const d=drR[i],c=crR[i];
-      rows+=`<tr><td style="font-size:10px;color:var(--text3)">${d?d.date:''}</td><td style="font-size:11px;color:var(--text2)">${d?d.desc:''}</td><td style="font-family:'JetBrains Mono',monospace;color:var(--blue3)">${d?fc(d.amt):''}</td><td style="font-size:10px;color:var(--text3)">${c?c.date:''}</td><td style="font-size:11px;color:var(--text2)">${c?c.desc:''}</td><td style="font-family:'JetBrains Mono',monospace;color:var(--green3)">${c?fc(c.amt):''}</td></tr>`;
-    }
-    rows+=`<tr style="background:var(--bg3)"><td colspan="2" style="font-size:11px;font-weight:600;color:var(--text2)">Balance</td><td style="font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--blue3)">${fc(dr)}</td><td colspan="2"></td><td style="font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--green3)">${fc(cr)}</td></tr>`;
-    html+=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;margin-bottom:14px;overflow:hidden"><div style="background:var(--bg3);padding:12px 16px;display:flex;align-items:center;border-bottom:1px solid var(--border)"><div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--text)">${acc}</div><div style="font-size:10px;color:var(--text3);text-transform:uppercase">${data.type}</div></div><div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:${net>=0?'var(--blue3)':'var(--green3)'}">${net>=0?'Dr':'Cr'} ${fc(Math.abs(net))}</div></div><div class="tw" style="border:none;border-radius:0;margin:0"><table><thead><tr><th>Date</th><th>Dr Entry</th><th>Amount</th><th>Date</th><th>Cr Entry</th><th>Amount</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
-  });
-  el.innerHTML=html;
-}
-function renderTrial(){
-  const el=document.getElementById('tFull');if(!el)return;
-  const b=getBal();if(!Object.keys(b).length){el.innerHTML='<div style="text-align:center;padding:30px;color:var(--text3)">No entries</div>';return;}
-  const rows=Object.entries(b).map(([a,v])=>({a,type:v.type,dr:v.net>0?v.net:0,cr:v.net<0?Math.abs(v.net):0}));
-  const tD=rows.reduce((s,r)=>s+r.dr,0),tC=rows.reduce((s,r)=>s+r.cr,0),ok=Math.abs(tD-tC)<0.05;
-  el.innerHTML=`<div class="alert ${ok?'al-ok':'al-danger'}"><span class="alert-ico">${ok?'✅':'⚠️'}</span><div class="alert-body"><div class="alert-title">${ok?'Balanced':'NOT Balanced'}</div>Dr ${fc(tD)} | Cr ${fc(tC)}</div></div>
-  <div class="tw"><table><thead><tr><th>Account</th><th>Type</th><th>Debit</th><th>Credit</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${r.a}</td><td><span class="tag t-${r.type==='asset'?'blue':r.type==='liability'?'red':r.type==='revenue'?'green':r.type==='expense'?'orange':'gold'}" style="font-size:9px">${r.type}</span></td><td style="font-family:'JetBrains Mono',monospace;color:var(--blue3)">${r.dr>0?fc(r.dr):''}</td><td style="font-family:'JetBrains Mono',monospace;color:var(--green3)">${r.cr>0?fc(r.cr):''}</td></tr>`).join('')}</tbody><tfoot><tr><td colspan="2" style="font-weight:700">Total</td><td style="font-family:'JetBrains Mono',monospace;font-weight:700">${fc(tD)}</td><td style="font-family:'JetBrains Mono',monospace;font-weight:700">${fc(tC)}</td></tr></tfoot></table></div>`;
-}
-// F7: income triggers prepaid check
-function renderIncome(){
-  checkPrepaidAmortization();
-  const el=document.getElementById('iFull');if(!el)return;
-  const from=(document.getElementById('iFrom')||{}).value||'',to=(document.getElementById('iTo')||{}).value||'';
-  const b=getBal(from,to);if(!Object.keys(b).length){el.innerHTML='<div style="text-align:center;padding:30px;color:var(--text3)">No entries</div>';return;}
-  const rA=Object.entries(b).filter(([,v])=>v.type==='revenue'),xA=Object.entries(b).filter(([,v])=>v.type==='expense');
-  const tR=rA.reduce((s,[,v])=>s+Math.abs(v.net),0),tX=xA.reduce((s,[,v])=>s+Math.abs(v.net),0),net=tR-tX;
-  el.innerHTML=`<div class="kgrid"><div class="kpi"><div class="kpi-lbl">Revenue</div><div class="kpi-val pos">${fc(tR)}</div></div><div class="kpi"><div class="kpi-lbl">Expenses</div><div class="kpi-val neg">${fc(tX)}</div></div><div class="kpi"><div class="kpi-lbl">${net>=0?'Net Profit':'Net Loss'}</div><div class="kpi-val ${net>=0?'pos':'neg'}">${fc(Math.abs(net))}</div></div></div>
-  <div class="fs-card"><div class="fs-title">Income Statement — ${BIZ_NAME}</div><div class="fs-sub">${from||'Beginning'} → ${to||'Now'}</div>
-  <div class="fs-section">Revenue</div>${rA.map(([a,v])=>`<div class="fs-row indent"><span>${a}</span><span class="fs-val pos">${fc(Math.abs(v.net))}</span></div>`).join('')||'<div class="fs-row indent" style="color:var(--text3)"><span>No revenue</span><span>—</span></div>'}
-  <div class="fs-row sub"><span>Total Revenue</span><span class="fs-val pos">${fc(tR)}</span></div>
-  <div class="fs-section">Expenses</div>${xA.map(([a,v])=>`<div class="fs-row indent"><span>${a}</span><span class="fs-val neg">(${fc(Math.abs(v.net))})</span></div>`).join('')||'<div class="fs-row indent" style="color:var(--text3)"><span>No expenses</span><span>—</span></div>'}
-  <div class="fs-row sub"><span>Total Expenses</span><span class="fs-val neg">(${fc(tX)})</span></div>
-  <div class="fs-row total"><span>${net>=0?'NET PROFIT':'NET LOSS'}</span><span class="fs-val ${net>=0?'pos':'neg'}">${fc(Math.abs(net))}</span></div></div>`;
-}
-function renderBalance(){
-  checkPrepaidAmortization();
-  const el=document.getElementById('bFull');if(!el)return;
-  const b=getBal();if(!Object.keys(b).length){el.innerHTML='<div style="text-align:center;padding:30px;color:var(--text3)">No entries</div>';return;}
-  const aA=Object.entries(b).filter(([,v])=>v.type==='asset'),lA=Object.entries(b).filter(([,v])=>v.type==='liability'),eA=Object.entries(b).filter(([,v])=>v.type==='equity');
-  const tA=aA.reduce((s,[,v])=>s+v.net,0),tL=lA.reduce((s,[,v])=>s+Math.abs(v.net),0),tEB=eA.reduce((s,[,v])=>s+Math.abs(v.net),0);
-  const re=sumByType(b,'revenue')-sumByType(b,'expense'),tE=tEB+re;
-  const r=(lbl,val,indent,clr)=>`<div class="fs-row ${indent?'indent':'sub'}"><span>${lbl}</span><span class="fs-val" style="color:${clr||'var(--text)'}">${fc(val)}</span></div>`;
-  el.innerHTML=`<div class="kgrid"><div class="kpi"><div class="kpi-lbl">Assets</div><div class="kpi-val">${fc(tA)}</div></div><div class="kpi"><div class="kpi-lbl">Liabilities</div><div class="kpi-val neg">${fc(tL)}</div></div><div class="kpi"><div class="kpi-lbl">Equity</div><div class="kpi-val pos">${fc(tE)}</div></div></div>
-  <div class="fs-card"><div class="fs-title">Balance Sheet — ${BIZ_NAME}</div><div class="fs-sub">${today()}</div>
-  <div class="fs-section">Assets</div>${aA.map(([a,v])=>r(a,v.net,true,'var(--blue3)')).join('')||'<div class="fs-row indent" style="color:var(--text3)"><span>None</span><span>—</span></div>'}
-  <div class="fs-row total"><span>Total Assets</span><span class="fs-val">${fc(tA)}</span></div>
-  <div class="fs-section">Liabilities</div>${lA.map(([a,v])=>r(a,Math.abs(v.net),true,'var(--red3)')).join('')||'<div class="fs-row indent" style="color:var(--text3)"><span>None</span><span>—</span></div>'}
-  ${r('Total Liabilities',tL,false,'var(--red3)')}
-  <div class="fs-section">Equity</div>${eA.map(([a,v])=>r(a,Math.abs(v.net),true,'var(--green3)')).join('')}
-  ${r(re>=0?'Retained Earnings':'Accumulated Loss',re,true,re>=0?'var(--green3)':'var(--red3)')}
-  ${r('Total Equity',tE,false,'var(--green3)')}
-  <div class="fs-row total"><span>Liabilities + Equity</span><span class="fs-val">${fc(tL+tE)}</span></div></div>`;
-}
-// F4+F14: live job costing with WIP
-function renderJobCost(){
-  const el=document.getElementById('jobCostCards');if(!el)return;
-  if(!DB.projects.length){el.innerHTML='<div style="text-align:center;padding:30px;color:var(--text3)">No projects</div>';return;}
-  el.innerHTML=DB.projects.map(p=>{
-    const costs=getProjCosts(p.name),revenue=getProjRevenue(p.name),budget=p.value||0;
-    const costPct=budget>0?Math.min(100,Math.round(costs/budget*100)):0,profit=revenue-costs;
-    const wip=calcWIP(p);
-    const wipHTML=wip?`<div style="margin-top:10px;padding:10px;background:var(--bg3);border:1px solid var(--border);border-radius:5px"><div style="font-size:10px;color:var(--text3);margin-bottom:6px;font-family:'JetBrains Mono',monospace">WIP — ${wip.pct}% complete by cost</div><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:6px"><span>Earned: <b style="color:var(--green3)">${fc(wip.earned)}</b></span><span>Billed: <b style="color:var(--gold2)">${fc(wip.billed)}</b></span><span>Diff: <b style="color:${wip.diff>=0?'var(--green3)':'var(--red3)'}">${fc(Math.abs(wip.diff))}</b></span></div><div style="font-size:11px;color:${wip.diff>=0?'var(--green3)':'var(--red3)'};margin-bottom:6px">${wip.label}</div>${Math.abs(wip.diff)>0.01?`<button class="btn btn-outline" style="font-size:10px;width:100%;padding:6px" onclick="postWIPAdjustment(${p.id})">📒 Post WIP Adjustment</button>`:'<div style="font-size:10px;color:var(--green3)">✅ No adjustment needed</div>'}</div>`:'';
-    return `<div class="card"><div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:14px"><div style="flex:1"><div style="font-size:15px;font-weight:700;color:var(--text)">🏗️ ${p.name}</div><div style="font-size:11px;color:var(--text3)">${p.client||'—'} · ${p.location||'—'}</div></div><span class="tag ${p.status==='active'?'t-green':'t-gold'}">${p.status==='active'?'Active':'Done'}</span></div>
-    <div class="kgrid" style="grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">
-      <div class="kpi"><div class="kpi-lbl">Contract</div><div class="kpi-val" style="font-size:14px">${fc(budget)}</div></div>
-      <div class="kpi"><div class="kpi-lbl">Costs (Live)</div><div class="kpi-val warn" style="font-size:14px">${fc(costs)}</div></div>
-      <div class="kpi"><div class="kpi-lbl">Revenue (Live)</div><div class="kpi-val pos" style="font-size:14px">${fc(revenue)}</div></div>
-      <div class="kpi"><div class="kpi-lbl">${profit>=0?'Profit':'Loss'}</div><div class="kpi-val ${profit>=0?'pos':'neg'}" style="font-size:14px">${fc(Math.abs(profit))}</div></div>
-    </div>
-    <div class="prog-wrap"><div class="prog-labels"><span>Cost vs Budget</span><span>${costPct}%</span></div><div class="prog"><div class="prog-fill ${costPct>90?'red':costPct>70?'gold':'green'}" style="width:${costPct}%"></div></div></div>
-    ${costPct>90?'<div class="alert al-danger" style="margin-top:8px"><span class="alert-ico">🚨</span><div class="alert-body"><div class="alert-title">Cost over 90% of contract!</div></div></div>':''}
-    ${wipHTML}</div>`;
-  }).join('');
-}
-// Mobile Money
-function addMobileMoney(){
-  const net=document.getElementById('mmNet').value,type=document.getElementById('mmType').value;
-  const amt=parseFloat(document.getElementById('mmAmt').value)||0,cur=document.getElementById('mmCur').value,ref=document.getElementById('mmRef').value.trim();
-  if(!amt){showToast('Enter amount');return;}
-  const isIn=type==='in',amtUSD=cur==='SSP'?amt/SSP_RATE:amt;
-  DB.entries.push({id:DB.nextId++,date:today(),desc:`${net.toUpperCase()} ${type} — ${ref||'Mobile Money'}`,type:'Mobile Money',amount:amtUSD,project:'',debits:[{acct:isIn?'Cash':'Accounts Payable',amt:amtUSD,atype:isIn?'asset':'liability'}],credits:[{acct:isIn?'Contract Revenue':'Cash',amt:amtUSD,atype:isIn?'revenue':'asset'}]});
-  DB.mobileMoney.push({id:Date.now(),net,type,amt,cur,ref,date:today(),isIn});
-  saveData();renderAll();document.getElementById('mmAmt').value='';document.getElementById('mmRef').value='';
-  document.getElementById('mmSt').innerHTML=`<span style="color:var(--green3)">✅ ${fc(amtUSD)}</span>`;
-  showToast('✅ Mobile money recorded');setTimeout(()=>{const e=document.getElementById('mmSt');if(e)e.innerHTML='';},3000);
-}
-function renderMM(){
-  const mtnIn=DB.mobileMoney.filter(m=>m.net==='mtn'&&m.isIn).reduce((s,m)=>s+(m.cur==='SSP'?m.amt/SSP_RATE:m.amt),0);
-  const airtelIn=DB.mobileMoney.filter(m=>m.net==='airtel'&&m.isIn).reduce((s,m)=>s+(m.cur==='SSP'?m.amt/SSP_RATE:m.amt),0);
-  const out=DB.mobileMoney.filter(m=>!m.isIn).reduce((s,m)=>s+(m.cur==='SSP'?m.amt/SSP_RATE:m.amt),0);
-  ['mtnInVal','airtelInVal','mmOutVal','mmNetVal'].forEach((id,i)=>{const el=document.getElementById(id);if(!el)return;const vals=[mtnIn,airtelIn,out,mtnIn+airtelIn-out];el.textContent=fc(vals[i]);el.className='kpi-val'+(i===3?(vals[i]>=0?' pos':' neg'):i<2?' pos':' neg');});
-  const list=document.getElementById('mmList');if(!list)return;
-  if(!DB.mobileMoney.length){list.innerHTML='<div style="text-align:center;padding:20px;color:var(--text3)">No records</div>';return;}
-  list.innerHTML=[...DB.mobileMoney].reverse().slice(0,20).map(m=>`<div class="mm-row"><div class="mm-logo ${m.net}">${m.net==='mtn'?'MTN':'AIR'}</div><div class="mm-body"><div class="mm-name">${m.net.toUpperCase()} ${m.type} — ${m.ref||'—'}</div><div class="mm-ref">${m.date} · ${m.cur}</div></div><div class="mm-amount ${m.isIn?'in':'out'}">${m.isIn?'+':'-'}${fc(m.cur==='SSP'?m.amt/SSP_RATE:m.amt)}</div></div>`).join('');
-}
-// Petty Cash
-function replenishPetty(){const amt=parseFloat(document.getElementById('pcRepAmt').value)||0;if(!amt){showToast('Enter amount');return;}DB.entries.push({id:DB.nextId++,date:today(),desc:'Petty cash replenishment',type:'Petty Cash Fund',amount:amt,project:'',debits:[{acct:'Petty Cash',amt,atype:'asset'}],credits:[{acct:'Cash',amt,atype:'asset'}]});saveData();renderAll();document.getElementById('pcRepAmt').value='';showToast('✅ Replenished');}
-function postPettyExpense(){
-  const desc=document.getElementById('pcDesc').value.trim(),amt=parseFloat(document.getElementById('pcAmt').value)||0,cat=document.getElementById('pcCat').value;
-  if(!desc||!amt){showToast('Enter description and amount');return;}
-  const pc=getBal()['Petty Cash']?getBal()['Petty Cash'].net:0;if(amt>pc){showToast('Insufficient petty cash');return;}
-  DB.entries.push({id:DB.nextId++,date:today(),desc:desc+' (petty cash)',type:'Petty Cash Used',amount:amt,project:'',debits:[{acct:cat,amt,atype:'expense'}],credits:[{acct:'Petty Cash',amt,atype:'asset'}]});
-  saveData();renderAll();document.getElementById('pcDesc').value='';document.getElementById('pcAmt').value='';showToast('✅ Expense recorded');
-}
-function renderPetty(){
-  const b=getBal(),pc=b['Petty Cash']?b['Petty Cash'].net:0;
-  const el=document.getElementById('pettyCashBalance');if(el)el.textContent=fc(pc);
-  const hist=document.getElementById('pettyHistory');if(!hist)return;
-  const entries=[...DB.entries].filter(e=>(e.debits||[]).some(d=>d.acct==='Petty Cash')||(e.credits||[]).some(c=>c.acct==='Petty Cash')).reverse().slice(0,20);
-  hist.innerHTML=entries.length?entries.map(e=>`<div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;align-items:center"><div style="color:var(--text3);white-space:nowrap;font-family:'JetBrains Mono',monospace">${e.date}</div><div style="flex:1;color:var(--text)">${e.desc}</div><div style="font-family:'JetBrains Mono',monospace;color:${e.type==='Petty Cash Fund'?'var(--green3)':'var(--red3)'}">${e.type==='Petty Cash Fund'?'+':'-'}${fc(e.amount)}</div></div>`).join(''):'<div style="text-align:center;padding:16px;color:var(--text3)">No records</div>';
-}
-// F1: weighted avg cost
-function getWeightedAvgCost(name){
-  const m=DB.materials.find(m=>m.name.toLowerCase()===name.toLowerCase());if(m&&m.cost>0)return m.cost;
-  const rel=DB.entries.filter(e=>(e.desc||'').toLowerCase().includes(name.toLowerCase())&&(e.debits||[]).some(d=>d.acct==='Construction Materials'));
-  return rel.length?rel.reduce((s,e)=>s+(e.amount||0),0)/rel.length:0;
-}
-function addMaterial(){
-  const name=document.getElementById('matName').value.trim(),cat=document.getElementById('matCat').value,qty=parseFloat(document.getElementById('matQty').value)||0,unit=document.getElementById('matUnit').value;
-  let cost=parseFloat(document.getElementById('matCost').value)||0;const min=parseFloat(document.getElementById('matMin').value)||0;
-  const st=document.getElementById('matAddSt');if(!name||!qty){st.innerHTML='<span style="color:var(--red3)">Enter name and quantity</span>';return;}
-  if(!cost){cost=getWeightedAvgCost(name);if(cost>0)st.innerHTML=`<span style="color:var(--orange3)">Auto cost from history: ${fc(cost)}</span>`;}
-  const existing=DB.materials.find(m=>m.name.toLowerCase()===name.toLowerCase());
-  if(existing){existing.qty+=qty;}else{DB.materials.push({id:Date.now(),name,cat,qty,unit,cost,min,addedAt:today()});}
-  saveData();renderMaterials();document.getElementById('matName').value='';document.getElementById('matQty').value='';
-  if(!st.innerHTML)st.innerHTML=`<span style="color:var(--green3)">✅ ${name} added</span>`;setTimeout(()=>st.innerHTML='',3000);
-}
-function updateMatQty(id,delta){const m=DB.materials.find(m=>m.id===id);if(m){m.qty=Math.max(0,m.qty+delta);saveData();renderMaterials();}}
-function deleteMat(id){if(!confirm('Delete?'))return;DB.materials=DB.materials.filter(m=>m.id!==id);saveData();renderMaterials();}
-function renderMaterials(){
-  const el=document.getElementById('matList');if(!el)return;const q=(document.getElementById('matSearch')||{}).value||'';
-  if(!DB.materials.length){el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text3)">No materials</div>';return;}
-  const total=DB.materials.reduce((s,m)=>s+m.qty*m.cost,0);
-  const list=DB.materials.filter(m=>!q||m.name.toLowerCase().includes(q.toLowerCase()));
-  el.innerHTML=`<div style="font-size:11px;color:var(--text3);margin-bottom:10px;font-family:'JetBrains Mono',monospace">Total: ${fc(total)} · ${DB.materials.length} items · ${DB.materials.filter(m=>m.min>0&&m.qty<=m.min).length} low</div>`+
-    list.map(m=>{const low=m.min>0&&m.qty<=m.min,out=m.qty===0;const ico={Cement:'🧱',Steel:'⚙️',Sand:'🪨',Fuel:'⛽',Timber:'🪵',Paint:'🎨'}[m.cat]||'📦';
-    return `<div class="inv-row ${out?'out-stock':low?'low-stock':''}"><div class="inv-ico">${ico}</div><div style="flex:1"><div class="inv-name">${m.name} ${out?'<span class="tag t-red" style="font-size:9px">Out</span>':low?'<span class="tag t-orange" style="font-size:9px">Low</span>':''}</div><div class="inv-detail">${m.cat} · ${fc(m.cost)}/${m.unit}</div></div><div class="qty-ctrl"><button class="qty-btn" onclick="updateMatQty(${m.id},-1)">−</button><div class="inv-qty ${out?'out':low?'low':'ok'}" style="width:60px;text-align:center">${m.qty} ${m.unit}</div><button class="qty-btn" onclick="updateMatQty(${m.id},1)">+</button></div><button class="qty-btn" onclick="deleteMat(${m.id})" style="color:var(--red3)">✕</button></div>`;}).join('');
-}
-function addDelivery(){
-  const supplier=document.getElementById('delSupplier').value.trim(),invNo=document.getElementById('delInvNo').value.trim(),items=document.getElementById('delItems').value.trim(),total=parseFloat(document.getElementById('delTotal').value)||0,pay=document.getElementById('delPay').value,date=document.getElementById('delDate').value||today();
-  const st=document.getElementById('delSt');if(!supplier||!total){st.innerHTML='<span style="color:var(--red3)">Enter supplier and amount</span>';return;}
-  DB.deliveries.push({id:Date.now(),supplier,invNo,items,total,pay,date});
-  DB.entries.push({id:DB.nextId++,date,desc:`Delivery from ${supplier}: ${items} (${invNo})`,type:pay==='cash'?'Materials Purchase - Cash':'Materials Purchase - Credit',amount:total,project:'',debits:[{acct:'Construction Materials',amt:total,atype:'asset'}],credits:[{acct:pay==='cash'?'Cash':'Accounts Payable',amt:total,atype:pay==='cash'?'asset':'liability'}]});
-  saveData();renderAll();document.getElementById('delSupplier').value='';document.getElementById('delInvNo').value='';document.getElementById('delItems').value='';document.getElementById('delTotal').value='';
-  st.innerHTML=`<span style="color:var(--green3)">✅ ${fc(total)}</span>`;showToast('✅ Delivery recorded');setTimeout(()=>st.innerHTML='',3000);
-}
-function renderDeliveries(){
-  const el=document.getElementById('deliveryList');if(!el)return;if(!DB.deliveries.length){el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text3)">No deliveries</div>';return;}
-  el.innerHTML=`<div class="tw"><table><thead><tr><th>Date</th><th>Supplier</th><th>Invoice</th><th>Items</th><th>Amount</th><th>Payment</th></tr></thead><tbody>`+[...DB.deliveries].reverse().map(d=>`<tr><td style="font-size:10px;color:var(--text3)">${d.date}</td><td>${d.supplier}</td><td style="font-family:'JetBrains Mono',monospace;font-size:10px">${d.invNo||'—'}</td><td style="font-size:11px;color:var(--text2)">${d.items||'—'}</td><td style="font-family:'JetBrains Mono',monospace">${fc(d.total)}</td><td><span class="tag ${d.pay==='cash'?'t-green':'t-orange'}" style="font-size:9px">${d.pay==='cash'?'Cash':'Credit'}</span></td></tr>`).join('')+'</tbody></table></div>';
-}
-function addWorker(){
-  const name=document.getElementById('wkName').value.trim(),role=document.getElementById('wkRole').value,salary=parseFloat(document.getElementById('wkSalary').value)||0,cur=document.getElementById('wkCur').value;
-  const st=document.getElementById('wkAddSt');if(!name||!salary){st.innerHTML='<span style="color:var(--red3)">Enter name and salary</span>';return;}
-  const salaryUSD=cur==='SSP'?salary/SSP_RATE:salary;
-  DB.workers.push({id:Date.now(),name,role,salary:salaryUSD,cur,active:true});
-  saveData();renderWorkers();document.getElementById('wkName').value='';document.getElementById('wkSalary').value='';
-  st.innerHTML=`<span style="color:var(--green3)">✅ ${name} added</span>`;setTimeout(()=>st.innerHTML='',3000);
-}
-function paySalary(){
-  const sel=document.getElementById('payWorker'),wkId=parseInt(sel.value),month=document.getElementById('payMonth').value,override=parseFloat(document.getElementById('payOverride').value)||0,worker=DB.workers.find(w=>w.id===wkId);
-  if(!worker){showToast('Select worker');return;}const amt=override||worker.salary;
-  DB.entries.push({id:DB.nextId++,date:today(),desc:`Salary ${worker.name} — ${month} (${worker.role})`,type:'Salary Payment',amount:amt,project:'',debits:[{acct:'Salary Expense',amt,atype:'expense'}],credits:[{acct:'Cash',amt,atype:'asset'}]});
-  saveData();renderAll();showToast(`✅ Paid ${worker.name} — ${fc(amt)}`);document.getElementById('payOverride').value='';
-}
-function payAllSalaries(){
-  const month=document.getElementById('payMonth').value;
-  DB.workers.filter(w=>w.active).forEach(w=>DB.entries.push({id:DB.nextId++,date:today(),desc:`Salary ${w.name} — ${month}`,type:'Salary Payment',amount:w.salary,project:'',debits:[{acct:'Salary Expense',amt:w.salary,atype:'expense'}],credits:[{acct:'Cash',amt:w.salary,atype:'asset'}]}));
-  saveData();renderAll();showToast(`✅ All salaries paid`);
-}
-function deleteWorker(id){if(!confirm('Delete?'))return;DB.workers=DB.workers.filter(w=>w.id!==id);saveData();renderWorkers();}
-function renderWorkers(){
-  const sel=document.getElementById('payWorker');if(sel)sel.innerHTML=DB.workers.map(w=>`<option value="${w.id}">${w.name} — ${w.role} (${fc(w.salary)}/mo)</option>`).join('');
-  const el=document.getElementById('workerList');if(!el)return;if(!DB.workers.length){el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text3)">No workers</div>';return;}
-  const total=DB.workers.filter(w=>w.active).reduce((s,w)=>s+w.salary,0);
-  el.innerHTML=`<div style="font-size:11px;color:var(--text3);margin-bottom:10px;font-family:'JetBrains Mono',monospace">Total payroll: ${fc(total)}/mo</div>`+DB.workers.map(w=>`<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;margin-bottom:5px"><div style="font-size:18px">👷</div><div style="flex:1"><div style="font-size:13px;font-weight:500;color:var(--text)">${w.name}</div><div style="font-size:10px;color:var(--text3)">${w.role}</div></div><div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:var(--gold2)">${fc(w.salary)}/mo</div><button style="padding:3px 8px;background:transparent;border:1px solid rgba(192,48,42,.3);border-radius:3px;color:var(--red3);font-size:10px;cursor:pointer" onclick="deleteWorker(${w.id})">✕</button></div>`).join('');
-}
-function addProject(){
-  const name=document.getElementById('pjName').value.trim(),client=document.getElementById('pjClient').value.trim(),value=parseFloat(document.getElementById('pjValue').value)||0,cur=document.getElementById('pjCur').value,location=document.getElementById('pjLocation').value.trim(),retention=parseFloat(document.getElementById('pjRetention').value)||10,start=document.getElementById('pjStart').value,end=document.getElementById('pjEnd').value;
-  const st=document.getElementById('projAddSt');if(!name){st.innerHTML='<span style="color:var(--red3)">Enter project name</span>';return;}
-  const valueUSD=cur==='SSP'?value/SSP_RATE:value;
-  DB.projects.push({id:Date.now(),name,client,value:valueUSD,cur,location,retention,start,end,status:'active',progress:0,billed:0,retentionHeld:0});
-  saveData();renderProjects();populateProjectSelects();document.getElementById('pjName').value='';document.getElementById('pjClient').value='';document.getElementById('pjValue').value='';
-  st.innerHTML=`<span style="color:var(--green3)">✅ ${name} added</span>`;setTimeout(()=>st.innerHTML='',3000);
-}
-function updateProgress(id){const pct=prompt('% Complete (0-100):');if(pct===null)return;const p=DB.projects.find(p=>p.id===id);if(p){p.progress=Math.min(100,Math.max(0,parseInt(pct)||0));saveData();renderProjects();}}
-function completeProject(id){const p=DB.projects.find(p=>p.id===id);if(p){p.status='done';p.progress=100;saveData();renderProjects();renderAll();showToast('✅ Project complete — '+p.name);}}
-function deleteProject(id){if(!confirm('Delete?'))return;DB.projects=DB.projects.filter(p=>p.id!==id);saveData();renderProjects();populateProjectSelects();}
-function renderProjects(){
-  const el=document.getElementById('projectCards');if(!el)return;if(!DB.projects.length){el.innerHTML='<div style="text-align:center;padding:30px;color:var(--text3)">No projects</div>';return;}
-  el.innerHTML=DB.projects.map(p=>`<div class="card"><div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:12px"><div style="flex:1"><div style="font-size:15px;font-weight:700;color:var(--text)">🏗️ ${p.name}</div><div style="font-size:11px;color:var(--text3);margin-top:2px">📍 ${p.location||'—'} · Client: ${p.client||'—'}</div><div style="font-size:10px;color:var(--text3);font-family:'JetBrains Mono',monospace">${p.start||'?'} → ${p.end||'?'}</div></div><span class="tag ${p.status==='active'?'t-green':'t-gold'}">${p.status==='active'?'Active':'Done'}</span></div><div class="kgrid" style="grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px"><div class="kpi"><div class="kpi-lbl">Contract</div><div class="kpi-val" style="font-size:14px">${fc(p.value)}</div></div><div class="kpi"><div class="kpi-lbl">Retention ${p.retention}%</div><div class="kpi-val warn" style="font-size:14px">${fc(p.value*(p.retention/100))}</div></div><div class="kpi"><div class="kpi-lbl">Progress</div><div class="kpi-val" style="font-size:14px">${p.progress||0}%</div></div></div><div class="prog-wrap"><div class="prog-labels"><span>Progress</span><span>${p.progress||0}%</span></div><div class="prog"><div class="prog-fill gold" style="width:${p.progress||0}%"></div></div></div><div class="btn-row">${p.status==='active'?`<button class="btn btn-outline" style="font-size:11px" onclick="updateProgress(${p.id})">📊 Update</button><button class="btn btn-outline" style="font-size:11px" onclick="nav('invoice',null)">🧾 Invoice</button><button class="btn btn-green" style="font-size:11px" onclick="completeProject(${p.id})">✅ Done</button>`:'<span style="font-size:11px;color:var(--text3)">Completed</span>'}<button class="btn btn-danger" style="font-size:11px;margin-left:auto" onclick="deleteProject(${p.id})">🗑️</button></div></div>`).join('');
-}
-// F2: safe project selects
-function populateProjectSelects(){
-  ['invProject','retProject'].forEach(id=>{const sel=document.getElementById(id);if(!sel)return;if(!DB.projects.length){sel.innerHTML='<option value="" disabled selected>— No Active Projects —</option>';sel.disabled=true;}else{sel.disabled=false;sel.innerHTML=DB.projects.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');}});
-}
-function updateRetLiveBalance(){
-  const sel=document.getElementById('retProject');if(!sel||sel.disabled)return;
-  const projId=parseInt(sel.value),p=DB.projects.find(p=>p.id===projId);if(!p)return;
-  const live=getRetBal(p.name);const el=document.getElementById('retLiveBalance');
-  if(el){el.style.display='block';el.textContent=`Live Retention Balance: ${fc(live)}`;}
-}
-function previewInvoice(){
-  const amt=parseFloat(document.getElementById('invAmt').value)||0,pct=parseFloat(document.getElementById('invPct').value)||0,ret=parseFloat(document.getElementById('invRet').value)||10,retAmt=amt*ret/100,netAmt=amt-retAmt;
-  const el=document.getElementById('invoicePreview');if(!el)return;
-  el.innerHTML=`<div class="invoice-preview"><h2>🧾 INVOICE</h2><div style="font-size:11px;color:var(--text3);margin-bottom:14px">No: ${document.getElementById('invNo').value||'—'} · Date: ${today()}</div><div class="invoice-row"><span>Amount Due</span><span>${fc(amt)}</span></div><div class="invoice-row"><span>% Complete</span><span>${pct}%</span></div><div class="invoice-row"><span>Retention ${ret}%</span><span style="color:var(--orange3)">(${fc(retAmt)})</span></div><div class="invoice-row total"><span>Net Due</span><span style="color:var(--green3)">${fc(netAmt)}</span></div></div>`;
-}
-function renderInvoicePage(){populateProjectSelects();previewInvoice();}
-function postInvoice(){
-  const projId=parseInt(document.getElementById('invProject').value),invNo=document.getElementById('invNo').value.trim(),amt=parseFloat(document.getElementById('invAmt').value)||0,ret=parseFloat(document.getElementById('invRet').value)||10;
-  if(!amt){showToast('Enter amount');return;}
-  const p=DB.projects.find(p=>p.id===projId),retAmt=amt*ret/100,netAmt=amt-retAmt;
-  DB.entries.push({id:DB.nextId++,date:today(),desc:`Progress billing ${p?p.name:''} (${invNo})`,type:'Progress Billing',amount:netAmt,project:p?p.name:'',debits:[{acct:'Accounts Receivable',amt:netAmt,atype:'asset'},{acct:'Retention Receivable',amt:retAmt,atype:'asset'}],credits:[{acct:'Contract Revenue',amt:amt,atype:'revenue'}]});
-  if(p){p.billed=(p.billed||0)+amt;p.retentionHeld=(p.retentionHeld||0)+retAmt;}
-  saveData();renderAll();showToast(`✅ Invoice posted — ${fc(amt)}`);document.getElementById('invAmt').value='';document.getElementById('invNo').value='';
-}
-// F11+F12: Retention with live balance and validation
-function renderRetention(){
-  const b=getBal(),totalRet=b['Retention Receivable']?b['Retention Receivable'].net:0;
-  const el=document.getElementById('retentionKpis');
-  if(el)el.innerHTML=`<div class="kpi"><div class="kpi-lbl">Total Retention (Live)</div><div class="kpi-val warn">${fc(totalRet)}</div><div class="kpi-sub">From journal</div></div><div class="kpi"><div class="kpi-lbl">Projects</div><div class="kpi-val">${DB.projects.length}</div></div>`;
-  const tbl=document.getElementById('retentionTable');if(!tbl)return;
-  tbl.innerHTML=`<div class="tw"><table><thead><tr><th>Project</th><th>Client</th><th>Ret%</th><th>Live Balance (Journal)</th><th>Status</th></tr></thead><tbody>`+
-    DB.projects.map(p=>`<tr><td>${p.name}</td><td>${p.client||'—'}</td><td>${p.retention}%</td><td style="font-family:'JetBrains Mono',monospace;color:var(--orange3)">${fc(getRetBal(p.name))}</td><td><span class="tag ${p.status==='active'?'t-orange':'t-green'}" style="font-size:9px">${p.status==='active'?'Holding':'Released'}</span></td></tr>`).join('')+'</tbody></table></div>';
-  populateProjectSelects();
-}
-function releaseRetention(){
-  const projId=parseInt(document.getElementById('retProject').value),amt=parseFloat(document.getElementById('retAmt').value)||0,p=DB.projects.find(p=>p.id===projId);
-  if(!p||!amt){showToast('Select project and enter amount');return;}
-  const live=getRetBal(p.name);
-  if(amt>live+0.01){showToast(`⚠️ Cannot release ${fc(amt)} — Live balance only ${fc(live)}`);return;}
-  DB.entries.push({id:DB.nextId++,date:today(),desc:`Retention released — ${p.name}`,type:'Retention Released',amount:amt,project:p.name,debits:[{acct:'Cash',amt,atype:'asset'}],credits:[{acct:'Retention Receivable',amt,atype:'asset'}]});
-  p.retentionHeld=Math.max(0,(p.retentionHeld||0)-amt);saveData();renderAll();renderRetention();
-  showToast(`✅ Released ${fc(amt)}`);document.getElementById('retAmt').value='';
-}
-// Depreciation
 function getDepAccts(t){const m={'Equipment':{dep:'Depreciation Expense - Equipment',acc:'Accumulated Depreciation - Equipment'},'Heavy Machinery':{dep:'Depreciation Expense - Equipment',acc:'Accumulated Depreciation - Equipment'},'Vehicles':{dep:'Depreciation Expense - Vehicles',acc:'Accumulated Depreciation - Vehicles'},'Building':{dep:'Depreciation Expense - Building',acc:'Accumulated Depreciation - Building'}};return m[t]||m['Equipment'];}
 function addAsset(){
   const name=document.getElementById('aName').value.trim(),type=document.getElementById('aType').value,cost=parseFloat(document.getElementById('aCost').value),life=parseInt(document.getElementById('aLife').value),date=document.getElementById('aDate').value;
   const st=document.getElementById('assetAddSt');if(!name||!cost||!life||!date){st.innerHTML='<span style="color:var(--red3)">Fill all fields</span>';return;}
   DB.assets.push({id:Date.now(),name,type,cost,life,date,monthlyDep:Math.round(cost/life/12*100)/100,lastPostedMonth:null});
   saveData();document.getElementById('aName').value='';document.getElementById('aCost').value='';document.getElementById('aLife').value='';
-  st.innerHTML=`<span style="color:var(--green3)">✅ ${name} added — ${fc(Math.round(cost/life/12*100)/100)}/mo</span>`;renderDepPage();setTimeout(()=>st.innerHTML='',3000);
+  st.innerHTML=`<span style="color:var(--green3)">✅ ${name} — ${fc(Math.round(cost/life/12*100)/100)}/mo</span>`;renderDepPage();setTimeout(()=>st.innerHTML='',3000);
 }
 function deleteAsset(id){if(!confirm('Delete?'))return;DB.assets=DB.assets.filter(a=>a.id!==id);saveData();renderDepPage();}
 function renderDepPage(){
@@ -1016,10 +201,10 @@ function renderDepPage(){
   al.innerHTML=DB.assets.length?DB.assets.map(a=>`<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;margin-bottom:5px"><div style="flex:1;font-size:12px;color:var(--text)"><strong>${a.name}</strong> <span class="tag t-blue" style="font-size:9px">${a.type}</span><div style="font-size:10px;color:var(--text3);margin-top:2px">${fc(a.cost)} · ${a.life}yr · last: ${a.lastPostedMonth||'never'}</div></div><div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--blue3)">${fc(a.monthlyDep)}/mo</div><button style="padding:3px 7px;background:transparent;border:1px solid rgba(192,48,42,.3);border-radius:3px;color:var(--red3);font-size:10px;cursor:pointer" onclick="deleteAsset(${a.id})">✕</button></div>`).join(''):'<div style="text-align:center;padding:16px;color:var(--text3)">No assets</div>';
   const now=new Date(),thisM=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
   const due=DB.assets.filter(a=>a.lastPostedMonth!==thisM);const dl=document.getElementById('depDueList');if(!dl)return;
-  if(!due.length){dl.innerHTML=`<div class="alert al-ok"><span class="alert-ico">✅</span><div class="alert-body">All depreciation posted for ${thisM}</div></div>`;return;}
+  if(!due.length){dl.innerHTML=`<div class="alert al-ok"><span class="alert-ico">✅</span><div class="alert-body">All posted for ${thisM}</div></div>`;return;}
   const total=due.reduce((s,a)=>s+a.monthlyDep,0);
-  dl.innerHTML=`<div class="alert al-info"><span class="alert-ico">🤖</span><div class="alert-body"><div class="alert-title">AUTO: These will post automatically on next login</div>${fc(total)}/mo total</div></div>`+
-    due.map(a=>`<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;margin-bottom:5px"><div style="flex:1"><div style="font-size:12px;color:var(--text)">${a.name}</div></div><div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--green3)">${fc(a.monthlyDep)}/mo</div><button class="btn btn-gold" style="font-size:11px;padding:6px 12px" onclick="postDep(${a.id})">↗ Post Now</button></div>`).join('')+
+  dl.innerHTML=`<div class="alert al-info"><span class="alert-ico">🤖</span><div class="alert-body"><div class="alert-title">AUTO on next login: ${fc(total)}/mo</div></div></div>`+
+    due.map(a=>`<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;margin-bottom:5px"><div style="flex:1"><div style="font-size:12px;color:var(--text)">${a.name}</div></div><div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--green3)">${fc(a.monthlyDep)}/mo</div><button class="btn btn-gold" style="font-size:11px;padding:6px 12px" onclick="postDep(${a.id})">↗ Post</button></div>`).join('')+
     `<button class="btn btn-gold" style="width:100%;margin-top:8px" onclick="postAllDep()">✅ Post All — ${fc(total)}</button>`;
 }
 function postDep(assetId){
@@ -1027,24 +212,22 @@ function postDep(assetId){
   const now=new Date(),thisM=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
   const accts=getDepAccts(asset.type);
   DB.entries.push({id:DB.nextId++,date:today(),desc:`Depreciation — ${asset.name}`,type:'Monthly Depreciation',amount:asset.monthlyDep,project:'',debits:[{acct:accts.dep,amt:asset.monthlyDep,atype:'expense'}],credits:[{acct:accts.acc,amt:asset.monthlyDep,atype:'asset'}]});
-  asset.lastPostedMonth=thisM;saveData();renderAll();renderDepPage();showToast(`✅ Dep posted — ${asset.name}`);
+  asset.lastPostedMonth=thisM;saveData();renderAll();renderDepPage();showToast(`✅ ${asset.name}`);
 }
 function postAllDep(){const now=new Date(),thisM=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');DB.assets.filter(a=>a.lastPostedMonth!==thisM).forEach(a=>postDep(a.id));}
-// Audit
 function runAudit(){
   const findings=[];
   DB.entries.forEach(e=>{const dr=(e.debits||[]).reduce((s,d)=>s+d.amt,0),cr=(e.credits||[]).reduce((s,c)=>s+c.amt,0);if(Math.abs(dr-cr)>0.05)findings.push({sev:'high',title:'Unbalanced Entry',desc:`#${e.id} (${e.desc}) Dr=${fc(dr)} Cr=${fc(cr)}`,meta:e.date});});
   const seen={};DB.entries.forEach(e=>{const k=`${e.date}-${e.amount}-${e.type}`;if(seen[k])findings.push({sev:'high',title:'Duplicate Entry',desc:`Two entries on ${e.date} for ${fc(e.amount)} (${e.type})`,meta:`#${e.id}`});seen[k]=true;});
-  DB.entries.filter(e=>(e.debits||[]).some(d=>d.acct==='Miscellaneous Expense'&&d.amt>1000)).forEach(e=>findings.push({sev:'med',title:'Large Misc Expense',desc:`${e.desc} — ${fc(e.amount)}. Review categorization.`,meta:e.date}));
+  DB.entries.filter(e=>(e.debits||[]).some(d=>d.acct==='Miscellaneous Expense'&&d.amt>1000)).forEach(e=>findings.push({sev:'med',title:'Large Misc Expense',desc:`${e.desc} — ${fc(e.amount)}`,meta:e.date}));
   const low=DB.materials.filter(m=>m.min>0&&m.qty<=m.min);if(low.length)findings.push({sev:'med',title:'Low Stock',desc:low.map(m=>`${m.name}: ${m.qty} ${m.unit}`).join(', '),meta:'Inventory'});
-  if(DB.entries.length===0)findings.push({sev:'low',title:'No entries',desc:'Start recording transactions',meta:'System'});
-  else if(!findings.filter(f=>f.sev==='high').length)findings.push({sev:'low',title:'✅ No Critical Issues',desc:'All entries balanced. No duplicates.',meta:'Audit: '+today()});
+  if(DB.entries.length===0)findings.push({sev:'low',title:'No entries',desc:'Start recording',meta:'System'});
+  else if(!findings.filter(f=>f.sev==='high').length)findings.push({sev:'low',title:'✅ No Critical Issues',desc:'All balanced.',meta:'Audit: '+today()});
   const el=document.getElementById('auditFindings');if(!el)return;
   el.innerHTML=findings.map(f=>`<div class="audit-item"><div class="audit-dot ${f.sev}"></div><div class="audit-info"><div class="audit-title">${f.title}</div><div class="audit-desc">${f.desc}</div><div class="audit-meta">${f.meta}</div></div><span class="tag ${f.sev==='high'?'t-red':f.sev==='med'?'t-orange':'t-green'}" style="font-size:9px">${f.sev.toUpperCase()}</span></div>`).join('');
   const high=findings.filter(f=>f.sev==='high').length;const ab=document.getElementById('auditBadge');if(ab){ab.textContent=high||'✓';ab.style.background=high>0?'var(--red2)':'var(--green2)';}
   const tbAlert=document.getElementById('tbAlert');if(tbAlert){tbAlert.style.display=high>0?'block':'none';const txt=document.getElementById('tbAlertTxt');if(txt)txt.textContent=high;}
 }
-// F13: AI Advisor with auto-post
 async function sendChat(){
   const inp=document.getElementById('chatInp'),q=inp.value.trim();if(!q)return;inp.value='';
   const msgs=document.getElementById('chatMsgs');
@@ -1052,10 +235,10 @@ async function sendChat(){
   const b=getBal();
   const context=`COMPANY: ${BIZ_NAME} · Juba, South Sudan · ${CUR}
 REVENUE: ${fc(sumByType(b,'revenue'))} · EXPENSES: ${fc(sumByType(b,'expense'))} · NET: ${fc(sumByType(b,'revenue')-sumByType(b,'expense'))}
-CASH: ${fc(b['Cash']?b['Cash'].net:0)} · AR: ${fc(b['Accounts Receivable']?b['Accounts Receivable'].net:0)} · RETENTION LIVE: ${fc(b['Retention Receivable']?b['Retention Receivable'].net:0)}
+CASH: ${fc(b['Cash']?b['Cash'].net:0)} · AR: ${fc(b['Accounts Receivable']?b['Accounts Receivable'].net:0)} · RETENTION: ${fc(b['Retention Receivable']?b['Retention Receivable'].net:0)}
 PROJECTS: ${DB.projects.map(p=>p.name+' ('+p.status+', contract '+fc(p.value)+', billed '+fc(p.billed||0)+')').join('; ')||'none'}
 WORKERS: ${DB.workers.map(w=>w.name+' '+w.role+' '+fc(w.salary)+'/mo').join('; ')||'none'}
-ASSETS: ${DB.assets.map(a=>a.name+' '+fc(a.monthlyDep)+'/mo').join('; ')||'none'}
+MATERIALS: ${DB.materials.map(m=>m.name+': '+m.qty+' '+m.unit+' @ '+fc(m.cost)).join('; ')||'none'}
 JOURNAL ENTRIES: ${DB.entries.length}`;
   try{
     const res=await fetch('/api/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:q,mode:'advisor',context})});
@@ -1072,20 +255,19 @@ async function applyAdvisorEntry(eid){
   const msgs=document.getElementById('chatMsgs');msgs.innerHTML+=`<div class="msg ai loading" id="applyLoad">📒 Converting...</div>`;
   try{
     const res=await fetch('/api/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:'Convert this accounting advice to journal entry JSON: '+text})});
-    const data=await res.json();let raw=(data.result||'').trim().replace(/^\`\`\`json\s*/i,'').replace(/^\`\`\`\s*/,'').replace(/\`\`\`\s*$/,'').trim();
+    const data=await res.json();let raw=(data.result||'').trim().replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
     const m=raw.match(/\{[\s\S]*\}/);if(!m)throw new Error('Could not parse');
     const p=JSON.parse(m[0]);if(!p.entries||!p.entries.length)throw new Error('No entries');
     document.getElementById('applyLoad').remove();
     const deb=p.entries.filter(r=>(+r.debit)>0).map(r=>({acct:r.account,amt:+(+r.debit).toFixed(2),atype:(r.type||'asset').toLowerCase()}));
     const cred=p.entries.filter(r=>(+r.credit)>0).map(r=>({acct:r.account,amt:+(+r.credit).toFixed(2),atype:(r.type||'asset').toLowerCase()}));
     DB.entries.push({id:DB.nextId++,date:today(),desc:p.description||'Advisor entry',type:p.type||'Advisor',amount:p.amount||0,debits:deb,credits:cred});
-    saveData();renderAll();msgs.innerHTML+=`<div class="msg ai" style="color:var(--green3)">✅ Posted to journal!</div>`;showToast('✅ Advisor entry posted!');
+    saveData();renderAll();msgs.innerHTML+=`<div class="msg ai" style="color:var(--green3)">✅ Posted!</div>`;showToast('✅ Advisor entry posted!');
   }catch(err){const el=document.getElementById('applyLoad');if(el)el.remove();msgs.innerHTML+=`<div class="msg ai" style="color:var(--red3)">⚠️ ${err.message}</div>`;}
 }
 function saveSettings(){BIZ_NAME=document.getElementById('bizName').value.trim()||BIZ_NAME;SSP_RATE=parseFloat(document.getElementById('sspRate').value)||1300;document.getElementById('tbBiz').textContent=BIZ_NAME;saveData();renderAll();document.getElementById('settingsSt').innerHTML='<span style="color:var(--green3)">✅ Saved</span>';setTimeout(()=>document.getElementById('settingsSt').innerHTML='',3000);}
 function changePw(){const o=document.getElementById('op').value,n=document.getElementById('np').value,cu=getCU(),u=getU();if(u[cu].pass!==btoa(o)){document.getElementById('pwSt').innerHTML='<span style="color:var(--red3)">Wrong password</span>';return;}if(!n){document.getElementById('pwSt').innerHTML='<span style="color:var(--red3)">Enter new password</span>';return;}u[cu].pass=btoa(n);setU(u);document.getElementById('pwSt').innerHTML='<span style="color:var(--green3)">✅ Changed</span>';document.getElementById('op').value='';document.getElementById('np').value='';}
 function emailReport(){const b=getBal(),tR=sumByType(b,'revenue'),tX=sumByType(b,'expense'),net=tR-tX,cash=b['Cash']?b['Cash'].net:0;const email=document.getElementById('emailAddr')?document.getElementById('emailAddr').value.trim():'';const subject=encodeURIComponent(`${BIZ_NAME} Report ${today()}`);const body=encodeURIComponent(`HISABI HENSI REPORT\nCompany: ${BIZ_NAME}\nDate: ${today()}\nRevenue: ${fc(tR)}\nExpenses: ${fc(tX)}\nNet: ${fc(net)}\nCash: ${fc(cash)}\nEntries: ${DB.entries.length}`);if(email)window.location.href=`mailto:${email}?subject=${subject}&body=${body}`;else window.location.href=`mailto:?subject=${subject}&body=${body}`;}
-
 </script>
 </body>
-</html> 
+</html>
