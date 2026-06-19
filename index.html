@@ -1,5 +1,3 @@
-bash
-cat > /home/claude/index.html << 'HTMLEOF'
 <!DOCTYPE html>
 <html lang="ti">
 <head>
@@ -71,8 +69,7 @@ tbody td{padding:9px 12px;border-bottom:1px solid var(--border);color:var(--text
 .t-orange{background:rgba(176,96,16,.15);color:var(--orange3);border:1px solid rgba(224,128,32,.2)}
 .prog-wrap{margin-bottom:8px}.prog-labels{display:flex;justify-content:space-between;font-size:10px;color:var(--text2);margin-bottom:4px;font-family:'JetBrains Mono',monospace}
 .prog{height:5px;background:var(--bg4);border-radius:3px;overflow:hidden}.prog-fill{height:100%;border-radius:3px;transition:width .6s ease}
-.prog-fill.gold{background:linear-gradient(90deg,var(--gold),var(--gold2))}.prog-fill.green{background:linear-gradient(90deg,var(--green),var(--green2))}
-.prog-fill.red{background:linear-gradient(90deg,var(--red2),var(--red3))}
+.prog-fill.gold{background:linear-gradient(90deg,var(--gold),var(--gold2))}.prog-fill.green{background:linear-gradient(90deg,var(--green),var(--green2))}.prog-fill.red{background:linear-gradient(90deg,var(--red2),var(--red3))}
 .hero-input-card{background:linear-gradient(135deg,var(--bg2),var(--bg3));border:1px solid var(--border2);border-radius:10px;padding:20px;margin-bottom:16px;position:relative;overflow:hidden}
 .hero-input-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--gold),var(--gold2),var(--gold3))}
 .hero-lbl{font-family:'Noto Sans Ethiopic',sans-serif;font-size:13px;color:var(--text2);margin-bottom:10px;display:flex;align-items:center;gap:8px}
@@ -172,7 +169,7 @@ tbody td{padding:9px 12px;border-bottom:1px solid var(--border);color:var(--text
 <div class="page" id="pg-mobilemoney"><div class="ph"><h1>📱 Mobile Money</h1></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px"><div class="card"><div class="card-hdr"><span>➕</span><span>Add Transaction</span></div><div class="fg"><label>Network</label><select id="mmNet"><option value="mtn">MTN</option><option value="airtel">Airtel</option></select></div><div class="fg"><label>Type</label><select id="mmType"><option value="in">Received</option><option value="out">Sent</option></select></div><div class="fgrid"><div class="fg"><label>Amount</label><input id="mmAmt" type="number" placeholder="500"/></div><div class="fg"><label>Currency</label><select id="mmCur"><option>USD</option><option>SSP</option></select></div></div><div class="fg"><label>Reference</label><input id="mmRef" placeholder="JOHN / TXN123"/></div><div class="btn-row"><button class="btn btn-gold" onclick="addMobileMoney()">📱 Record</button></div><div id="mmSt" style="font-size:11px;margin-top:8px"></div></div><div class="card"><div class="kgrid" style="grid-template-columns:1fr 1fr;gap:8px"><div class="kpi"><div class="kpi-lbl">MTN In</div><div class="kpi-val pos" id="mtnInVal">0</div></div><div class="kpi"><div class="kpi-lbl">Airtel In</div><div class="kpi-val pos" id="airtelInVal">0</div></div><div class="kpi"><div class="kpi-lbl">Out</div><div class="kpi-val neg" id="mmOutVal">0</div></div><div class="kpi"><div class="kpi-lbl">Net</div><div class="kpi-val" id="mmNetVal">0</div></div></div></div></div><div class="card"><div class="card-hdr"><span>📋</span><span>History</span></div><div id="mmList"></div></div></div>
 <div class="page" id="pg-materials"><div class="ph"><h1>🧱 Materials</h1></div><div class="card"><div class="card-hdr"><span>➕</span><span>Add Material</span></div><div class="fgrid"><div class="fg"><label>Name</label><input id="matName" type="text" placeholder="ሲሚንቶ · Cement"/></div><div class="fg"><label>Category</label><select id="matCat"><option>Cement</option><option>Steel</option><option>Sand</option><option>Gravel</option><option>Timber</option><option>Fuel Stock</option><option>Paint</option><option>Other</option></select></div><div class="fg"><label>Quantity</label><input id="matQty" type="number" placeholder="100"/></div><div class="fg"><label>Unit</label><select id="matUnit"><option>bags</option><option>kg</option><option>tons</option><option>liters</option><option>m³</option><option>pieces</option><option>meters</option></select></div><div class="fg"><label>Unit Cost (blank=auto)</label><input id="matCost" type="number" placeholder="25"/></div><div class="fg"><label>Min Alert</label><input id="matMin" type="number" placeholder="20"/></div></div><div class="btn-row"><button class="btn btn-gold" onclick="addMaterial()">➕ Add</button></div><div id="matAddSt" style="font-size:11px;margin-top:8px"></div></div><div class="card"><input style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:8px 12px;font-size:12px;color:var(--text);outline:none;margin-bottom:12px" placeholder="Search..." id="matSearch" oninput="renderMaterials()"/><div id="matList"></div></div></div>
 <div class="page" id="pg-deliveries"><div class="ph"><h1>🚚 Deliveries</h1></div><div class="card"><div class="card-hdr"><span>➕</span><span>New Delivery</span></div><div class="fgrid"><div class="fg"><label>Supplier</label><input id="delSupplier" type="text" placeholder="Supplier name"/></div><div class="fg"><label>Invoice #</label><input id="delInvNo" type="text" placeholder="INV-001"/></div><div class="fg"><label>Items</label><input id="delItems" type="text" placeholder="Cement 100 bags"/></div><div class="fg"><label>Total Value</label><input id="delTotal" type="number" placeholder="5000"/></div><div class="fg"><label>Payment</label><select id="delPay"><option value="cash">Cash</option><option value="credit">Credit</option></select></div><div class="fg"><label>Date</label><input id="delDate" type="date"/></div></div><div class="btn-row"><button class="btn btn-gold" onclick="addDelivery()">✅ Record</button></div><div id="delSt" style="font-size:11px;margin-top:8px"></div></div><div class="card"><div class="card-hdr"><span>📋</span><span>Received</span></div><div id="deliveryList"></div></div></div>
-<div class="page" id="pg-workers"><div class="ph"><h1>👷 Workers & Payroll</h1></div><div class="card"><div class="card-hdr"><span>➕</span><span>Add Worker</span></div><div class="fgrid"><div class="fg"><label>Name</label><input id="wkName" type="text" placeholder="Worker name"/></div><div class="fg"><label>Role</label><select id="wkRole"><option>Mason</option><option>Carpenter</option><option>Electrician</option><option>Plumber</option><option>Labourer</option><option>Driver</option><option>Site Supervisor</option><option>Engineer</option><option>Other</option></select></div><div class="fg"><label>Monthly Salary</label><input id="wkSalary" type="number" placeholder="500"/></div><div class="fg"><label>Currency</label><select id="wkCur"><option>USD</option><option>SSP</option></select></div></div><div class="btn-row"><button class="btn btn-gold" onclick="addWorker()">➕ Add</button></div><div id="wkAddSt" style="font-size:11px;margin-top:8px"></div></div><div class="card"><div class="card-hdr"><span>💰</span><span>Pay Salary</span></div><div class="fgrid"><div class="fg"><label>Worker</label><select id="payWorker"></select></div><div class="fg"><label>Month</label><input id="payMonth" type="month"/></div><div class="fg"><label>Override Amount</label><input id="payOverride" type="number" placeholder="blank=full"/></div></div><div class="btn-row"><button class="btn btn-gold" onclick="paySalary()">💰 Pay</button><button class="btn btn-outline" onclick="payAllSalaries()">💰 Pay All</button></div></div><div class="card"><div class="card-hdr"><span>👥</span><span>Workers</span></div><div id="workerList"></div></div></div>
+<div class="page" id="pg-workers"><div class="ph"><h1>👷 Workers &amp; Payroll</h1></div><div class="card"><div class="card-hdr"><span>➕</span><span>Add Worker</span></div><div class="fgrid"><div class="fg"><label>Name</label><input id="wkName" type="text" placeholder="Worker name"/></div><div class="fg"><label>Role</label><select id="wkRole"><option>Mason</option><option>Carpenter</option><option>Electrician</option><option>Plumber</option><option>Labourer</option><option>Driver</option><option>Site Supervisor</option><option>Engineer</option><option>Other</option></select></div><div class="fg"><label>Monthly Salary</label><input id="wkSalary" type="number" placeholder="500"/></div><div class="fg"><label>Currency</label><select id="wkCur"><option>USD</option><option>SSP</option></select></div></div><div class="btn-row"><button class="btn btn-gold" onclick="addWorker()">➕ Add</button></div><div id="wkAddSt" style="font-size:11px;margin-top:8px"></div></div><div class="card"><div class="card-hdr"><span>💰</span><span>Pay Salary</span></div><div class="fgrid"><div class="fg"><label>Worker</label><select id="payWorker"></select></div><div class="fg"><label>Month</label><input id="payMonth" type="month"/></div><div class="fg"><label>Override Amount</label><input id="payOverride" type="number" placeholder="blank=full"/></div></div><div class="btn-row"><button class="btn btn-gold" onclick="paySalary()">💰 Pay</button><button class="btn btn-outline" onclick="payAllSalaries()">💰 Pay All</button></div></div><div class="card"><div class="card-hdr"><span>👥</span><span>Workers</span></div><div id="workerList"></div></div></div>
 <div class="page" id="pg-projects"><div class="ph"><h1>🏗️ Projects</h1></div><div class="card"><div class="card-hdr"><span>➕</span><span>New Project</span></div><div class="fgrid"><div class="fg"><label>Project Name</label><input id="pjName" type="text" placeholder="Juba Clinic Construction"/></div><div class="fg"><label>Client</label><input id="pjClient" type="text" placeholder="Client name"/></div><div class="fg"><label>Contract Value</label><input id="pjValue" type="number" placeholder="500000"/></div><div class="fg"><label>Currency</label><select id="pjCur"><option>USD</option><option>SSP</option></select></div><div class="fg"><label>Location</label><input id="pjLocation" type="text" placeholder="Juba, South Sudan"/></div><div class="fg"><label>Retention %</label><input id="pjRetention" type="number" placeholder="10" value="10"/></div><div class="fg"><label>Start</label><input id="pjStart" type="date"/></div><div class="fg"><label>End</label><input id="pjEnd" type="date"/></div></div><div class="btn-row"><button class="btn btn-gold" onclick="addProject()">➕ Add Project</button></div><div id="projAddSt" style="font-size:11px;margin-top:8px"></div></div><div id="projectCards"></div></div>
 <div class="page" id="pg-invoice"><div class="ph"><h1>🧾 Invoice</h1></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:16px"><div class="card"><div class="fg"><label>Project</label><select id="invProject"></select></div><div class="fg"><label>Invoice #</label><input id="invNo" type="text" placeholder="INV-001"/></div><div class="fg"><label>Amount</label><input id="invAmt" type="number" placeholder="50000" oninput="previewInvoice()"/></div><div class="fg"><label>% Complete</label><input id="invPct" type="number" placeholder="30" oninput="previewInvoice()"/></div><div class="fg"><label>Retention %</label><input id="invRet" type="number" placeholder="10" value="10" oninput="previewInvoice()"/></div><div class="btn-row"><button class="btn btn-gold" onclick="postInvoice()">✅ Post Invoice</button><button class="btn btn-outline" onclick="window.print()">🖨️</button></div></div><div class="card"><div class="card-hdr"><span>👁️</span><span>Preview</span></div><div id="invoicePreview"></div></div></div></div>
 <div class="page" id="pg-retention"><div class="ph"><h1>🔒 Retention Management</h1></div><div class="kgrid" id="retentionKpis"></div><div class="card"><div class="card-hdr"><span>📋</span><span>By Project (Live from Journal)</span></div><div id="retentionTable"></div></div><div class="card"><div class="card-hdr"><span>✅</span><span>Release Retention</span></div><div class="fgrid"><div class="fg"><label>Project</label><select id="retProject" onchange="updateRetLiveBalance()"></select></div><div class="fg"><label>Amount to Release</label><input id="retAmt" type="number" placeholder="5000"/></div></div><div id="retLiveBalance" style="font-size:12px;color:var(--orange3);margin-bottom:10px;font-family:'JetBrains Mono',monospace;padding:8px;background:var(--bg3);border-radius:5px;display:none"></div><div class="btn-row"><button class="btn btn-gold" onclick="releaseRetention()">✅ Release</button></div></div></div>
@@ -190,23 +187,19 @@ tbody td{padding:9px 12px;border-bottom:1px solid var(--border);color:var(--text
 </div></div></div>
 <div class="toast" id="toast"></div>
 <script>
-// ============================================================
 // DATA & STATE
-// ============================================================
 let DB={entries:[],projects:[],workers:[],materials:[],assets:[],mobileMoney:[],deliveries:[],pettyCash:[],nextId:1};
 let CUR='USD',SSP_RATE=1300,BIZ_NAME='My Construction Co';
 let _pending=null,_mic=null,_isReg=false;
 
 function today(){return new Date().toISOString().split('T')[0];}
-function fc(n,cur){const c=cur||CUR;if(c==='SSP')return 'SSP £'+(n*SSP_RATE).toLocaleString(undefined,{maximumFractionDigits:0});return '$'+(+n||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});}
+function fc(n){if(CUR==='SSP')return'SSP £'+(+(n||0)*SSP_RATE).toLocaleString(undefined,{maximumFractionDigits:0});return'$'+(+(n||0)).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});}
 function showToast(msg,dur=3000){const t=document.getElementById('toast');t.textContent=msg;t.style.display='block';setTimeout(()=>t.style.display='none',dur);}
 
-// ============================================================
-// USER AUTH (localStorage per-user)
-// ============================================================
+// AUTH
 function getU(){try{return JSON.parse(localStorage.getItem('hh_users')||'{}')}catch{return{}}}
-function setU(u){localStorage.setItem('hh_users',JSON.stringify(u))}
-function getCU(){return localStorage.getItem('hh_cu')||''}
+function setU(u){localStorage.setItem('hh_users',JSON.stringify(u));}
+function getCU(){return localStorage.getItem('hh_cu')||'';}
 function loadDB(){
   const cu=getCU();if(!cu)return;
   const u=getU();if(!u[cu])return;
@@ -216,8 +209,7 @@ function loadDB(){
 function saveData(){
   const cu=getCU();if(!cu)return;
   const u=getU();if(!u[cu])return;
-  u[cu].db=JSON.stringify(DB);u[cu].biz=BIZ_NAME;u[cu].sspRate=SSP_RATE;
-  setU(u);
+  u[cu].db=JSON.stringify(DB);u[cu].biz=BIZ_NAME;u[cu].sspRate=SSP_RATE;setU(u);
 }
 
 function toggleReg(){
@@ -228,8 +220,7 @@ function toggleReg(){
 }
 
 function doLogin(){
-  const u=document.getElementById('lu').value.trim();
-  const p=document.getElementById('lp').value;
+  const u=document.getElementById('lu').value.trim(),p=document.getElementById('lp').value;
   const err=document.getElementById('lerr');
   if(!u||!p){err.style.display='block';err.textContent='Fill all fields';return;}
   const users=getU();
@@ -237,8 +228,7 @@ function doLogin(){
     if(users[u]){err.style.display='block';err.textContent='Username taken';return;}
     const biz=document.getElementById('lb').value.trim()||u+' Construction';
     users[u]={pass:btoa(p),biz,sspRate:1300,db:JSON.stringify(DB)};
-    setU(users);localStorage.setItem('hh_cu',u);BIZ_NAME=biz;
-    launchApp();
+    setU(users);localStorage.setItem('hh_cu',u);BIZ_NAME=biz;launchApp();
   } else {
     if(!users[u]||users[u].pass!==btoa(p)){err.style.display='block';err.textContent='Wrong username or password';return;}
     localStorage.setItem('hh_cu',u);loadDB();launchApp();
@@ -258,14 +248,10 @@ function launchApp(){
   document.getElementById('tbBiz').textContent=BIZ_NAME;
   document.getElementById('bizName').value=BIZ_NAME;
   document.getElementById('sspRate').value=SSP_RATE;
-  autoDepreciation();
-  renderAll();
-  runAudit();
+  autoDepreciation();renderAll();runAudit();
 }
 
-// ============================================================
 // NAVIGATION
-// ============================================================
 function nav(page,el){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
   document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('on'));
@@ -281,7 +267,6 @@ function nav(page,el){
   if(page==='journal')renderJournal();
   if(page==='settings'){document.getElementById('bizName').value=BIZ_NAME;document.getElementById('sspRate').value=SSP_RATE;}
 }
-
 function setCur(c){
   CUR=c;
   document.getElementById('cur-usd').classList.toggle('on',c==='USD');
@@ -289,9 +274,7 @@ function setCur(c){
   renderAll();
 }
 
-// ============================================================
 // BALANCE ENGINE
-// ============================================================
 function getBal(){
   const b={};
   function add(acct,atype,dr,cr){
@@ -309,9 +292,7 @@ function getBal(){
 }
 function sumByType(b,type){return Object.values(b).filter(v=>v.atype===type).reduce((s,v)=>s+v.net,0);}
 
-// ============================================================
 // RENDER ALL
-// ============================================================
 function renderAll(){
   renderHomeKpis();renderTodayEntries();renderMiniCF();renderHomeAlerts();
   renderWorkerList();renderPayWorkerSelect();renderProjectCards();renderInvProjectSelect();
@@ -321,19 +302,13 @@ function renderAll(){
   const jb=document.getElementById('jBadge');if(jb)jb.textContent=DB.entries.length;
 }
 
-// ============================================================
 // HOME KPIs
-// ============================================================
 function renderHomeKpis(){
-  const b=getBal();
-  const rev=sumByType(b,'revenue'),exp=sumByType(b,'expense'),net=rev-exp;
-  const cash=b['Cash']?b['Cash'].net:0;
-  const ar=b['Accounts Receivable']?b['Accounts Receivable'].net:0;
-  const ret=b['Retention Receivable']?b['Retention Receivable'].net:0;
-  const wip=b['Work in Progress']?b['Work in Progress'].net:0;
+  const b=getBal(),rev=sumByType(b,'revenue'),exp=sumByType(b,'expense'),net=rev-exp;
+  const cash=b['Cash']?b['Cash'].net:0,ar=b['Accounts Receivable']?b['Accounts Receivable'].net:0;
+  const ret=b['Retention Receivable']?b['Retention Receivable'].net:0,wip=b['Work in Progress']?b['Work in Progress'].net:0;
   const el=document.getElementById('homeKpis');if(!el)return;
-  el.innerHTML=`
-    <div class="kpi"><div class="kpi-lbl">Revenue</div><div class="kpi-val pos">${fc(rev)}</div></div>
+  el.innerHTML=`<div class="kpi"><div class="kpi-lbl">Revenue</div><div class="kpi-val pos">${fc(rev)}</div></div>
     <div class="kpi"><div class="kpi-lbl">Expenses</div><div class="kpi-val neg">${fc(exp)}</div></div>
     <div class="kpi"><div class="kpi-lbl">Net Profit</div><div class="kpi-val ${net>=0?'pos':'neg'}">${fc(net)}</div></div>
     <div class="kpi"><div class="kpi-lbl">Cash</div><div class="kpi-val ${cash>=0?'':'neg'}">${fc(cash)}</div></div>
@@ -341,127 +316,83 @@ function renderHomeKpis(){
     <div class="kpi"><div class="kpi-lbl">Retention</div><div class="kpi-val warn">${fc(ret)}</div></div>
     <div class="kpi"><div class="kpi-lbl">WIP</div><div class="kpi-val">${fc(wip)}</div></div>`;
 }
-
 function renderHomeAlerts(){
-  const alerts=[];
-  const b=getBal();
-  const cash=b['Cash']?b['Cash'].net:0;
-  if(cash<0)alerts.push({cls:'al-danger',ico:'🔴',title:'Negative Cash!',msg:'Cash balance is below zero: '+fc(cash)});
+  const alerts=[];const b=getBal();const cash=b['Cash']?b['Cash'].net:0;
+  if(cash<0)alerts.push({cls:'al-danger',ico:'🔴',title:'Negative Cash!',msg:'Cash: '+fc(cash)});
   const low=DB.materials.filter(m=>m.min>0&&m.qty<=m.min);
   if(low.length)alerts.push({cls:'al-warn',ico:'⚠️',title:'Low Stock',msg:low.map(m=>m.name+': '+m.qty+' '+m.unit).join(', ')});
-  const soon=DB.projects.filter(p=>{if(!p.end||p.status==='Completed')return false;const d=(new Date(p.end)-new Date())/(1000*60*60*24);return d>=0&&d<=14;});
+  const soon=DB.projects.filter(p=>{if(!p.end||p.status==='Completed')return false;const d=(new Date(p.end)-new Date())/(864e5);return d>=0&&d<=14;});
   if(soon.length)alerts.push({cls:'al-warn',ico:'📅',title:'Projects Ending Soon',msg:soon.map(p=>p.name).join(', ')});
   const el=document.getElementById('homeAlerts');if(!el)return;
   el.innerHTML=alerts.map(a=>`<div class="alert ${a.cls}"><span class="alert-ico">${a.ico}</span><div class="alert-body"><div class="alert-title">${a.title}</div>${a.msg}</div></div>`).join('');
 }
-
 function renderTodayEntries(){
   const el=document.getElementById('todayEntries');if(!el)return;
-  const t=today();const te=DB.entries.filter(e=>e.date===t);
+  const te=DB.entries.filter(e=>e.date===today());
   if(!te.length){el.innerHTML='<div style="text-align:center;padding:16px;color:var(--text3);font-size:12px">No entries today</div>';return;}
   el.innerHTML=te.slice(-8).reverse().map(e=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px"><div><div style="color:var(--text)">${e.desc}</div><div style="font-size:10px;color:var(--text3)">${e.type}</div></div><div style="font-family:'JetBrains Mono',monospace;color:var(--gold3)">${fc(e.amount)}</div></div>`).join('');
 }
-
 function renderMiniCF(){
   const el=document.getElementById('miniCF');if(!el)return;
   const b=getBal();const cash=b['Cash']?b['Cash'].net:0;
-  const avgExp=DB.entries.length>0?sumByType(b,'expense')/3:0;
-  const months=['Month 1','Month 2','Month 3'];
-  const rev=sumByType(b,'revenue')/3;
-  el.innerHTML=months.map((m,i)=>{
+  const avgExp=sumByType(b,'expense')/3,rev=sumByType(b,'revenue')/3;
+  el.innerHTML=['Month 1','Month 2','Month 3'].map((m,i)=>{
     const proj=cash+(rev-avgExp)*(i+1);
     return `<div class="cf-row"><div class="cf-label">${m}</div><div class="cf-bar-bg"><div class="cf-bar ${proj>=0?'pos':'neg'}" style="width:${Math.min(100,Math.abs(proj)/Math.max(1,Math.abs(cash)+1000)*100)}%"></div></div><div class="cf-val" style="color:${proj>=0?'var(--green3)':'var(--red3)'}">${fc(proj)}</div></div>`;
   }).join('');
 }
 
-// ============================================================
 // AI RECORD
-// ============================================================
 function useChip(el){document.getElementById('mainInp').value=el.textContent;document.getElementById('mainInp').focus();}
-
 async function doRecord(){
   const inp=document.getElementById('mainInp'),q=inp.value.trim();if(!q)return;
   const btn=document.querySelector('.hero-send');btn.textContent='⏳';btn.disabled=true;
   try{
-    const res=await fetch('/api/ai',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({prompt:q,materials:DB.materials})});
+    const res=await fetch('/api/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:q,materials:DB.materials})});
     const data=await res.json();
     let raw=(data.result||'').trim().replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
-    const m=raw.match(/\{[\s\S]*\}/);if(!m)throw new Error('No JSON');
-    const p=JSON.parse(m[0]);
-    _pending=p;
-    showResult(p);
-  }catch(err){showToast('❌ Error: '+err.message);}
+    const m=raw.match(/\{[\s\S]*\}/);if(!m)throw new Error('No JSON from AI');
+    _pending=JSON.parse(m[0]);showResult(_pending);
+  }catch(err){showToast('❌ '+err.message);}
   btn.textContent='↗';btn.disabled=false;
 }
-
 function showResult(p){
   const rc=document.getElementById('resultCard');rc.style.display='block';
   document.getElementById('resultTitle').textContent=p.description||'Transaction';
   document.getElementById('resultType').textContent=p.type||'Entry';
   document.getElementById('resultDesc').textContent=p.prepaidMonths?'Prepaid: '+p.prepaidMonths+' months amortization scheduled':'';
-  const meta=document.getElementById('resultMeta');
-  meta.innerHTML=`<div class="meta-box"><div class="meta-lbl">Amount</div><div class="meta-val">${fc(p.amount||0)}</div></div>
-    <div class="meta-box"><div class="meta-lbl">Date</div><div class="meta-val">${p.date||today()}</div></div>
-    <div class="meta-box"><div class="meta-lbl">Currency</div><div class="meta-val">${p.currency||'USD'}</div></div>
-    <div class="meta-box"><div class="meta-lbl">Type</div><div class="meta-val">${p.type||'—'}</div></div>`;
+  document.getElementById('resultMeta').innerHTML=`<div class="meta-box"><div class="meta-lbl">Amount</div><div class="meta-val">${fc(p.amount||0)}</div></div><div class="meta-box"><div class="meta-lbl">Date</div><div class="meta-val">${p.date||today()}</div></div><div class="meta-box"><div class="meta-lbl">Currency</div><div class="meta-val">${p.currency||'USD'}</div></div><div class="meta-box"><div class="meta-lbl">Type</div><div class="meta-val">${p.type||'—'}</div></div>`;
   const ent=document.getElementById('resultEntries');
-  if(p.entries&&p.entries.length){
-    ent.innerHTML=`<table><thead><tr><th>Account</th><th>Type</th><th>Debit</th><th>Credit</th></tr></thead><tbody>${
-      p.entries.map(r=>`<tr><td>${r.account}</td><td><span class="tag t-blue">${r.type||''}</span></td><td style="color:var(--green3);font-family:'JetBrains Mono',monospace">${r.debit?fc(r.debit):''}</td><td style="color:var(--red3);font-family:'JetBrains Mono',monospace">${r.credit?fc(r.credit):''}</td></tr>`).join('')
-    }</tbody></table>`;
-  }else{ent.innerHTML='';}
+  ent.innerHTML=p.entries&&p.entries.length?`<table><thead><tr><th>Account</th><th>Type</th><th>Debit</th><th>Credit</th></tr></thead><tbody>${p.entries.map(r=>`<tr><td>${r.account}</td><td><span class="tag t-blue">${r.type||''}</span></td><td style="color:var(--green3);font-family:'JetBrains Mono',monospace">${r.debit?fc(r.debit):''}</td><td style="color:var(--red3);font-family:'JetBrains Mono',monospace">${r.credit?fc(r.credit):''}</td></tr>`).join('')}</tbody></table>`:'' ;
   document.getElementById('postBtn').disabled=false;
 }
-
 function postEntry(){
-  if(!_pending)return;
-  const p=_pending;
+  if(!_pending)return;const p=_pending;
   const debits=(p.entries||[]).filter(r=>(+r.debit)>0).map(r=>({acct:r.account,amt:+(+r.debit).toFixed(2),atype:(r.type||'asset').toLowerCase()}));
   const credits=(p.entries||[]).filter(r=>(+r.credit)>0).map(r=>({acct:r.account,amt:+(+r.credit).toFixed(2),atype:(r.type||'asset').toLowerCase()}));
   DB.entries.push({id:DB.nextId++,date:p.date||today(),desc:p.description||'Entry',type:p.type||'General',amount:p.amount||0,project:p.project||'',debits,credits});
-  // material usage deduction
-  if(p.materialUsage){
-    const mat=DB.materials.find(m=>m.name.toLowerCase().includes((p.materialUsage.name||'').toLowerCase()));
-    if(mat){mat.qty=Math.max(0,mat.qty-(p.materialUsage.qty||0));}
-  }
-  // prepaid amortization schedule
+  if(p.materialUsage){const mat=DB.materials.find(m=>m.name.toLowerCase().includes((p.materialUsage.name||'').toLowerCase()));if(mat)mat.qty=Math.max(0,mat.qty-(p.materialUsage.qty||0));}
   if(p.prepaidMonths&&p.prepaidMonths>1){
-    const monthly=(p.amount||0)/p.prepaidMonths;
-    for(let i=1;i<p.prepaidMonths;i++){
-      const d=new Date(p.date||today());d.setMonth(d.getMonth()+i);
-      DB.entries.push({id:DB.nextId++,date:d.toISOString().split('T')[0],desc:'Amortize: '+p.description,type:'Prepaid Amortization',amount:monthly,project:'',
-        debits:[{acct:'Rent Expense',amt:monthly,atype:'expense'}],credits:[{acct:'Prepaid Rent',amt:monthly,atype:'asset'}]});
-    }
+    const mo=(p.amount||0)/p.prepaidMonths;
+    for(let i=1;i<p.prepaidMonths;i++){const d=new Date(p.date||today());d.setMonth(d.getMonth()+i);
+      DB.entries.push({id:DB.nextId++,date:d.toISOString().split('T')[0],desc:'Amortize: '+p.description,type:'Prepaid Amortization',amount:mo,project:'',debits:[{acct:'Rent Expense',amt:mo,atype:'expense'}],credits:[{acct:'Prepaid Rent',amt:mo,atype:'asset'}]});}
   }
   saveData();renderAll();runAudit();
-  document.getElementById('resultCard').style.display='none';
-  document.getElementById('mainInp').value='';
+  document.getElementById('resultCard').style.display='none';document.getElementById('mainInp').value='';
   showToast('✅ Posted to Journal!');_pending=null;
 }
 
-// ============================================================
 // PETTY CASH
-// ============================================================
-function getPettyCashBalance(){
-  const b=getBal();
-  return b['Petty Cash']?b['Petty Cash'].net:0;
-}
-function renderPettyBalance(){
-  const el=document.getElementById('pettyCashBalance');if(!el)return;
-  el.textContent=fc(getPettyCashBalance());
-}
+function renderPettyBalance(){const el=document.getElementById('pettyCashBalance');if(!el)return;const b=getBal();el.textContent=fc(b['Petty Cash']?b['Petty Cash'].net:0);}
 function replenishPetty(){
   const amt=parseFloat(document.getElementById('pcRepAmt').value);if(!amt)return;
-  DB.entries.push({id:DB.nextId++,date:today(),desc:'Petty Cash Replenishment',type:'Petty Cash',amount:amt,project:'',
-    debits:[{acct:'Petty Cash',amt,atype:'asset'}],credits:[{acct:'Cash',amt,atype:'asset'}]});
+  DB.entries.push({id:DB.nextId++,date:today(),desc:'Petty Cash Replenishment',type:'Petty Cash',amount:amt,project:'',debits:[{acct:'Petty Cash',amt,atype:'asset'}],credits:[{acct:'Cash',amt,atype:'asset'}]});
   saveData();renderAll();showToast('✅ Replenished '+fc(amt));document.getElementById('pcRepAmt').value='';
 }
 function postPettyExpense(){
   const desc=document.getElementById('pcDesc').value.trim(),amt=parseFloat(document.getElementById('pcAmt').value),cat=document.getElementById('pcCat').value;
   if(!desc||!amt)return;
-  DB.entries.push({id:DB.nextId++,date:today(),desc,type:'Petty Cash Expense',amount:amt,project:'',
-    debits:[{acct:cat,amt,atype:'expense'}],credits:[{acct:'Petty Cash',amt,atype:'asset'}]});
+  DB.entries.push({id:DB.nextId++,date:today(),desc,type:'Petty Cash Expense',amount:amt,project:'',debits:[{acct:cat,amt,atype:'expense'}],credits:[{acct:'Petty Cash',amt,atype:'asset'}]});
   saveData();renderAll();showToast('✅ '+desc);document.getElementById('pcDesc').value='';document.getElementById('pcAmt').value='';
 }
 function renderPettyHistory(){
@@ -471,9 +402,7 @@ function renderPettyHistory(){
   el.innerHTML=items.map(e=>`<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px"><div><div style="color:var(--text)">${e.desc}</div><div style="font-size:10px;color:var(--text3)">${e.date} · ${e.type}</div></div><div style="font-family:'JetBrains Mono',monospace;color:${e.type==='Petty Cash'?'var(--green3)':'var(--red3)'}">${e.type==='Petty Cash'?'+':'-'}${fc(e.amount)}</div></div>`).join('');
 }
 
-// ============================================================
 // MOBILE MONEY
-// ============================================================
 function addMobileMoney(){
   const net=document.getElementById('mmNet').value,type=document.getElementById('mmType').value;
   let amt=parseFloat(document.getElementById('mmAmt').value);const cur=document.getElementById('mmCur').value;
@@ -481,26 +410,19 @@ function addMobileMoney(){
   if(!amt){st.innerHTML='<span style="color:var(--red3)">Enter amount</span>';return;}
   if(cur==='SSP')amt=amt/SSP_RATE;
   DB.mobileMoney.push({id:Date.now(),net,type,amt,ref,date:today()});
-  if(type==='in'){
-    DB.entries.push({id:DB.nextId++,date:today(),desc:`Mobile Money IN (${net.toUpperCase()}) — ${ref}`,type:'Mobile Money',amount:amt,project:'',
-      debits:[{acct:'Cash',amt,atype:'asset'}],credits:[{acct:'Contract Revenue',amt,atype:'revenue'}]});
-  } else {
-    DB.entries.push({id:DB.nextId++,date:today(),desc:`Mobile Money OUT (${net.toUpperCase()}) — ${ref}`,type:'Mobile Money',amount:amt,project:'',
-      debits:[{acct:'Miscellaneous Expense',amt,atype:'expense'}],credits:[{acct:'Cash',amt,atype:'asset'}]});
-  }
-  saveData();renderAll();st.innerHTML=`<span style="color:var(--green3)">✅ ${fc(amt)}</span>`;
-  setTimeout(()=>st.innerHTML='',3000);
+  DB.entries.push({id:DB.nextId++,date:today(),desc:`Mobile Money ${type==='in'?'IN':'OUT'} (${net.toUpperCase()}) — ${ref}`,type:'Mobile Money',amount:amt,project:'',
+    debits:type==='in'?[{acct:'Cash',amt,atype:'asset'}]:[{acct:'Miscellaneous Expense',amt,atype:'expense'}],
+    credits:type==='in'?[{acct:'Contract Revenue',amt,atype:'revenue'}]:[{acct:'Cash',amt,atype:'asset'}]});
+  saveData();renderAll();st.innerHTML=`<span style="color:var(--green3)">✅ ${fc(amt)}</span>`;setTimeout(()=>st.innerHTML='',3000);
 }
 function renderMobileMoneySummary(){
   const mtnIn=DB.mobileMoney.filter(m=>m.net==='mtn'&&m.type==='in').reduce((s,m)=>s+m.amt,0);
   const airtelIn=DB.mobileMoney.filter(m=>m.net==='airtel'&&m.type==='in').reduce((s,m)=>s+m.amt,0);
   const out=DB.mobileMoney.filter(m=>m.type==='out').reduce((s,m)=>s+m.amt,0);
-  const net=mtnIn+airtelIn-out;
-  const el=(id)=>document.getElementById(id);
-  if(el('mtnInVal'))el('mtnInVal').textContent=fc(mtnIn);
-  if(el('airtelInVal'))el('airtelInVal').textContent=fc(airtelIn);
-  if(el('mmOutVal'))el('mmOutVal').textContent=fc(out);
-  if(el('mmNetVal')){el('mmNetVal').textContent=fc(net);el('mmNetVal').className='kpi-val '+(net>=0?'pos':'neg');}
+  const net2=mtnIn+airtelIn-out;
+  const g=id=>document.getElementById(id);
+  if(g('mtnInVal'))g('mtnInVal').textContent=fc(mtnIn);if(g('airtelInVal'))g('airtelInVal').textContent=fc(airtelIn);
+  if(g('mmOutVal'))g('mmOutVal').textContent=fc(out);if(g('mmNetVal')){g('mmNetVal').textContent=fc(net2);g('mmNetVal').className='kpi-val '+(net2>=0?'pos':'neg');}
 }
 function renderMobileMoneyList(){
   const el=document.getElementById('mmList');if(!el)return;
@@ -508,21 +430,16 @@ function renderMobileMoneyList(){
   el.innerHTML=DB.mobileMoney.slice(-30).reverse().map(m=>`<div class="mm-row"><div class="mm-logo ${m.net}">${m.net.toUpperCase()}</div><div class="mm-body"><div class="mm-name">${m.ref||'—'}</div><div class="mm-ref">${m.date}</div></div><div class="mm-amount ${m.type}">${m.type==='in'?'+':'-'}${fc(m.amt)}</div></div>`).join('');
 }
 
-// ============================================================
 // MATERIALS
-// ============================================================
 function addMaterial(){
   const name=document.getElementById('matName').value.trim(),cat=document.getElementById('matCat').value;
   const qty=parseFloat(document.getElementById('matQty').value)||0,unit=document.getElementById('matUnit').value;
   const cost=parseFloat(document.getElementById('matCost').value)||0,min=parseFloat(document.getElementById('matMin').value)||0;
   const st=document.getElementById('matAddSt');if(!name){st.innerHTML='<span style="color:var(--red3)">Enter name</span>';return;}
   const existing=DB.materials.find(m=>m.name.toLowerCase()===name.toLowerCase());
-  if(existing){existing.qty+=qty;existing.cost=cost||existing.cost;}
-  else{DB.materials.push({id:Date.now(),name,cat,qty,unit,cost,min});}
-  if(qty>0&&cost>0){
-    DB.entries.push({id:DB.nextId++,date:today(),desc:`Purchase: ${name} ${qty} ${unit}`,type:'Material Purchase',amount:qty*cost,project:'',
-      debits:[{acct:'Construction Materials',amt:qty*cost,atype:'asset'}],credits:[{acct:'Cash',amt:qty*cost,atype:'asset'}]});
-  }
+  if(existing){existing.qty+=qty;if(cost)existing.cost=cost;}
+  else DB.materials.push({id:Date.now(),name,cat,qty,unit,cost,min});
+  if(qty>0&&cost>0)DB.entries.push({id:DB.nextId++,date:today(),desc:`Purchase: ${name} ${qty} ${unit}`,type:'Material Purchase',amount:qty*cost,project:'',debits:[{acct:'Construction Materials',amt:qty*cost,atype:'asset'}],credits:[{acct:'Cash',amt:qty*cost,atype:'asset'}]});
   saveData();renderAll();document.getElementById('matName').value='';document.getElementById('matQty').value='';document.getElementById('matCost').value='';
   st.innerHTML=`<span style="color:var(--green3)">✅ ${name}</span>`;setTimeout(()=>st.innerHTML='',3000);
 }
@@ -532,16 +449,14 @@ function renderMaterials(){
   const items=DB.materials.filter(m=>!q||m.name.toLowerCase().includes(q.toLowerCase()));
   if(!items.length){el.innerHTML='<div style="text-align:center;padding:16px;color:var(--text3)">No materials</div>';return;}
   el.innerHTML=items.map(m=>{
-    const cls=m.min>0&&m.qty===0?'out-stock':m.min>0&&m.qty<=m.min?'low-stock':'';
-    const qcls=m.qty===0?'out':m.min>0&&m.qty<=m.min?'low':'ok';
-    return `<div class="inv-row ${cls}"><div class="inv-ico">🧱</div><div class="inv-name">${m.name}<div class="inv-detail">${m.cat} · ${fc(m.cost)}/unit · min:${m.min}</div></div><div class="qty-ctrl"><button class="qty-btn" onclick="adjMat(${m.id},-1)">−</button><div class="inv-qty ${qcls}" style="margin:0 6px">${m.qty} ${m.unit}</div><button class="qty-btn" onclick="adjMat(${m.id},1)">+</button></div></div>`;
+    const cls=m.qty===0&&m.min>0?'out-stock':m.qty<=m.min&&m.min>0?'low-stock':'';
+    const qcls=m.qty===0?'out':m.qty<=m.min&&m.min>0?'low':'ok';
+    return `<div class="inv-row ${cls}"><div class="inv-ico">🧱</div><div style="flex:1"><div class="inv-name">${m.name}<div class="inv-detail">${m.cat} · ${fc(m.cost)}/unit · min:${m.min}</div></div></div><div class="qty-ctrl"><button class="qty-btn" onclick="adjMat(${m.id},-1)">−</button><div class="inv-qty ${qcls}" style="margin:0 6px">${m.qty} ${m.unit}</div><button class="qty-btn" onclick="adjMat(${m.id},1)">+</button></div></div>`;
   }).join('');
 }
-function adjMat(id,delta){const m=DB.materials.find(x=>x.id===id);if(!m)return;m.qty=Math.max(0,m.qty+delta);saveData();renderMaterials();}
+function adjMat(id,d){const m=DB.materials.find(x=>x.id===id);if(!m)return;m.qty=Math.max(0,m.qty+d);saveData();renderMaterials();}
 
-// ============================================================
 // DELIVERIES
-// ============================================================
 function addDelivery(){
   const supplier=document.getElementById('delSupplier').value.trim(),invNo=document.getElementById('delInvNo').value.trim();
   const items=document.getElementById('delItems').value.trim(),total=parseFloat(document.getElementById('delTotal').value)||0;
@@ -551,61 +466,44 @@ function addDelivery(){
   DB.entries.push({id:DB.nextId++,date,desc:`Delivery: ${supplier} — ${items||invNo}`,type:'Delivery',amount:total,project:'',
     debits:[{acct:'Construction Materials',amt:total,atype:'asset'}],
     credits:pay==='cash'?[{acct:'Cash',amt:total,atype:'asset'}]:[{acct:'Accounts Payable',amt:total,atype:'liability'}]});
-  saveData();renderAll();st.innerHTML=`<span style="color:var(--green3)">✅ ${supplier}</span>`;
-  setTimeout(()=>st.innerHTML='',3000);
+  saveData();renderAll();st.innerHTML=`<span style="color:var(--green3)">✅ ${supplier}</span>`;setTimeout(()=>st.innerHTML='',3000);
 }
 function renderDeliveryList(){
   const el=document.getElementById('deliveryList');if(!el)return;
   if(!DB.deliveries.length){el.innerHTML='<div style="text-align:center;padding:16px;color:var(--text3)">No deliveries</div>';return;}
-  el.innerHTML=`<table><thead><tr><th>Date</th><th>Supplier</th><th>Items</th><th>Total</th><th>Payment</th></tr></thead><tbody>${
-    DB.deliveries.slice(-30).reverse().map(d=>`<tr><td>${d.date}</td><td>${d.supplier}</td><td>${d.items||d.invNo}</td><td style="font-family:'JetBrains Mono',monospace">${fc(d.total)}</td><td><span class="tag ${d.pay==='cash'?'t-green':'t-orange'}">${d.pay}</span></td></tr>`).join('')
-  }</tbody></table>`;
+  el.innerHTML=`<table><thead><tr><th>Date</th><th>Supplier</th><th>Items</th><th>Total</th><th>Payment</th></tr></thead><tbody>${DB.deliveries.slice(-30).reverse().map(d=>`<tr><td>${d.date}</td><td>${d.supplier}</td><td>${d.items||d.invNo}</td><td style="font-family:'JetBrains Mono',monospace">${fc(d.total)}</td><td><span class="tag ${d.pay==='cash'?'t-green':'t-orange'}">${d.pay}</span></td></tr>`).join('')}</tbody></table>`;
 }
 
-// ============================================================
-// WORKERS & PAYROLL
-// ============================================================
+// WORKERS
 function addWorker(){
   const name=document.getElementById('wkName').value.trim(),role=document.getElementById('wkRole').value;
   let salary=parseFloat(document.getElementById('wkSalary').value)||0;const cur=document.getElementById('wkCur').value;
   const st=document.getElementById('wkAddSt');if(!name||!salary){st.innerHTML='<span style="color:var(--red3)">Fill name and salary</span>';return;}
   if(cur==='SSP')salary=salary/SSP_RATE;
-  DB.workers.push({id:Date.now(),name,role,salary,cur:'USD'});
+  DB.workers.push({id:Date.now(),name,role,salary});
   saveData();renderAll();document.getElementById('wkName').value='';document.getElementById('wkSalary').value='';
   st.innerHTML=`<span style="color:var(--green3)">✅ ${name}</span>`;setTimeout(()=>st.innerHTML='',3000);
 }
 function renderWorkerList(){
   const el=document.getElementById('workerList');if(!el)return;
   if(!DB.workers.length){el.innerHTML='<div style="text-align:center;padding:16px;color:var(--text3)">No workers</div>';return;}
-  el.innerHTML=`<table><thead><tr><th>Name</th><th>Role</th><th>Monthly</th><th>Action</th></tr></thead><tbody>${
-    DB.workers.map(w=>`<tr><td>${w.name}</td><td>${w.role}</td><td style="font-family:'JetBrains Mono',monospace">${fc(w.salary)}</td><td><button class="btn btn-danger" style="font-size:10px;padding:4px 8px" onclick="deleteWorker(${w.id})">✕</button></td></tr>`).join('')
-  }</tbody></table>`;
+  el.innerHTML=`<table><thead><tr><th>Name</th><th>Role</th><th>Monthly</th><th>Action</th></tr></thead><tbody>${DB.workers.map(w=>`<tr><td>${w.name}</td><td>${w.role}</td><td style="font-family:'JetBrains Mono',monospace">${fc(w.salary)}</td><td><button class="btn btn-danger" style="font-size:10px;padding:4px 8px" onclick="deleteWorker(${w.id})">✕</button></td></tr>`).join('')}</tbody></table>`;
 }
 function deleteWorker(id){if(!confirm('Delete worker?'))return;DB.workers=DB.workers.filter(w=>w.id!==id);saveData();renderAll();}
-function renderPayWorkerSelect(){
-  const el=document.getElementById('payWorker');if(!el)return;
-  el.innerHTML=DB.workers.map(w=>`<option value="${w.id}">${w.name} (${fc(w.salary)}/mo)</option>`).join('');
-}
+function renderPayWorkerSelect(){const el=document.getElementById('payWorker');if(!el)return;el.innerHTML=DB.workers.map(w=>`<option value="${w.id}">${w.name} (${fc(w.salary)}/mo)</option>`).join('');}
 function paySalary(){
   const wid=parseInt(document.getElementById('payWorker').value),month=document.getElementById('payMonth').value;
   const override=parseFloat(document.getElementById('payOverride').value)||0;
-  const w=DB.workers.find(x=>x.id===wid);if(!w)return;
-  const amt=override||w.salary;
-  DB.entries.push({id:DB.nextId++,date:today(),desc:`Salary: ${w.name} (${month||today().slice(0,7)})`,type:'Payroll',amount:amt,project:'',
-    debits:[{acct:'Salary Expense',amt,atype:'expense'}],credits:[{acct:'Cash',amt,atype:'asset'}]});
+  const w=DB.workers.find(x=>x.id===wid);if(!w)return;const amt=override||w.salary;
+  DB.entries.push({id:DB.nextId++,date:today(),desc:`Salary: ${w.name} (${month||today().slice(0,7)})`,type:'Payroll',amount:amt,project:'',debits:[{acct:'Salary Expense',amt,atype:'expense'}],credits:[{acct:'Cash',amt,atype:'asset'}]});
   saveData();renderAll();showToast(`✅ Paid ${fc(amt)} to ${w.name}`);
 }
 function payAllSalaries(){
-  DB.workers.forEach(w=>{
-    DB.entries.push({id:DB.nextId++,date:today(),desc:`Salary: ${w.name} (${today().slice(0,7)})`,type:'Payroll',amount:w.salary,project:'',
-      debits:[{acct:'Salary Expense',amt:w.salary,atype:'expense'}],credits:[{acct:'Cash',amt:w.salary,atype:'asset'}]});
-  });
+  DB.workers.forEach(w=>DB.entries.push({id:DB.nextId++,date:today(),desc:`Salary: ${w.name} (${today().slice(0,7)})`,type:'Payroll',amount:w.salary,project:'',debits:[{acct:'Salary Expense',amt:w.salary,atype:'expense'}],credits:[{acct:'Cash',amt:w.salary,atype:'asset'}]}));
   saveData();renderAll();showToast(`✅ Paid ${DB.workers.length} workers`);
 }
 
-// ============================================================
 // PROJECTS
-// ============================================================
 function addProject(){
   const name=document.getElementById('pjName').value.trim(),client=document.getElementById('pjClient').value.trim();
   let value=parseFloat(document.getElementById('pjValue').value)||0;const cur=document.getElementById('pjCur').value;
@@ -620,11 +518,10 @@ function addProject(){
 function renderProjectCards(){
   const el=document.getElementById('projectCards');if(!el)return;
   if(!DB.projects.length){el.innerHTML='<div class="card" style="text-align:center;color:var(--text3);padding:24px">No projects yet</div>';return;}
-  const b=getBal();
   el.innerHTML=DB.projects.map(p=>{
     const costs=DB.entries.filter(e=>e.project===p.name).reduce((s,e)=>s+(e.debits||[]).filter(d=>d.atype==='expense').reduce((ss,d)=>ss+d.amt,0),0);
     const pct=p.value>0?Math.min(100,Math.round((p.billed||0)/p.value*100)):0;
-    return `<div class="card"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px"><div><div style="font-size:14px;font-weight:700;color:var(--text)">${p.name}</div><div style="font-size:11px;color:var(--text3)">${p.client||''} · ${p.location||''}</div></div><div style="display:flex;gap:6px;align-items:center"><span class="tag ${p.status==='Active'?'t-green':'t-blue'}">${p.status}</span><button class="btn btn-outline" style="font-size:10px;padding:3px 8px" onclick="toggleProjectStatus(${p.id})">${p.status==='Active'?'Complete':'Reopen'}</button><button class="btn btn-danger" style="font-size:10px;padding:3px 8px" onclick="deleteProject(${p.id})">✕</button></div></div>
+    return `<div class="card"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px"><div><div style="font-size:14px;font-weight:700;color:var(--text)">${p.name}</div><div style="font-size:11px;color:var(--text3)">${p.client||''} · ${p.location||''}</div></div><div style="display:flex;gap:6px"><span class="tag ${p.status==='Active'?'t-green':'t-blue'}">${p.status}</span><button class="btn btn-outline" style="font-size:10px;padding:3px 8px" onclick="toggleProjectStatus(${p.id})">${p.status==='Active'?'Complete':'Reopen'}</button><button class="btn btn-danger" style="font-size:10px;padding:3px 8px" onclick="deleteProject(${p.id})">✕</button></div></div>
     <div class="kgrid" style="grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">
       <div class="kpi"><div class="kpi-lbl">Contract</div><div class="kpi-val" style="font-size:14px">${fc(p.value)}</div></div>
       <div class="kpi"><div class="kpi-lbl">Billed</div><div class="kpi-val pos" style="font-size:14px">${fc(p.billed||0)}</div></div>
@@ -638,84 +535,57 @@ function renderProjectCards(){
 function toggleProjectStatus(id){const p=DB.projects.find(x=>x.id===id);if(!p)return;p.status=p.status==='Active'?'Completed':'Active';saveData();renderProjectCards();}
 function deleteProject(id){if(!confirm('Delete project?'))return;DB.projects=DB.projects.filter(p=>p.id!==id);saveData();renderAll();}
 
-// ============================================================
 // INVOICE
-// ============================================================
-function renderInvProjectSelect(){
-  const el=document.getElementById('invProject');if(!el)return;
-  el.innerHTML=DB.projects.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
-}
+function renderInvProjectSelect(){const el=document.getElementById('invProject');if(!el)return;el.innerHTML=DB.projects.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');}
 function previewInvoice(){
-  const amt=parseFloat(document.getElementById('invAmt').value)||0;
-  const ret=(parseFloat(document.getElementById('invRet').value)||10)/100;
-  const retAmt=amt*ret,net=amt-retAmt;
-  document.getElementById('invoicePreview').innerHTML=`<div class="invoice-preview"><h2>Invoice Preview</h2><div style="font-size:10px;color:var(--text3);margin-bottom:12px">${BIZ_NAME}</div><div class="invoice-row"><span>Gross Amount</span><span>${fc(amt)}</span></div><div class="invoice-row"><span>Retention (${(ret*100).toFixed(0)}%)</span><span style="color:var(--red3)">-${fc(retAmt)}</span></div><div class="invoice-row total"><span>Net Due</span><span style="color:var(--gold3)">${fc(net)}</span></div></div>`;
+  const amt=parseFloat(document.getElementById('invAmt').value)||0,ret=(parseFloat(document.getElementById('invRet').value)||10)/100;
+  const retAmt=amt*ret;
+  document.getElementById('invoicePreview').innerHTML=`<div class="invoice-preview"><h2>Invoice Preview</h2><div style="font-size:10px;color:var(--text3);margin-bottom:12px">${BIZ_NAME}</div><div class="invoice-row"><span>Gross Amount</span><span>${fc(amt)}</span></div><div class="invoice-row"><span>Retention (${(ret*100).toFixed(0)}%)</span><span style="color:var(--red3)">-${fc(retAmt)}</span></div><div class="invoice-row total"><span>Net Due</span><span style="color:var(--gold3)">${fc(amt-retAmt)}</span></div></div>`;
 }
 function postInvoice(){
   const pid=parseInt(document.getElementById('invProject').value),invNo=document.getElementById('invNo').value.trim();
   const amt=parseFloat(document.getElementById('invAmt').value)||0,pct=parseFloat(document.getElementById('invPct').value)||0;
   const ret=(parseFloat(document.getElementById('invRet').value)||10)/100;
   const p=DB.projects.find(x=>x.id===pid);if(!p||!amt)return;
-  const retAmt=amt*ret,net=amt-retAmt;
-  p.billed=(p.billed||0)+amt;
+  const retAmt=amt*ret,net=amt-retAmt;p.billed=(p.billed||0)+amt;
   DB.entries.push({id:DB.nextId++,date:today(),desc:`Invoice ${invNo||''}: ${p.name} (${pct}%)`,type:'Invoice',amount:amt,project:p.name,
     debits:[{acct:'Accounts Receivable',amt:net,atype:'asset'},{acct:'Retention Receivable',amt:retAmt,atype:'asset'}],
     credits:[{acct:'Contract Revenue',amt,atype:'revenue'}]});
-  saveData();renderAll();showToast(`✅ Invoice ${invNo} posted — Net: ${fc(net)}`);
+  saveData();renderAll();showToast(`✅ Invoice posted — Net: ${fc(net)}`);
 }
 
-// ============================================================
 // RETENTION
-// ============================================================
-function renderRetProjectSelect(){
-  const el=document.getElementById('retProject');if(!el)return;
-  el.innerHTML=DB.projects.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
-}
+function renderRetProjectSelect(){const el=document.getElementById('retProject');if(!el)return;el.innerHTML=DB.projects.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');}
 function updateRetLiveBalance(){
-  const pid=parseInt(document.getElementById('retProject').value);
-  const p=DB.projects.find(x=>x.id===pid);if(!p)return;
-  const b=getBal();const retBal=b['Retention Receivable']?b['Retention Receivable'].net:0;
+  const b=getBal(),retBal=b['Retention Receivable']?b['Retention Receivable'].net:0;
   const el=document.getElementById('retLiveBalance');if(!el)return;
-  el.style.display='block';el.textContent=`Retention Receivable (all projects): ${fc(retBal)}`;
+  el.style.display='block';el.textContent=`Retention Receivable: ${fc(retBal)}`;
 }
 function releaseRetention(){
   const pid=parseInt(document.getElementById('retProject').value),amt=parseFloat(document.getElementById('retAmt').value)||0;
   const p=DB.projects.find(x=>x.id===pid);if(!p||!amt)return;
-  DB.entries.push({id:DB.nextId++,date:today(),desc:`Retention Released: ${p.name}`,type:'Retention Release',amount:amt,project:p.name,
-    debits:[{acct:'Cash',amt,atype:'asset'}],credits:[{acct:'Retention Receivable',amt,atype:'asset'}]});
+  DB.entries.push({id:DB.nextId++,date:today(),desc:`Retention Released: ${p.name}`,type:'Retention Release',amount:amt,project:p.name,debits:[{acct:'Cash',amt,atype:'asset'}],credits:[{acct:'Retention Receivable',amt,atype:'asset'}]});
   saveData();renderAll();showToast(`✅ Released ${fc(amt)}`);document.getElementById('retAmt').value='';
 }
 function renderRetention(){
-  const b=getBal();
-  const totalRet=b['Retention Receivable']?b['Retention Receivable'].net:0;
-  const el=document.getElementById('retentionKpis');if(el){
-    el.innerHTML=`<div class="kpi"><div class="kpi-lbl">Total Retention Held</div><div class="kpi-val warn">${fc(totalRet)}</div></div>
-      <div class="kpi"><div class="kpi-lbl">Projects</div><div class="kpi-val">${DB.projects.length}</div></div>`;
-  }
+  const b=getBal(),totalRet=b['Retention Receivable']?b['Retention Receivable'].net:0;
+  const el=document.getElementById('retentionKpis');if(el)el.innerHTML=`<div class="kpi"><div class="kpi-lbl">Total Retention Held</div><div class="kpi-val warn">${fc(totalRet)}</div></div><div class="kpi"><div class="kpi-lbl">Projects</div><div class="kpi-val">${DB.projects.length}</div></div>`;
   const tb=document.getElementById('retentionTable');if(!tb)return;
   if(!DB.projects.length){tb.innerHTML='<div style="text-align:center;padding:16px;color:var(--text3)">No projects</div>';return;}
-  tb.innerHTML=`<table><thead><tr><th>Project</th><th>Contract</th><th>Billed</th><th>Retention %</th><th>Est. Retention</th></tr></thead><tbody>${
-    DB.projects.map(p=>`<tr><td>${p.name}</td><td>${fc(p.value)}</td><td>${fc(p.billed||0)}</td><td>${p.retention}%</td><td style="color:var(--orange3);font-family:'JetBrains Mono',monospace">${fc((p.billed||0)*p.retention/100)}</td></tr>`).join('')
-  }</tbody></table>`;
+  tb.innerHTML=`<table><thead><tr><th>Project</th><th>Contract</th><th>Billed</th><th>Retention %</th><th>Est. Retention</th></tr></thead><tbody>${DB.projects.map(p=>`<tr><td>${p.name}</td><td>${fc(p.value)}</td><td>${fc(p.billed||0)}</td><td>${p.retention}%</td><td style="color:var(--orange3)">${fc((p.billed||0)*p.retention/100)}</td></tr>`).join('')}</tbody></table>`;
 }
 
-// ============================================================
 // JOURNAL
-// ============================================================
 function renderJournal(){
   const el=document.getElementById('jFull');if(!el)return;
-  const q=(document.getElementById('jSearch')||{}).value||'';
-  const from=(document.getElementById('jFrom')||{}).value||'';
-  const to=(document.getElementById('jTo')||{}).value||'';
+  const q=(document.getElementById('jSearch')||{}).value||'',from=(document.getElementById('jFrom')||{}).value||'',to=(document.getElementById('jTo')||{}).value||'';
   let entries=[...DB.entries].reverse();
   if(q)entries=entries.filter(e=>e.desc.toLowerCase().includes(q.toLowerCase())||e.type.toLowerCase().includes(q.toLowerCase()));
-  if(from)entries=entries.filter(e=>e.date>=from);
-  if(to)entries=entries.filter(e=>e.date<=to);
+  if(from)entries=entries.filter(e=>e.date>=from);if(to)entries=entries.filter(e=>e.date<=to);
   if(!entries.length){el.innerHTML='<div style="text-align:center;padding:24px;color:var(--text3)">No entries</div>';return;}
   el.innerHTML=entries.map(e=>{
-    const dr=(e.debits||[]).reduce((s,d)=>s+d.amt,0),cr=(e.credits||[]).reduce((s,c)=>s+c.amt,0);
-    const balanced=Math.abs(dr-cr)<0.05;
-    return `<div class="card" style="margin-bottom:10px;${!balanced?'border-color:var(--red2)':''}">
+    const dr=(e.debits||[]).reduce((s,d)=>s+d.amt,0),cr=(e.credits||[]).reduce((s,c)=>s+c.amt,0),bal=Math.abs(dr-cr)<0.05;
+    return `<div class="card" style="margin-bottom:10px;${!bal?'border-color:var(--red2)':''}">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <div><span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3)">#${e.id} · ${e.date}</span> <span class="tag t-blue">${e.type}</span>${e.project?` <span class="tag t-gold">${e.project}</span>`:''}</div>
         <div style="display:flex;gap:6px;align-items:center"><span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--gold3)">${fc(e.amount)}</span><button style="padding:2px 7px;background:transparent;border:1px solid rgba(192,48,42,.3);border-radius:3px;color:var(--red3);font-size:10px;cursor:pointer" onclick="deleteEntry(${e.id})">✕</button></div>
@@ -724,171 +594,111 @@ function renderJournal(){
       <table style="font-size:11px"><thead><tr><th>Account</th><th>Debit</th><th>Credit</th></tr></thead><tbody>
         ${(e.debits||[]).map(d=>`<tr><td>${d.acct}</td><td style="color:var(--green3);font-family:'JetBrains Mono',monospace">${fc(d.amt)}</td><td></td></tr>`).join('')}
         ${(e.credits||[]).map(c=>`<tr><td>${c.acct}</td><td></td><td style="color:var(--red3);font-family:'JetBrains Mono',monospace">${fc(c.amt)}</td></tr>`).join('')}
-        <tr style="border-top:1px solid var(--border)"><td style="color:var(--text2)">Total</td><td style="font-family:'JetBrains Mono',monospace;color:${balanced?'var(--green3)':'var(--red3)'}">${fc(dr)}</td><td style="font-family:'JetBrains Mono',monospace;color:${balanced?'var(--green3)':'var(--red3)'}">${fc(cr)}</td></tr>
+        <tr style="border-top:1px solid var(--border)"><td style="color:var(--text2)">Total</td><td style="font-family:'JetBrains Mono',monospace;color:${bal?'var(--green3)':'var(--red3)'}">${fc(dr)}</td><td style="font-family:'JetBrains Mono',monospace;color:${bal?'var(--green3)':'var(--red3)'}">${fc(cr)}</td></tr>
       </tbody></table></div>`;
   }).join('');
 }
 function deleteEntry(id){if(!confirm('Delete this entry?'))return;DB.entries=DB.entries.filter(e=>e.id!==id);saveData();renderAll();runAudit();}
-function clearJFilter(){
-  const jFrom=document.getElementById('jFrom'),jTo=document.getElementById('jTo'),jSearch=document.getElementById('jSearch');
-  if(jFrom)jFrom.value='';if(jTo)jTo.value='';if(jSearch)jSearch.value='';renderJournal();
-}
+function clearJFilter(){['jFrom','jTo','jSearch'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});renderJournal();}
 
-// ============================================================
 // LEDGER
-// ============================================================
 function renderLedger(){
   const el=document.getElementById('lFull');if(!el)return;
   const b=getBal();const accts=Object.keys(b).sort();
-  if(!accts.length){el.innerHTML='<div style="text-align:center;padding:24px;color:var(--text3)">No ledger data</div>';return;}
+  if(!accts.length){el.innerHTML='<div style="text-align:center;padding:24px;color:var(--text3)">No data</div>';return;}
   el.innerHTML=accts.map(acct=>{
-    const entries=[];
+    const rows=[];
     DB.entries.forEach(e=>{
-      (e.debits||[]).forEach(d=>{if(d.acct===acct)entries.push({date:e.date,desc:e.desc,dr:d.amt,cr:0});});
-      (e.credits||[]).forEach(c=>{if(c.acct===acct)entries.push({date:e.date,desc:e.desc,dr:0,cr:c.amt});});
+      (e.debits||[]).forEach(d=>{if(d.acct===acct)rows.push({date:e.date,desc:e.desc,dr:d.amt,cr:0});});
+      (e.credits||[]).forEach(c=>{if(c.acct===acct)rows.push({date:e.date,desc:e.desc,dr:0,cr:c.amt});});
     });
-    entries.sort((a,b)=>a.date.localeCompare(b.date));
-    return `<div class="fs-card"><div class="fs-title">${acct}</div><div class="fs-sub">${b[acct].atype} · Balance: ${fc(b[acct].net)}</div>
-      <table><thead><tr><th>Date</th><th>Description</th><th>Debit</th><th>Credit</th></tr></thead><tbody>
-      ${entries.map(e=>`<tr><td>${e.date}</td><td>${e.desc}</td><td style="color:var(--green3);font-family:'JetBrains Mono',monospace">${e.dr?fc(e.dr):''}</td><td style="color:var(--red3);font-family:'JetBrains Mono',monospace">${e.cr?fc(e.cr):''}</td></tr>`).join('')}
-      </tbody></table></div>`;
+    rows.sort((a,z)=>a.date.localeCompare(z.date));
+    return `<div class="fs-card"><div class="fs-title">${acct}</div><div class="fs-sub">${b[acct].atype} · Balance: ${fc(b[acct].net)}</div><table><thead><tr><th>Date</th><th>Description</th><th>Debit</th><th>Credit</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${r.date}</td><td>${r.desc}</td><td style="color:var(--green3);font-family:'JetBrains Mono',monospace">${r.dr?fc(r.dr):''}</td><td style="color:var(--red3);font-family:'JetBrains Mono',monospace">${r.cr?fc(r.cr):''}</td></tr>`).join('')}</tbody></table></div>`;
   }).join('');
 }
 
-// ============================================================
 // TRIAL BALANCE
-// ============================================================
 function renderTrial(){
   const el=document.getElementById('tFull');if(!el)return;
-  const b=getBal();const accts=Object.keys(b).sort();
-  let totDr=0,totCr=0;
-  const rows=accts.map(a=>{
-    const dr=b[a].dr,cr=b[a].cr;totDr+=dr;totCr+=cr;
-    return `<tr><td>${a}</td><td><span class="tag t-blue" style="font-size:9px">${b[a].atype}</span></td><td style="font-family:'JetBrains Mono',monospace;color:var(--green3)">${fc(dr)}</td><td style="font-family:'JetBrains Mono',monospace;color:var(--red3)">${fc(cr)}</td></tr>`;
-  }).join('');
-  const balanced=Math.abs(totDr-totCr)<0.05;
-  el.innerHTML=`<div class="fs-card"><div class="fs-title">Trial Balance</div><div class="fs-sub">${today()} · ${balanced?'✅ Balanced':'❌ Unbalanced'}</div>
-    <table><thead><tr><th>Account</th><th>Type</th><th>Debit</th><th>Credit</th></tr></thead><tbody>${rows}
-    <tr style="border-top:2px solid var(--border2);font-weight:700"><td>TOTAL</td><td></td><td style="font-family:'JetBrains Mono',monospace;color:${balanced?'var(--green3)':'var(--red3)'}">${fc(totDr)}</td><td style="font-family:'JetBrains Mono',monospace;color:${balanced?'var(--green3)':'var(--red3)'}">${fc(totCr)}</td></tr>
-    </tbody></table></div>`;
+  const b=getBal();const accts=Object.keys(b).sort();let tDr=0,tCr=0;
+  const rows=accts.map(a=>{tDr+=b[a].dr;tCr+=b[a].cr;return `<tr><td>${a}</td><td><span class="tag t-blue" style="font-size:9px">${b[a].atype}</span></td><td style="font-family:'JetBrains Mono',monospace;color:var(--green3)">${fc(b[a].dr)}</td><td style="font-family:'JetBrains Mono',monospace;color:var(--red3)">${fc(b[a].cr)}</td></tr>`;}).join('');
+  const bal=Math.abs(tDr-tCr)<0.05;
+  el.innerHTML=`<div class="fs-card"><div class="fs-title">Trial Balance</div><div class="fs-sub">${today()} · ${bal?'✅ Balanced':'❌ Unbalanced'}</div><table><thead><tr><th>Account</th><th>Type</th><th>Debit</th><th>Credit</th></tr></thead><tbody>${rows}<tr style="border-top:2px solid var(--border2);font-weight:700"><td>TOTAL</td><td></td><td style="font-family:'JetBrains Mono',monospace;color:${bal?'var(--green3)':'var(--red3)'}">${fc(tDr)}</td><td style="font-family:'JetBrains Mono',monospace;color:${bal?'var(--green3)':'var(--red3)'}">${fc(tCr)}</td></tr></tbody></table></div>`;
 }
 
-// ============================================================
 // INCOME STATEMENT
-// ============================================================
 function renderIncome(){
   const el=document.getElementById('iFull');if(!el)return;
-  const from=(document.getElementById('iFrom')||{}).value||'';
-  const to=(document.getElementById('iTo')||{}).value||'';
+  const from=(document.getElementById('iFrom')||{}).value||'',to=(document.getElementById('iTo')||{}).value||'';
   const b={};
-  function add(acct,atype,dr,cr){
-    if(!b[acct])b[acct]={atype,dr:0,cr:0,net:0};
-    b[acct].dr+=dr;b[acct].cr+=cr;
-    const t=(b[acct].atype||'').toLowerCase();
-    if(t==='asset'||t==='expense')b[acct].net=b[acct].dr-b[acct].cr;
-    else b[acct].net=b[acct].cr-b[acct].dr;
-  }
-  DB.entries.filter(e=>(!from||e.date>=from)&&(!to||e.date<=to)).forEach(e=>{
-    (e.debits||[]).forEach(d=>add(d.acct,d.atype,d.amt,0));
-    (e.credits||[]).forEach(c=>add(c.acct,c.atype,0,c.amt));
-  });
-  const rev=Object.entries(b).filter(([,v])=>v.atype==='revenue');
-  const exp=Object.entries(b).filter(([,v])=>v.atype==='expense');
-  const totRev=rev.reduce((s,[,v])=>s+v.net,0);
-  const totExp=exp.reduce((s,[,v])=>s+v.net,0);
-  const net=totRev-totExp;
+  function add(acct,atype,dr,cr){if(!b[acct])b[acct]={atype,dr:0,cr:0,net:0};b[acct].dr+=dr;b[acct].cr+=cr;const t=(b[acct].atype||'').toLowerCase();b[acct].net=t==='asset'||t==='expense'?b[acct].dr-b[acct].cr:b[acct].cr-b[acct].dr;}
+  DB.entries.filter(e=>(!from||e.date>=from)&&(!to||e.date<=to)).forEach(e=>{(e.debits||[]).forEach(d=>add(d.acct,d.atype,d.amt,0));(e.credits||[]).forEach(c=>add(c.acct,c.atype,0,c.amt));});
+  const rev=Object.entries(b).filter(([,v])=>v.atype==='revenue'),exp=Object.entries(b).filter(([,v])=>v.atype==='expense');
+  const tR=rev.reduce((s,[,v])=>s+v.net,0),tX=exp.reduce((s,[,v])=>s+v.net,0),net=tR-tX;
   el.innerHTML=`<div class="fs-card"><div class="fs-title">Income Statement</div><div class="fs-sub">${from||'All time'} → ${to||today()}</div>
-    <div class="fs-section">Revenue</div>
-    ${rev.map(([a,v])=>`<div class="fs-row indent"><span>${a}</span><span class="fs-val" style="color:var(--green3)">${fc(v.net)}</span></div>`).join('')}
-    <div class="fs-row sub"><span>Total Revenue</span><span class="fs-val" style="color:var(--green3)">${fc(totRev)}</span></div>
-    <div class="fs-section">Expenses</div>
-    ${exp.map(([a,v])=>`<div class="fs-row indent"><span>${a}</span><span class="fs-val" style="color:var(--red3)">${fc(v.net)}</span></div>`).join('')}
-    <div class="fs-row sub"><span>Total Expenses</span><span class="fs-val" style="color:var(--red3)">${fc(totExp)}</span></div>
-    <div class="fs-row total"><span>Net ${net>=0?'Profit':'Loss'}</span><span class="fs-val" style="color:${net>=0?'var(--green3)':'var(--red3)'}">${fc(net)}</span></div>
-    </div>`;
+    <div class="fs-section">Revenue</div>${rev.map(([a,v])=>`<div class="fs-row indent"><span>${a}</span><span class="fs-val" style="color:var(--green3)">${fc(v.net)}</span></div>`).join('')}
+    <div class="fs-row sub"><span>Total Revenue</span><span class="fs-val" style="color:var(--green3)">${fc(tR)}</span></div>
+    <div class="fs-section">Expenses</div>${exp.map(([a,v])=>`<div class="fs-row indent"><span>${a}</span><span class="fs-val" style="color:var(--red3)">${fc(v.net)}</span></div>`).join('')}
+    <div class="fs-row sub"><span>Total Expenses</span><span class="fs-val" style="color:var(--red3)">${fc(tX)}</span></div>
+    <div class="fs-row total"><span>Net ${net>=0?'Profit':'Loss'}</span><span class="fs-val" style="color:${net>=0?'var(--green3)':'var(--red3)'}">${fc(net)}</span></div></div>`;
 }
 
-// ============================================================
 // BALANCE SHEET
-// ============================================================
 function renderBalance(){
   const el=document.getElementById('bFull');if(!el)return;
   const b=getBal();
-  const assets=Object.entries(b).filter(([,v])=>v.atype==='asset');
-  const liabs=Object.entries(b).filter(([,v])=>v.atype==='liability');
-  const equity=Object.entries(b).filter(([,v])=>v.atype==='equity');
+  const assets=Object.entries(b).filter(([,v])=>v.atype==='asset'),liabs=Object.entries(b).filter(([,v])=>v.atype==='liability'),equity=Object.entries(b).filter(([,v])=>v.atype==='equity');
   const rev=sumByType(b,'revenue'),exp=sumByType(b,'expense');
-  const totA=assets.reduce((s,[,v])=>s+v.net,0);
-  const totL=liabs.reduce((s,[,v])=>s+v.net,0);
-  const totE=equity.reduce((s,[,v])=>s+v.net,0)+(rev-exp);
+  const tA=assets.reduce((s,[,v])=>s+v.net,0),tL=liabs.reduce((s,[,v])=>s+v.net,0),tE=equity.reduce((s,[,v])=>s+v.net,0)+(rev-exp);
   el.innerHTML=`<div class="fs-card"><div class="fs-title">Balance Sheet</div><div class="fs-sub">As of ${today()}</div>
-    <div class="fs-section">Assets</div>
-    ${assets.map(([a,v])=>`<div class="fs-row indent"><span>${a}</span><span class="fs-val">${fc(v.net)}</span></div>`).join('')}
-    <div class="fs-row sub"><span>Total Assets</span><span class="fs-val" style="color:var(--green3)">${fc(totA)}</span></div>
-    <div class="fs-section">Liabilities</div>
-    ${liabs.map(([a,v])=>`<div class="fs-row indent"><span>${a}</span><span class="fs-val" style="color:var(--red3)">${fc(v.net)}</span></div>`).join('')}
-    <div class="fs-row sub"><span>Total Liabilities</span><span class="fs-val" style="color:var(--red3)">${fc(totL)}</span></div>
-    <div class="fs-section">Equity</div>
-    ${equity.map(([a,v])=>`<div class="fs-row indent"><span>${a}</span><span class="fs-val">${fc(v.net)}</span></div>`).join('')}
+    <div class="fs-section">Assets</div>${assets.map(([a,v])=>`<div class="fs-row indent"><span>${a}</span><span class="fs-val">${fc(v.net)}</span></div>`).join('')}
+    <div class="fs-row sub"><span>Total Assets</span><span class="fs-val" style="color:var(--green3)">${fc(tA)}</span></div>
+    <div class="fs-section">Liabilities</div>${liabs.map(([a,v])=>`<div class="fs-row indent"><span>${a}</span><span class="fs-val" style="color:var(--red3)">${fc(v.net)}</span></div>`).join('')}
+    <div class="fs-row sub"><span>Total Liabilities</span><span class="fs-val" style="color:var(--red3)">${fc(tL)}</span></div>
+    <div class="fs-section">Equity</div>${equity.map(([a,v])=>`<div class="fs-row indent"><span>${a}</span><span class="fs-val">${fc(v.net)}</span></div>`).join('')}
     <div class="fs-row indent"><span>Retained Earnings</span><span class="fs-val">${fc(rev-exp)}</span></div>
-    <div class="fs-row sub"><span>Total Equity</span><span class="fs-val">${fc(totE)}</span></div>
-    <div class="fs-row total"><span>Liabilities + Equity</span><span class="fs-val" style="color:${Math.abs(totA-(totL+totE))<0.5?'var(--green3)':'var(--red3)'}">${fc(totL+totE)}</span></div>
-    </div>`;
+    <div class="fs-row sub"><span>Total Equity</span><span class="fs-val">${fc(tE)}</span></div>
+    <div class="fs-row total"><span>Liabilities + Equity</span><span class="fs-val" style="color:${Math.abs(tA-(tL+tE))<0.5?'var(--green3)':'var(--red3)'}">${fc(tL+tE)}</span></div></div>`;
 }
 
-// ============================================================
-// CASH FLOW FORECAST
-// ============================================================
+// CASHFLOW
 function renderCashflow(){
   const el=document.getElementById('cfFull');if(!el)return;
-  const b=getBal();
-  const cash=b['Cash']?b['Cash'].net:0;
-  const avgRev=sumByType(b,'revenue')/Math.max(1,3);
-  const avgExp=sumByType(b,'expense')/Math.max(1,3);
-  const depMo=DB.assets.reduce((s,a)=>s+a.monthlyDep,0);
-  const months=3;let running=cash;
+  const b=getBal(),cash=b['Cash']?b['Cash'].net:0,avgRev=sumByType(b,'revenue')/3,avgExp=sumByType(b,'expense')/3;
+  const depMo=DB.assets.reduce((s,a)=>s+a.monthlyDep,0);let run=cash;
   let html=`<div class="cf-row" style="font-weight:700"><div class="cf-label">Opening</div><div class="cf-bar-bg"></div><div class="cf-val">${fc(cash)}</div></div>`;
-  for(let i=1;i<=months;i++){
-    running+=(avgRev-avgExp-depMo);
-    html+=`<div class="cf-row"><div class="cf-label">Month ${i}</div><div class="cf-bar-bg"><div class="cf-bar ${running>=0?'pos':'neg'}" style="width:${Math.min(100,Math.abs(running)/Math.max(1,Math.abs(cash)+5000)*80)}%"></div></div><div class="cf-val" style="color:${running>=0?'var(--green3)':'var(--red3)'}">${fc(running)}</div></div>`;
-  }
-  html+=`<div style="font-size:10px;color:var(--text3);margin-top:8px">Based on avg monthly revenue ${fc(avgRev)}, expenses ${fc(avgExp)}, depreciation ${fc(depMo)}/mo</div>`;
+  for(let i=1;i<=3;i++){run+=(avgRev-avgExp-depMo);html+=`<div class="cf-row"><div class="cf-label">Month ${i}</div><div class="cf-bar-bg"><div class="cf-bar ${run>=0?'pos':'neg'}" style="width:${Math.min(100,Math.abs(run)/Math.max(1,Math.abs(cash)+5000)*80)}%"></div></div><div class="cf-val" style="color:${run>=0?'var(--green3)':'var(--red3)'}">${fc(run)}</div></div>`;}
+  html+=`<div style="font-size:10px;color:var(--text3);margin-top:8px">Avg monthly: Rev ${fc(avgRev)} · Exp ${fc(avgExp)} · Dep ${fc(depMo)}</div>`;
   el.innerHTML=html;
 }
 
-// ============================================================
 // JOB COSTING
-// ============================================================
 function renderJobCost(){
   const el=document.getElementById('jobCostCards');if(!el)return;
   if(!DB.projects.length){el.innerHTML='<div class="card" style="text-align:center;color:var(--text3);padding:24px">No projects</div>';return;}
   el.innerHTML=DB.projects.map(p=>{
-    const projEntries=DB.entries.filter(e=>e.project===p.name);
-    const costs={};
-    projEntries.forEach(e=>(e.debits||[]).filter(d=>d.atype==='expense').forEach(d=>{costs[d.acct]=(costs[d.acct]||0)+d.amt;}));
-    const totCost=Object.values(costs).reduce((s,v)=>s+v,0);
-    const wip=projEntries.reduce((s,e)=>{const w=(e.debits||[]).find(d=>d.acct==='Work in Progress');return s+(w?w.amt:0);},0);
-    const margin=p.value>0?((p.billed||0)-totCost)/p.value*100:0;
+    const pe=DB.entries.filter(e=>e.project===p.name);
+    const costs={};pe.forEach(e=>(e.debits||[]).filter(d=>d.atype==='expense').forEach(d=>{costs[d.acct]=(costs[d.acct]||0)+d.amt;}));
+    const tC=Object.values(costs).reduce((s,v)=>s+v,0);
+    const wip=pe.reduce((s,e)=>{const w=(e.debits||[]).find(d=>d.acct==='Work in Progress');return s+(w?w.amt:0);},0);
+    const margin=p.value>0?((p.billed||0)-tC)/p.value*100:0;
     return `<div class="fs-card"><div class="fs-title">${p.name}</div><div class="fs-sub">${p.client||''} · Contract: ${fc(p.value)}</div>
       <div class="kgrid" style="grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px">
         <div class="kpi"><div class="kpi-lbl">Billed</div><div class="kpi-val pos" style="font-size:14px">${fc(p.billed||0)}</div></div>
-        <div class="kpi"><div class="kpi-lbl">Cost</div><div class="kpi-val neg" style="font-size:14px">${fc(totCost)}</div></div>
+        <div class="kpi"><div class="kpi-lbl">Cost</div><div class="kpi-val neg" style="font-size:14px">${fc(tC)}</div></div>
         <div class="kpi"><div class="kpi-lbl">WIP</div><div class="kpi-val warn" style="font-size:14px">${fc(wip)}</div></div>
       </div>
       <div class="fs-section">Cost Breakdown</div>
       ${Object.entries(costs).map(([a,v])=>`<div class="fs-row indent"><span>${a}</span><span class="fs-val" style="color:var(--red3)">${fc(v)}</span></div>`).join('')||'<div style="color:var(--text3);font-size:12px;padding:8px 0">No costs allocated</div>'}
-      <div style="margin-top:8px;font-size:11px;color:${margin>=0?'var(--green3)':'var(--red3)'}">Gross Margin: ${margin.toFixed(1)}%</div>
-    </div>`;
+      <div style="margin-top:8px;font-size:11px;color:${margin>=0?'var(--green3)':'var(--red3)'}">Gross Margin: ${margin.toFixed(1)}%</div></div>`;
   }).join('');
 }
 
-// ============================================================
-// MIC / VOICE
-// ============================================================
+// MIC
 function toggleMic(){
   const btn=document.getElementById('micBtn');
   if(_mic){_mic.stop();_mic=null;btn.classList.remove('on');btn.textContent='🎙️';return;}
-  if(!window.SpeechRecognition&&!window.webkitSpeechRecognition){showToast('Voice not supported in this browser');return;}
+  if(!window.SpeechRecognition&&!window.webkitSpeechRecognition){showToast('Voice not supported');return;}
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   _mic=new SR();_mic.lang='en-US';_mic.continuous=false;_mic.interimResults=false;
   _mic.onresult=e=>{document.getElementById('mainInp').value=e.results[0][0].transcript;};
@@ -896,21 +706,16 @@ function toggleMic(){
   _mic.start();btn.classList.add('on');btn.textContent='🔴';
 }
 
-// ============================================================
 // DEPRECIATION
-// ============================================================
 function autoDepreciation(){
   const now=new Date(),thisM=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
   DB.assets.filter(a=>a.lastPostedMonth!==thisM).forEach(a=>{
     const accts=getDepAccts(a.type);
-    DB.entries.push({id:DB.nextId++,date:today(),desc:`Auto Depreciation — ${a.name}`,type:'Monthly Depreciation',amount:a.monthlyDep,project:'',
-      debits:[{acct:accts.dep,amt:a.monthlyDep,atype:'expense'}],credits:[{acct:accts.acc,amt:a.monthlyDep,atype:'asset'}]});
+    DB.entries.push({id:DB.nextId++,date:today(),desc:`Auto Depreciation — ${a.name}`,type:'Monthly Depreciation',amount:a.monthlyDep,project:'',debits:[{acct:accts.dep,amt:a.monthlyDep,atype:'expense'}],credits:[{acct:accts.acc,amt:a.monthlyDep,atype:'asset'}]});
     a.lastPostedMonth=thisM;
   });
-  if(DB.assets.length)saveData();
-  renderDepPage();
+  if(DB.assets.length)saveData();renderDepPage();
 }
-
 function getDepAccts(t){const m={'Equipment':{dep:'Depreciation Expense - Equipment',acc:'Accumulated Depreciation - Equipment'},'Heavy Machinery':{dep:'Depreciation Expense - Equipment',acc:'Accumulated Depreciation - Equipment'},'Vehicles':{dep:'Depreciation Expense - Vehicles',acc:'Accumulated Depreciation - Vehicles'},'Building':{dep:'Depreciation Expense - Building',acc:'Accumulated Depreciation - Building'}};return m[t]||m['Equipment'];}
 function addAsset(){
   const name=document.getElementById('aName').value.trim(),type=document.getElementById('aType').value,cost=parseFloat(document.getElementById('aCost').value),life=parseInt(document.getElementById('aLife').value),date=document.getElementById('aDate').value;
@@ -927,9 +732,7 @@ function renderDepPage(){
   const due=DB.assets.filter(a=>a.lastPostedMonth!==thisM);const dl=document.getElementById('depDueList');if(!dl)return;
   if(!due.length){dl.innerHTML=`<div class="alert al-ok"><span class="alert-ico">✅</span><div class="alert-body">All posted for ${thisM}</div></div>`;return;}
   const total=due.reduce((s,a)=>s+a.monthlyDep,0);
-  dl.innerHTML=`<div class="alert al-info"><span class="alert-ico">🤖</span><div class="alert-body"><div class="alert-title">AUTO on next login: ${fc(total)}/mo</div></div></div>`+
-    due.map(a=>`<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;margin-bottom:5px"><div style="flex:1"><div style="font-size:12px;color:var(--text)">${a.name}</div></div><div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--green3)">${fc(a.monthlyDep)}/mo</div><button class="btn btn-gold" style="font-size:11px;padding:6px 12px" onclick="postDep(${a.id})">↗ Post</button></div>`).join('')+
-    `<button class="btn btn-gold" style="width:100%;margin-top:8px" onclick="postAllDep()">✅ Post All — ${fc(total)}</button>`;
+  dl.innerHTML=`<div class="alert al-info"><span class="alert-ico">🤖</span><div class="alert-body"><div class="alert-title">AUTO on next login: ${fc(total)}/mo</div></div></div>`+due.map(a=>`<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;margin-bottom:5px"><div style="flex:1"><div style="font-size:12px;color:var(--text)">${a.name}</div></div><div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--green3)">${fc(a.monthlyDep)}/mo</div><button class="btn btn-gold" style="font-size:11px;padding:6px 12px" onclick="postDep(${a.id})">↗ Post</button></div>`).join('')+`<button class="btn btn-gold" style="width:100%;margin-top:8px" onclick="postAllDep()">✅ Post All — ${fc(total)}</button>`;
 }
 function postDep(assetId){
   const asset=DB.assets.find(a=>a.id===assetId);if(!asset)return;
@@ -940,9 +743,7 @@ function postDep(assetId){
 }
 function postAllDep(){const now=new Date(),thisM=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');DB.assets.filter(a=>a.lastPostedMonth!==thisM).forEach(a=>postDep(a.id));}
 
-// ============================================================
 // AUDIT
-// ============================================================
 function runAudit(){
   const findings=[];
   DB.entries.forEach(e=>{const dr=(e.debits||[]).reduce((s,d)=>s+d.amt,0),cr=(e.credits||[]).reduce((s,c)=>s+c.amt,0);if(Math.abs(dr-cr)>0.05)findings.push({sev:'high',title:'Unbalanced Entry',desc:`#${e.id} (${e.desc}) Dr=${fc(dr)} Cr=${fc(cr)}`,meta:e.date});});
@@ -957,21 +758,13 @@ function runAudit(){
   const tbAlert=document.getElementById('tbAlert');if(tbAlert){tbAlert.style.display=high>0?'block':'none';const txt=document.getElementById('tbAlertTxt');if(txt)txt.textContent=high;}
 }
 
-// ============================================================
-// AI CHAT ADVISOR
-// ============================================================
+// AI ADVISOR CHAT
 async function sendChat(){
   const inp=document.getElementById('chatInp'),q=inp.value.trim();if(!q)return;inp.value='';
   const msgs=document.getElementById('chatMsgs');
   msgs.innerHTML+=`<div class="msg user">${q}</div>`;msgs.innerHTML+=`<div class="msg ai loading" id="aiLoad">🤖 ይሓስብ ኣሎ...</div>`;msgs.scrollTop=msgs.scrollHeight;
   const b=getBal();
-  const context=`COMPANY: ${BIZ_NAME} · Juba, South Sudan · ${CUR}
-REVENUE: ${fc(sumByType(b,'revenue'))} · EXPENSES: ${fc(sumByType(b,'expense'))} · NET: ${fc(sumByType(b,'revenue')-sumByType(b,'expense'))}
-CASH: ${fc(b['Cash']?b['Cash'].net:0)} · AR: ${fc(b['Accounts Receivable']?b['Accounts Receivable'].net:0)} · RETENTION: ${fc(b['Retention Receivable']?b['Retention Receivable'].net:0)}
-PROJECTS: ${DB.projects.map(p=>p.name+' ('+p.status+', contract '+fc(p.value)+', billed '+fc(p.billed||0)+')').join('; ')||'none'}
-WORKERS: ${DB.workers.map(w=>w.name+' '+w.role+' '+fc(w.salary)+'/mo').join('; ')||'none'}
-MATERIALS: ${DB.materials.map(m=>m.name+': '+m.qty+' '+m.unit+' @ '+fc(m.cost)).join('; ')||'none'}
-JOURNAL ENTRIES: ${DB.entries.length}`;
+  const context=`COMPANY: ${BIZ_NAME} · Juba, South Sudan · ${CUR}\nREVENUE: ${fc(sumByType(b,'revenue'))} · EXPENSES: ${fc(sumByType(b,'expense'))} · NET: ${fc(sumByType(b,'revenue')-sumByType(b,'expense'))}\nCASH: ${fc(b['Cash']?b['Cash'].net:0)} · AR: ${fc(b['Accounts Receivable']?b['Accounts Receivable'].net:0)} · RETENTION: ${fc(b['Retention Receivable']?b['Retention Receivable'].net:0)}\nPROJECTS: ${DB.projects.map(p=>p.name+' ('+p.status+', contract '+fc(p.value)+', billed '+fc(p.billed||0)+')').join('; ')||'none'}\nWORKERS: ${DB.workers.map(w=>w.name+' '+w.role+' '+fc(w.salary)+'/mo').join('; ')||'none'}\nMATERIALS: ${DB.materials.map(m=>m.name+': '+m.qty+' '+m.unit+' @ '+fc(m.cost)).join('; ')||'none'}\nJOURNAL ENTRIES: ${DB.entries.length}`;
   try{
     const res=await fetch('/api/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:q,mode:'advisor',context})});
     const data=await res.json();const text=data.result||'ምላሽ ኣይመጸን';
@@ -982,7 +775,6 @@ JOURNAL ENTRIES: ${DB.entries.length}`;
     msgs.innerHTML+=`<div class="msg ai">${text.replace(/\n/g,'<br>')}${applyBtn}</div>`;msgs.scrollTop=msgs.scrollHeight;
   }catch(err){document.getElementById('aiLoad').remove();msgs.innerHTML+=`<div class="msg ai" style="color:var(--red3)">Error: ${err.message}</div>`;}
 }
-
 async function applyAdvisorEntry(eid){
   const text=(window._adv||{})[eid];if(!text)return;
   const msgs=document.getElementById('chatMsgs');msgs.innerHTML+=`<div class="msg ai loading" id="applyLoad">📒 Converting...</div>`;
@@ -999,25 +791,13 @@ async function applyAdvisorEntry(eid){
   }catch(err){const el=document.getElementById('applyLoad');if(el)el.remove();msgs.innerHTML+=`<div class="msg ai" style="color:var(--red3)">⚠️ ${err.message}</div>`;}
 }
 
-// ============================================================
 // SETTINGS
-// ============================================================
 function saveSettings(){BIZ_NAME=document.getElementById('bizName').value.trim()||BIZ_NAME;SSP_RATE=parseFloat(document.getElementById('sspRate').value)||1300;document.getElementById('tbBiz').textContent=BIZ_NAME;saveData();renderAll();document.getElementById('settingsSt').innerHTML='<span style="color:var(--green3)">✅ Saved</span>';setTimeout(()=>document.getElementById('settingsSt').innerHTML='',3000);}
 function changePw(){const o=document.getElementById('op').value,n=document.getElementById('np').value,cu=getCU(),u=getU();if(u[cu].pass!==btoa(o)){document.getElementById('pwSt').innerHTML='<span style="color:var(--red3)">Wrong password</span>';return;}if(!n){document.getElementById('pwSt').innerHTML='<span style="color:var(--red3)">Enter new password</span>';return;}u[cu].pass=btoa(n);setU(u);document.getElementById('pwSt').innerHTML='<span style="color:var(--green3)">✅ Changed</span>';document.getElementById('op').value='';document.getElementById('np').value='';}
 function emailReport(){const b=getBal(),tR=sumByType(b,'revenue'),tX=sumByType(b,'expense'),net=tR-tX,cash=b['Cash']?b['Cash'].net:0;const email=document.getElementById('emailAddr')?document.getElementById('emailAddr').value.trim():'';const subject=encodeURIComponent(`${BIZ_NAME} Report ${today()}`);const body=encodeURIComponent(`HISABI HENSI REPORT\nCompany: ${BIZ_NAME}\nDate: ${today()}\nRevenue: ${fc(tR)}\nExpenses: ${fc(tX)}\nNet: ${fc(net)}\nCash: ${fc(cash)}\nEntries: ${DB.entries.length}`);if(email)window.location.href=`mailto:${email}?subject=${subject}&body=${body}`;else window.location.href=`mailto:?subject=${subject}&body=${body}`;}
 
-// ============================================================
-// INIT — auto-login if session exists
-// ============================================================
-window.addEventListener('DOMContentLoaded',()=>{
-  const cu=getCU();
-  if(cu&&getU()[cu]){loadDB();launchApp();}
-});
+// INIT
+window.addEventListener('DOMContentLoaded',()=>{const cu=getCU();if(cu&&getU()[cu]){loadDB();launchApp();}});
 </script>
 </body>
 </html>
-HTMLEOF
-echo "Done. Size: $(wc -c < /home/claude/index.html) bytes"
-Output
-
-Command argument is 104_777 bytes, exceeding the 100_000-byte per-argument limit. For large content, pipe via stdin or use a file-write API instead of embedding the content inline in the command. Argument preview: 'cat > /home/claude/index.html << \'HTMLEOF\'\n<!DOCTYPE html>\n<html lang="ti">\n<head>\n<meta charset="UTF-8"/>\n<meta name="viewport" content="width=device-width, initial-scale=1.0"/>\n<title>ሒሳቢ ሃንሲ — Hisa'
