@@ -335,10 +335,12 @@ function renderTodayEntries(){
 function renderMiniCF(){
   const el=document.getElementById('miniCF');if(!el)return;
   const b=getBal();const cash=b['Cash']?b['Cash'].net:0;
-  const avgExp=sumByType(b,'expense')/3,rev=sumByType(b,'revenue')/3;
-  el.innerHTML=['Month 1','Month 2','Month 3'].map((m,i)=>{
-    const proj=cash+(rev-avgExp)*(i+1);
-    return `<div class="cf-row"><div class="cf-label">${m}</div><div class="cf-bar-bg"><div class="cf-bar ${proj>=0?'pos':'neg'}" style="width:${Math.min(100,Math.abs(proj)/Math.max(1,Math.abs(cash)+1000)*100)}%"></div></div><div class="cf-val" style="color:${proj>=0?'var(--green3)':'var(--red3)'}">${fc(proj)}</div></div>`;
+  const hist=getMonthlyHistory(3);
+  const netCashMonthly=hist.avgCashIn-hist.avgCashOut;
+  let run=cash;
+  el.innerHTML=['Month 1','Month 2','Month 3'].map((m)=>{
+    run+=netCashMonthly;
+    return `<div class="cf-row"><div class="cf-label">${m}</div><div class="cf-bar-bg"><div class="cf-bar ${run>=0?'pos':'neg'}" style="width:${Math.min(100,Math.abs(run)/Math.max(1,Math.abs(cash)+1000)*100)}%"></div></div><div class="cf-val" style="color:${run>=0?'var(--green3)':'var(--red3)'}">${fc(run)}</div></div>`;
   }).join('');
 }
 
@@ -556,16 +558,39 @@ function postInvoice(){
 
 // RETENTION
 function renderRetProjectSelect(){const el=document.getElementById('retProject');if(!el)return;el.innerHTML=DB.projects.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');}
+function getProjectRetentionBalance(projectName){
+  // Sum retention DR (held from invoices) minus retention CR (already released) for THIS project only
+  let held=0,released=0;
+  DB.entries.forEach(e=>{
+    if(e.project!==projectName)return;
+    (e.debits||[]).forEach(d=>{if(d.acct==='Retention Receivable')held+=d.amt;});
+    (e.credits||[]).forEach(c=>{if(c.acct==='Retention Receivable')released+=c.amt;});
+  });
+  return Math.max(0,held-released);
+}
 function updateRetLiveBalance(){
-  const b=getBal(),retBal=b['Retention Receivable']?b['Retention Receivable'].net:0;
+  const pid=parseInt(document.getElementById('retProject').value);
+  const p=DB.projects.find(x=>x.id===pid);
   const el=document.getElementById('retLiveBalance');if(!el)return;
-  el.style.display='block';el.textContent=`Retention Receivable: ${fc(retBal)}`;
+  if(!p){el.style.display='none';return;}
+  const bal=getProjectRetentionBalance(p.name);
+  el.style.display='block';
+  el.textContent=`Available Retention for ${p.name}: ${fc(bal)}`;
+  el.style.color=bal>0?'var(--orange3)':'var(--red3)';
 }
 function releaseRetention(){
   const pid=parseInt(document.getElementById('retProject').value),amt=parseFloat(document.getElementById('retAmt').value)||0;
   const p=DB.projects.find(x=>x.id===pid);if(!p||!amt)return;
+  const available=getProjectRetentionBalance(p.name);
+  if(amt>available+0.01){
+    showToast(`❌ Blocked: ${p.name} only has ${fc(available)} retention available — cannot release ${fc(amt)}`,5000);
+    const el=document.getElementById('retLiveBalance');
+    if(el){el.style.display='block';el.style.color='var(--red3)';el.textContent=`⚠️ Cannot release ${fc(amt)} — only ${fc(available)} held for ${p.name}`;}
+    return;
+  }
   DB.entries.push({id:DB.nextId++,date:today(),desc:`Retention Released: ${p.name}`,type:'Retention Release',amount:amt,project:p.name,debits:[{acct:'Cash',amt,atype:'asset'}],credits:[{acct:'Retention Receivable',amt,atype:'asset'}]});
   saveData();renderAll();showToast(`✅ Released ${fc(amt)}`);document.getElementById('retAmt').value='';
+  updateRetLiveBalance();
 }
 function renderRetention(){
   const b=getBal(),totalRet=b['Retention Receivable']?b['Retention Receivable'].net:0;
@@ -662,14 +687,43 @@ function renderBalance(){
 }
 
 // CASHFLOW
+function getMonthlyHistory(monthsBack=3){
+  // Group ALL entries by actual calendar month (YYYY-MM) using real dates from the journal
+  const months={};
+  DB.entries.forEach(e=>{
+    const ym=(e.date||today()).slice(0,7);
+    if(!months[ym])months[ym]={rev:0,exp:0,cashIn:0,cashOut:0};
+    (e.debits||[]).forEach(d=>{
+      if(d.atype==='expense')months[ym].exp+=d.amt;
+      if(d.acct==='Cash')months[ym].cashIn+=d.amt;
+    });
+    (e.credits||[]).forEach(c=>{
+      if(c.atype==='revenue')months[ym].rev+=c.amt;
+      if(c.acct==='Cash')months[ym].cashOut+=c.amt;
+    });
+  });
+  const keys=Object.keys(months).sort().slice(-monthsBack);
+  if(!keys.length)return{avgRev:0,avgExp:0,avgCashIn:0,avgCashOut:0,monthsFound:0};
+  const sums=keys.reduce((s,k)=>({rev:s.rev+months[k].rev,exp:s.exp+months[k].exp,cashIn:s.cashIn+months[k].cashIn,cashOut:s.cashOut+months[k].cashOut}),{rev:0,exp:0,cashIn:0,cashOut:0});
+  return{avgRev:sums.rev/keys.length,avgExp:sums.exp/keys.length,avgCashIn:sums.cashIn/keys.length,avgCashOut:sums.cashOut/keys.length,monthsFound:keys.length};
+}
 function renderCashflow(){
   const el=document.getElementById('cfFull');if(!el)return;
-  const b=getBal(),cash=b['Cash']?b['Cash'].net:0,avgRev=sumByType(b,'revenue')/3,avgExp=sumByType(b,'expense')/3;
-  const depMo=DB.assets.reduce((s,a)=>s+a.monthlyDep,0);let run=cash;
+  const b=getBal(),cash=b['Cash']?b['Cash'].net:0;
+  const hist=getMonthlyHistory(3);
+  // Net monthly cash movement = actual avg cash inflow minus actual avg cash outflow from real dated entries
+  const netCashMonthly=hist.avgCashIn-hist.avgCashOut;
+  const depMo=DB.assets.reduce((s,a)=>s+a.monthlyDep,0);
+  let run=cash;
   let html=`<div class="cf-row" style="font-weight:700"><div class="cf-label">Opening</div><div class="cf-bar-bg"></div><div class="cf-val">${fc(cash)}</div></div>`;
-  for(let i=1;i<=3;i++){run+=(avgRev-avgExp-depMo);html+=`<div class="cf-row"><div class="cf-label">Month ${i}</div><div class="cf-bar-bg"><div class="cf-bar ${run>=0?'pos':'neg'}" style="width:${Math.min(100,Math.abs(run)/Math.max(1,Math.abs(cash)+5000)*80)}%"></div></div><div class="cf-val" style="color:${run>=0?'var(--green3)':'var(--red3)'}">${fc(run)}</div></div>`;}
-  html+=`<div style="font-size:10px;color:var(--text3);margin-top:8px">Avg monthly: Rev ${fc(avgRev)} · Exp ${fc(avgExp)} · Dep ${fc(depMo)}</div>`;
+  for(let i=1;i<=3;i++){
+    run+=netCashMonthly-depMo;
+    html+=`<div class="cf-row"><div class="cf-label">Month ${i}</div><div class="cf-bar-bg"><div class="cf-bar ${run>=0?'pos':'neg'}" style="width:${Math.min(100,Math.abs(run)/Math.max(1,Math.abs(cash)+5000)*80)}%"></div></div><div class="cf-val" style="color:${run>=0?'var(--green3)':'var(--red3)'}">${fc(run)}</div></div>`;
+  }
+  html+=`<div style="font-size:10px;color:var(--text3);margin-top:8px">Based on ${hist.monthsFound||0} month(s) of actual journal history · Avg cash in ${fc(hist.avgCashIn)} · Avg cash out ${fc(hist.avgCashOut)} · Revenue ${fc(hist.avgRev)} · Expenses ${fc(hist.avgExp)} · Depreciation ${fc(depMo)}/mo</div>`;
+  if(hist.monthsFound===0)html+=`<div class="alert al-info" style="margin-top:10px"><span class="alert-ico">ℹ️</span><div class="alert-body">No journal history yet — forecast will activate once transactions are posted.</div></div>`;
   el.innerHTML=html;
+
 }
 
 // JOB COSTING
@@ -779,7 +833,8 @@ async function applyAdvisorEntry(eid){
   const text=(window._adv||{})[eid];if(!text)return;
   const msgs=document.getElementById('chatMsgs');msgs.innerHTML+=`<div class="msg ai loading" id="applyLoad">📒 Converting...</div>`;
   try{
-    const res=await fetch('/api/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:'Convert this accounting advice to journal entry JSON: '+text})});
+    // Pass current inventory so the converter can resolve unit costs & flag material usage, same as the main recorder
+    const res=await fetch('/api/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:'Convert this accounting advice to journal entry JSON: '+text,materials:DB.materials})});
     const data=await res.json();let raw=(data.result||'').trim().replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
     const m=raw.match(/\{[\s\S]*\}/);if(!m)throw new Error('Could not parse');
     const p=JSON.parse(m[0]);if(!p.entries||!p.entries.length)throw new Error('No entries');
@@ -787,7 +842,21 @@ async function applyAdvisorEntry(eid){
     const deb=p.entries.filter(r=>(+r.debit)>0).map(r=>({acct:r.account,amt:+(+r.debit).toFixed(2),atype:(r.type||'asset').toLowerCase()}));
     const cred=p.entries.filter(r=>(+r.credit)>0).map(r=>({acct:r.account,amt:+(+r.credit).toFixed(2),atype:(r.type||'asset').toLowerCase()}));
     DB.entries.push({id:DB.nextId++,date:today(),desc:p.description||'Advisor entry',type:p.type||'Advisor',amount:p.amount||0,debits:deb,credits:cred});
-    saveData();renderAll();msgs.innerHTML+=`<div class="msg ai" style="color:var(--green3)">✅ Posted!</div>`;showToast('✅ Advisor entry posted!');
+    // CENTRAL INVENTORY STORE BINDING: same deduction path as doRecord()/postEntry() — decrement physical stock when materialUsage is present
+    let invMsg='';
+    if(p.materialUsage&&p.materialUsage.name){
+      const mat=DB.materials.find(mm=>mm.name.toLowerCase().includes((p.materialUsage.name||'').toLowerCase()));
+      if(mat){
+        const qty=p.materialUsage.qty||0;
+        mat.qty=Math.max(0,mat.qty-qty);
+        invMsg=` · 🧱 ${mat.name} stock -${qty} ${mat.unit} (now ${mat.qty})`;
+      } else {
+        invMsg=` · ⚠️ Material "${p.materialUsage.name}" not found in inventory — stock NOT adjusted`;
+      }
+    }
+    saveData();renderAll();runAudit();
+    msgs.innerHTML+=`<div class="msg ai" style="color:var(--green3)">✅ Posted!${invMsg}</div>`;
+    showToast('✅ Advisor entry posted!'+(invMsg?' Inventory updated.':''));
   }catch(err){const el=document.getElementById('applyLoad');if(el)el.remove();msgs.innerHTML+=`<div class="msg ai" style="color:var(--red3)">⚠️ ${err.message}</div>`;}
 }
 
