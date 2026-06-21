@@ -171,7 +171,7 @@ tbody td{padding:9px 12px;border-bottom:1px solid var(--border);color:var(--text
 <div class="page" id="pg-mobilemoney"><div class="ph"><h1>📱 Mobile Money</h1></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px"><div class="card"><div class="card-hdr"><span>➕</span><span>Add Transaction</span></div><div class="fg"><label>Network</label><select id="mmNet"><option value="mtn">MTN</option><option value="airtel">Airtel</option></select></div><div class="fg"><label>Type</label><select id="mmType"><option value="in">Received</option><option value="out">Sent</option></select></div><div class="fgrid"><div class="fg"><label>Amount</label><input id="mmAmt" type="number" placeholder="500"/></div><div class="fg"><label>Currency</label><select id="mmCur"><option>USD</option><option>SSP</option></select></div></div><div class="fg"><label>Reference</label><input id="mmRef" placeholder="JOHN / TXN123"/></div><div class="btn-row"><button class="btn btn-gold" onclick="addMobileMoney()">📱 Record</button></div><div id="mmSt" style="font-size:11px;margin-top:8px"></div></div><div class="card"><div class="kgrid" style="grid-template-columns:1fr 1fr;gap:8px"><div class="kpi"><div class="kpi-lbl">MTN In</div><div class="kpi-val pos" id="mtnInVal">0</div></div><div class="kpi"><div class="kpi-lbl">Airtel In</div><div class="kpi-val pos" id="airtelInVal">0</div></div><div class="kpi"><div class="kpi-lbl">Out</div><div class="kpi-val neg" id="mmOutVal">0</div></div><div class="kpi"><div class="kpi-lbl">Net</div><div class="kpi-val" id="mmNetVal">0</div></div></div></div></div>
 <div class="card"><div class="card-hdr"><span>🏦</span><span>Statement Reconciliation</span></div><p style="font-size:11px;color:var(--text3);margin-bottom:10px">Upload an MTN/Airtel statement export (.csv or .xlsx). Each row is matched against existing recorded transactions by amount + reference.</p><div class="fgrid"><div class="fg"><label>Statement File</label><input id="reconFile" type="file" accept=".csv,.xlsx,.xls" onchange="handleStatementUpload(event)"/></div><div class="fg"><label>Network</label><select id="reconNet"><option value="mtn">MTN</option><option value="airtel">Airtel</option></select></div></div><div id="reconSt" style="font-size:11px;margin:8px 0"></div><div id="reconResults"></div></div>
 <div class="card"><div class="card-hdr"><span>📋</span><span>History</span></div><div id="mmList"></div></div></div>
-<div class="page" id="pg-materials"><div class="ph"><h1>🧱 Materials</h1></div><div class="card"><div class="card-hdr"><span>➕</span><span>Add Material</span></div><div class="fgrid"><div class="fg"><label>Name</label><input id="matName" type="text" placeholder="ሲሚንቶ · Cement"/></div><div class="fg"><label>Category</label><select id="matCat"><option>Cement</option><option>Steel</option><option>Sand</option><option>Gravel</option><option>Timber</option><option>Fuel Stock</option><option>Paint</option><option>Other</option></select></div><div class="fg"><label>Quantity</label><input id="matQty" type="number" placeholder="100"/></div><div class="fg"><label>Unit</label><select id="matUnit"><option>bags</option><option>kg</option><option>tons</option><option>liters</option><option>m³</option><option>pieces</option><option>meters</option></select></div><div class="fg"><label>Unit Cost (blank=auto)</label><input id="matCost" type="number" placeholder="25"/></div><div class="fg"><label>Min Alert</label><input id="matMin" type="number" placeholder="20"/></div></div><div class="btn-row"><button class="btn btn-gold" onclick="addMaterial()">➕ Add</button></div><div id="matAddSt" style="font-size:11px;margin-top:8px"></div></div><div class="card"><input style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:8px 12px;font-size:12px;color:var(--text);outline:none;margin-bottom:12px" placeholder="Search..." id="matSearch" oninput="renderMaterials()"/><div id="matList"></div></div></div>
+<div class="page" id="pg-materials"><div class="ph"><h1>🧱 Materials</h1><p>Costing method affects how usage is priced from purchase history</p></div><div class="card"><div class="card-hdr"><span>🧮</span><span>Costing Method</span></div><p style="font-size:11px;color:var(--text3);margin-bottom:10px">Currently active: <strong id="matCostingActiveLabel" style="color:var(--gold3)">WAC</strong> — this is what's used whenever material usage is recorded.</p><div class="btn-row" style="margin-top:0"><button class="btn" id="costing-wac-mat" onclick="setCostingMethod('WAC')">📊 Weighted Average Cost</button><button class="btn" id="costing-fifo-mat" onclick="setCostingMethod('FIFO')">📦 FIFO (First-In-First-Out)</button></div></div><div class="card"><div class="card-hdr"><span>➕</span><span>Add Material</span></div><div class="fgrid"><div class="fg"><label>Name</label><input id="matName" type="text" placeholder="ሲሚንቶ · Cement"/></div><div class="fg"><label>Category</label><select id="matCat"><option>Cement</option><option>Steel</option><option>Sand</option><option>Gravel</option><option>Timber</option><option>Fuel Stock</option><option>Paint</option><option>Other</option></select></div><div class="fg"><label>Quantity</label><input id="matQty" type="number" placeholder="100"/></div><div class="fg"><label>Unit</label><select id="matUnit"><option>bags</option><option>kg</option><option>tons</option><option>liters</option><option>m³</option><option>pieces</option><option>meters</option></select></div><div class="fg"><label>Unit Cost (blank=auto)</label><input id="matCost" type="number" placeholder="25"/></div><div class="fg"><label>Min Alert</label><input id="matMin" type="number" placeholder="20"/></div></div><div class="btn-row"><button class="btn btn-gold" onclick="addMaterial()">➕ Add</button></div><div id="matAddSt" style="font-size:11px;margin-top:8px"></div></div><div class="card"><input style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:8px 12px;font-size:12px;color:var(--text);outline:none;margin-bottom:12px" placeholder="Search..." id="matSearch" oninput="renderMaterials()"/><div id="matList"></div></div></div>
 <div class="page" id="pg-deliveries"><div class="ph"><h1>🚚 Deliveries</h1></div><div class="card"><div class="card-hdr"><span>➕</span><span>New Delivery</span></div><div class="fgrid"><div class="fg"><label>Supplier</label><input id="delSupplier" type="text" placeholder="Supplier name"/></div><div class="fg"><label>Invoice #</label><input id="delInvNo" type="text" placeholder="INV-001"/></div><div class="fg"><label>Items</label><input id="delItems" type="text" placeholder="Cement 100 bags"/></div><div class="fg"><label>Total Value</label><input id="delTotal" type="number" step="0.01" inputmode="decimal" placeholder="5000"/></div><div class="fg"><label>Payment</label><select id="delPay"><option value="cash">Cash</option><option value="credit">Credit</option></select></div><div class="fg"><label>Date</label><input id="delDate" type="date"/></div><div class="fg"><label>Link to Pending Material Batch</label><select id="delMaterial"></select></div></div><div class="btn-row"><button class="btn btn-gold" onclick="addDelivery()">✅ Record</button></div><div id="delSt" style="font-size:11px;margin-top:8px"></div></div><div class="card"><div class="card-hdr"><span>📋</span><span>Received</span></div><div id="deliveryList"></div></div></div>
 <div class="page" id="pg-workers"><div class="ph"><h1>👷 Workers &amp; Payroll</h1><p>Uganda statutory payroll: PAYE + NSSF (5% employee / 10% employer)</p></div><div class="card"><div class="card-hdr"><span>➕</span><span>Add Worker</span></div><div class="fgrid"><div class="fg"><label>Name</label><input id="wkName" type="text" placeholder="Worker name"/></div><div class="fg"><label>Role</label><select id="wkRole"><option>Mason</option><option>Carpenter</option><option>Electrician</option><option>Plumber</option><option>Labourer</option><option>Driver</option><option>Site Supervisor</option><option>Engineer</option><option>Other</option></select></div><div class="fg"><label>Classification</label><select id="wkClass" onchange="toggleWorkerClassFields()"><option value="Permanent">Permanent (Fixed Monthly)</option><option value="Casual">Casual (Variable Labor)</option></select></div><div class="fg"><label>Currency</label><select id="wkCur"><option>USD</option><option>SSP</option></select></div></div><div class="fgrid" id="wkPermanentFields"><div class="fg"><label>Monthly Salary (Gross)</label><input id="wkSalary" type="number" placeholder="500"/></div></div><div class="fgrid" id="wkCasualFields" style="display:none"><div class="fg"><label>Daily Wage Rate</label><input id="wkDailyRate" type="number" placeholder="15"/></div></div><div class="btn-row"><button class="btn btn-gold" onclick="addWorker()">➕ Add</button></div><div id="wkAddSt" style="font-size:11px;margin-top:8px"></div></div>
 <div class="card"><div class="card-hdr"><span>⏱️</span><span>Casual Labor Timekeeping</span></div><div class="fgrid"><div class="fg"><label>Worker</label><select id="casualWorker"></select></div><div class="fg"><label>Days Worked</label><input id="casualDays" type="number" placeholder="6"/></div><div class="fg"><label>Month</label><input id="casualMonth" type="month"/></div></div><div class="btn-row"><button class="btn btn-gold" onclick="logCasualDays()">📝 Log Days</button></div><div id="casualSt" style="font-size:11px;margin-top:8px"></div></div>
@@ -329,6 +329,7 @@ function renderAll(){
   renderWorkerList();renderPayWorkerSelect();renderProjectCards();renderInvProjectSelect();
   renderRetProjectSelect();renderMaterials();renderMobileMoneySummary();renderMobileMoneyList();
   renderPettyBalance();renderPettyHistory();renderDeliveryList();renderJournal();renderDelMaterialSelect();
+  renderCostingButtons();
   const pb=document.getElementById('projBadge');if(pb)pb.textContent=DB.projects.length;
   const jb=document.getElementById('jBadge');if(jb)jb.textContent=DB.entries.length;
 }
@@ -391,14 +392,55 @@ async function doRecord(){
   }catch(err){showToast('❌ '+err.message);}
   btn.textContent='↗';btn.disabled=false;
 }
+// Calculates what consumeMaterialLayers WOULD return, WITHOUT mutating the real layers —
+// used to show an accurate preview before the user commits by clicking Post.
+function previewMaterialCost(materialName,qty){
+  const mat=DB.materials.find(mm=>mm.name.toLowerCase().includes((materialName||'').toLowerCase()));
+  if(!mat)return{cost:0,found:false,shortfall:0,mat:null};
+  const layers=JSON.parse(JSON.stringify(mat.layers||[])); // deep copy, safe to mutate for preview math
+  const available=layers.reduce((s,l)=>s+l.qty,0);
+  const shortfall=Math.max(0,qty-available);
+  let remaining=qty,totalCost=0;
+  if(INV_COSTING_METHOD==='WAC'){
+    const totalQty=layers.reduce((s,l)=>s+l.qty,0);
+    const totalVal=layers.reduce((s,l)=>s+l.qty*l.unitCost,0);
+    const avg=totalQty>0?totalVal/totalQty:(mat.cost||0);
+    totalCost=Math.min(qty,available)*avg;
+  } else {
+    for(const l of layers){if(remaining<=0)break;const take=Math.min(l.qty,remaining);totalCost+=take*l.unitCost;remaining-=take;}
+  }
+  return{cost:totalCost,found:true,shortfall,mat};
+}
 function showResult(p){
   const rc=document.getElementById('resultCard');rc.style.display='block';
   document.getElementById('resultTitle').textContent=p.description||'Transaction';
   document.getElementById('resultType').textContent=p.type||'Entry';
-  document.getElementById('resultDesc').textContent=p.prepaidMonths?'Prepaid: '+p.prepaidMonths+' months amortization scheduled':'';
-  document.getElementById('resultMeta').innerHTML=`<div class="meta-box"><div class="meta-lbl">Amount</div><div class="meta-val">${fc(p.amount||0)}</div></div><div class="meta-box"><div class="meta-lbl">Date</div><div class="meta-val">${p.date||today()}</div></div><div class="meta-box"><div class="meta-lbl">Currency</div><div class="meta-val">${p.currency||'USD'}</div></div><div class="meta-box"><div class="meta-lbl">Type</div><div class="meta-val">${p.type||'—'}</div></div>`;
+  let realAmount=p.amount||0;
+  let costNote='';
+  // If this is material usage, override the displayed amount with the REAL WAC/FIFO cost so the
+  // preview matches exactly what postEntry() will actually post — no more surprise/mismatched numbers.
+  if(p.materialUsage&&p.materialUsage.name){
+    const preview=previewMaterialCost(p.materialUsage.name,p.materialUsage.qty||0);
+    if(preview.found){
+      realAmount=+preview.cost.toFixed(2);
+      const perUnit=p.materialUsage.qty>0?(realAmount/p.materialUsage.qty):0;
+      costNote=`💡 Costed via ${INV_COSTING_METHOD}: ${p.materialUsage.qty} ${preview.mat.unit} × ${fc(perUnit)}/unit avg = ${fc(realAmount)} (AI's raw guess was ${fc(p.amount||0)} — corrected automatically)`;
+      if(preview.shortfall>0)costNote+=` ⚠️ Only ${preview.mat.qty} ${preview.mat.unit} in stock — ${preview.shortfall} short`;
+    } else {
+      costNote=`⚠️ "${p.materialUsage.name}" not found in inventory by that name — using AI's estimated amount instead`;
+    }
+  }
+  document.getElementById('resultDesc').textContent=costNote||(p.prepaidMonths?'Prepaid: '+p.prepaidMonths+' months amortization scheduled':'');
+  document.getElementById('resultMeta').innerHTML=`<div class="meta-box"><div class="meta-lbl">Amount</div><div class="meta-val">${fc(realAmount)}</div></div><div class="meta-box"><div class="meta-lbl">Date</div><div class="meta-val">${p.date||today()}</div></div><div class="meta-box"><div class="meta-lbl">Currency</div><div class="meta-val">${p.currency||'USD'}</div></div><div class="meta-box"><div class="meta-lbl">Type</div><div class="meta-val">${p.type||'—'}</div></div>`;
   const ent=document.getElementById('resultEntries');
-  ent.innerHTML=p.entries&&p.entries.length?`<table><thead><tr><th>Account</th><th>Type</th><th>Debit</th><th>Credit</th></tr></thead><tbody>${p.entries.map(r=>`<tr><td>${r.account}</td><td><span class="tag t-blue">${r.type||''}</span></td><td style="color:var(--green3);font-family:'JetBrains Mono',monospace">${r.debit?fc(r.debit):''}</td><td style="color:var(--red3);font-family:'JetBrains Mono',monospace">${r.credit?fc(r.credit):''}</td></tr>`).join('')}</tbody></table>`:'' ;
+  // Show entries with the corrected amount substituted into WIP/Construction Materials lines, matching what will actually post
+  const displayEntries=(p.entries||[]).map(r=>{
+    if(p.materialUsage&&(r.account==='Work in Progress'||r.account==='Construction Materials')){
+      return{...r,debit:r.debit>0?realAmount:0,credit:r.credit>0?realAmount:0};
+    }
+    return r;
+  });
+  ent.innerHTML=displayEntries.length?`<table><thead><tr><th>Account</th><th>Type</th><th>Debit</th><th>Credit</th></tr></thead><tbody>${displayEntries.map(r=>`<tr><td>${r.account}</td><td><span class="tag t-blue">${r.type||''}</span></td><td style="color:var(--green3);font-family:'JetBrains Mono',monospace">${r.debit?fc(r.debit):''}</td><td style="color:var(--red3);font-family:'JetBrains Mono',monospace">${r.credit?fc(r.credit):''}</td></tr>`).join('')}</tbody></table>`:'' ;
   document.getElementById('postBtn').disabled=false;
 }
 function postEntry(){
@@ -654,13 +696,23 @@ function consumeMaterialLayers(materialName,qty){
 }
 function setCostingMethod(method){
   INV_COSTING_METHOD=method;saveData();renderMaterials();renderCostingButtons();
-  showToast(`✅ Costing method set to ${method}`);
+  showToast(`✅ Costing method set to ${method} — applies to next material usage`);
 }
 function renderCostingButtons(){
+  // Settings page buttons
   const wac=document.getElementById('costing-wac'),fifo=document.getElementById('costing-fifo');
-  if(!wac||!fifo)return;
-  wac.className='btn '+(INV_COSTING_METHOD==='WAC'?'btn-gold':'btn-outline');
-  fifo.className='btn '+(INV_COSTING_METHOD==='FIFO'?'btn-gold':'btn-outline');
+  if(wac&&fifo){
+    wac.className='btn '+(INV_COSTING_METHOD==='WAC'?'btn-gold':'btn-outline');
+    fifo.className='btn '+(INV_COSTING_METHOD==='FIFO'?'btn-gold':'btn-outline');
+  }
+  // Materials page buttons (separate IDs so both pages can show active state independently)
+  const wacMat=document.getElementById('costing-wac-mat'),fifoMat=document.getElementById('costing-fifo-mat');
+  if(wacMat&&fifoMat){
+    wacMat.className='btn '+(INV_COSTING_METHOD==='WAC'?'btn-gold':'btn-outline');
+    fifoMat.className='btn '+(INV_COSTING_METHOD==='FIFO'?'btn-gold':'btn-outline');
+  }
+  const label=document.getElementById('matCostingActiveLabel');
+  if(label)label.textContent=INV_COSTING_METHOD;
 }
 
 // DELIVERIES — Fix #14: this is now the SINGLE trigger that posts the journal entry and locks in
