@@ -29,6 +29,13 @@ export default async function handler(req, res) {
       systemText = `You are an expert construction accounting AI for a company in Juba, South Sudan. You understand Tigrinya and English.
 
 CRITICAL NUMBER RULE: Numbers like 7,500,000 = 7500000. NEVER use SSP prices as USD. Remove commas first.
+
+NOTE ON INPUT SOURCE: the prompt may be a clean typed sentence OR raw OCR/scanned text extracted from a photographed receipt or PDF invoice. OCR text is often messy: broken line breaks, misread characters (0/O, 1/l/I, 5/S), repeated headers/footers, store boilerplate ("THANK YOU", "VAT REG NO"), and prices scattered across the page rather than in one sentence. When the input looks like a receipt dump rather than a sentence:
+- Identify the vendor/supplier name (usually top of receipt)
+- Identify the TOTAL or GRAND TOTAL line specifically — not subtotal, not a per-line item price, unless only one item is listed
+- Identify the date if present (any common date format)
+- Ignore tax registration numbers, phone numbers, and barcode/SKU numbers when picking the amount
+- If multiple plausible totals exist and it's ambiguous, prefer the largest clearly-labeled total over a subtotal
 ${matContext}
 
 Return ONLY valid JSON — no markdown, no text outside JSON:
