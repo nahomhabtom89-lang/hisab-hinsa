@@ -229,6 +229,12 @@ function toggleReg(){
   document.getElementById('lerr').style.display='none';
 }
 
+// Returns a guaranteed-fresh, empty company database — used on registration so a new account
+// can NEVER inherit whatever happens to be sitting in the in-memory DB variable from a previous session.
+function freshDB(){
+  return{entries:[],projects:[],workers:[],materials:[],assets:[],mobileMoney:[],deliveries:[],pettyCash:[],nextId:1};
+}
+
 function doLogin(){
   const u=document.getElementById('lu').value.trim(),p=document.getElementById('lp').value;
   const err=document.getElementById('lerr');
@@ -237,19 +243,32 @@ function doLogin(){
   if(_isReg){
     if(users[u]){err.style.display='block';err.textContent='Username taken';return;}
     const biz=document.getElementById('lb').value.trim()||u+' Construction';
-    users[u]={pass:btoa(p),biz,sspRate:1300,db:JSON.stringify(DB)};
-    setU(users);localStorage.setItem('hh_cu',u);BIZ_NAME=biz;launchApp();
+    // FIX: always start a brand-new account with a guaranteed-empty database, never whatever
+    // happens to be in the in-memory DB variable (which could be a previous user's session data).
+    const newCompanyDB=freshDB();
+    users[u]={pass:btoa(p),biz,sspRate:1300,costingMethod:'WAC',db:JSON.stringify(newCompanyDB)};
+    setU(users);
+    localStorage.setItem('hh_cu',u);
+    // Reset all in-memory state to match the fresh account — don't carry over anything from before
+    DB=newCompanyDB;BIZ_NAME=biz;SSP_RATE=1300;INV_COSTING_METHOD='WAC';ACTIVE_PROJECT='';CUR='USD';
+    launchApp();
   } else {
     if(!users[u]||users[u].pass!==btoa(p)){err.style.display='block';err.textContent='Wrong username or password';return;}
+    // Reset in-memory state BEFORE loading, so if loadDB fails partway nothing leaks from the prior session
+    DB=freshDB();BIZ_NAME='My Construction Co';SSP_RATE=1300;INV_COSTING_METHOD='WAC';ACTIVE_PROJECT='';CUR='USD';
     localStorage.setItem('hh_cu',u);loadDB();launchApp();
   }
 }
 
 function doLogout(){
   localStorage.removeItem('hh_cu');
+  // Wipe in-memory state on logout — prevents any residual data from being visible
+  // for a split second if another person logs in right after without a full page reload.
+  DB=freshDB();BIZ_NAME='My Construction Co';SSP_RATE=1300;INV_COSTING_METHOD='WAC';ACTIVE_PROJECT='';CUR='USD';
   document.getElementById('mainApp').style.display='none';
   document.getElementById('loginScreen').style.display='flex';
   document.getElementById('lu').value='';document.getElementById('lp').value='';
+  document.getElementById('lerr').style.display='none';
 }
 
 function launchApp(){
