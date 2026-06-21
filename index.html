@@ -1227,24 +1227,28 @@ async function applyAdvisorEntry(eid){
     const m=raw.match(/\{[\s\S]*\}/);if(!m)throw new Error('Could not parse');
     const p=JSON.parse(m[0]);if(!p.entries||!p.entries.length)throw new Error('No entries');
     document.getElementById('applyLoad').remove();
-    const deb=p.entries.filter(r=>(+r.debit)>0).map(r=>({acct:r.account,amt:+(+r.debit).toFixed(2),atype:(r.type||'asset').toLowerCase()}));
-    const cred=p.entries.filter(r=>(+r.credit)>0).map(r=>({acct:r.account,amt:+(+r.credit).toFixed(2),atype:(r.type||'asset').toLowerCase()}));
-    DB.entries.push({id:DB.nextId++,date:today(),desc:p.description||'Advisor entry',type:p.type||'Advisor',amount:p.amount||0,debits:deb,credits:cred});
-    // CENTRAL INVENTORY STORE BINDING: same deduction path as doRecord()/postEntry() — decrement physical stock when materialUsage is present
+    let deb=p.entries.filter(r=>(+r.debit)>0).map(r=>({acct:r.account,amt:+(+r.debit).toFixed(2),atype:(r.type||'asset').toLowerCase()}));
+    let cred=p.entries.filter(r=>(+r.credit)>0).map(r=>({acct:r.account,amt:+(+r.credit).toFixed(2),atype:(r.type||'asset').toLowerCase()}));
+    let entryAmount=p.amount||0;
+    // REAL inventory costing — use the same WAC/FIFO layer engine as the main recorder (postEntry),
+    // instead of trusting the AI's guessed amount (which only knows the latest unit price, not history).
     let invMsg='';
     if(p.materialUsage&&p.materialUsage.name){
-      const mat=DB.materials.find(mm=>mm.name.toLowerCase().includes((p.materialUsage.name||'').toLowerCase()));
-      if(mat){
-        const qty=p.materialUsage.qty||0;
-        mat.qty=Math.max(0,mat.qty-qty);
-        invMsg=` · 🧱 ${mat.name} stock -${qty} ${mat.unit} (now ${mat.qty})`;
+      const result=consumeMaterialLayers(p.materialUsage.name,p.materialUsage.qty||0);
+      if(result.found){
+        entryAmount=+result.cost.toFixed(2);
+        deb=deb.map(d=>d.acct==='Work in Progress'?{...d,amt:entryAmount}:d);
+        cred=cred.map(c=>c.acct==='Construction Materials'?{...c,amt:entryAmount}:c);
+        invMsg=` · 🧱 ${result.mat.name} -${p.materialUsage.qty} ${result.mat.unit} costed at ${INV_COSTING_METHOD} = ${fc(entryAmount)} (now ${result.mat.qty} ${result.mat.unit} left)`;
+        if(result.shortfall>0)invMsg+=` ⚠️ ${result.shortfall} ${result.mat.unit} short — costed only what was in stock`;
       } else {
-        invMsg=` · ⚠️ Material "${p.materialUsage.name}" not found in inventory — stock NOT adjusted`;
+        invMsg=` · ⚠️ Material "${p.materialUsage.name}" not found in inventory — stock NOT adjusted, journal used AI-estimated amount`;
       }
     }
+    DB.entries.push({id:DB.nextId++,date:today(),desc:p.description||'Advisor entry',type:p.type||'Advisor',amount:entryAmount,debits:deb,credits:cred});
     saveData();renderAll();runAudit();
     msgs.innerHTML+=`<div class="msg ai" style="color:var(--green3)">✅ Posted!${invMsg}</div>`;
-    showToast('✅ Advisor entry posted!'+(invMsg?' Inventory updated.':''));
+    showToast('✅ Advisor entry posted!'+(invMsg?' Inventory updated with real cost.':''));
   }catch(err){const el=document.getElementById('applyLoad');if(el)el.remove();msgs.innerHTML+=`<div class="msg ai" style="color:var(--red3)">⚠️ ${err.message}</div>`;}
 }
 
