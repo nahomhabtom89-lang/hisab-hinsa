@@ -7,6 +7,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+Ethiopic:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.4/tesseract.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
 :root{--bg:#0a0e17;--bg2:#111827;--bg3:#1a2236;--bg4:#243048;--border:#1e2d47;--border2:#2a3f5e;--text:#e8edf5;--text2:#8fa3c0;--text3:#4d6280;--gold:#c49a2a;--gold2:#e0b84a;--gold3:#f5d070;--blue:#1a5eff;--blue2:#4080ff;--blue3:#80b0ff;--green:#0a7a3e;--green2:#12a855;--green3:#30d878;--red:#8b1a1a;--red2:#c0302a;--red3:#f07070;--orange:#b06010;--orange2:#e08020;--orange3:#ffb040;--shadow:0 8px 40px rgba(0,0,0,.6);--radius:8px}
 *{box-sizing:border-box;margin:0;padding:0}html{scroll-behavior:smooth}
@@ -163,6 +165,7 @@ tbody td{padding:9px 12px;border-bottom:1px solid var(--border);color:var(--text
 <div class="hero-input-card">
 <div class="hero-lbl">🎙️ ሎሚ እንታይ ዓሚልካ? <span style="font-size:10px;color:var(--text3)">(ብትግርኛ ወይ ብእንግሊዝ)</span></div>
 <div class="hero-inp-row"><button class="mic-btn" id="micBtn" onclick="toggleMic()">🎙️</button><input class="hero-inp" id="mainInp" placeholder="ደሞዝ 500 USD · used 15 bags cement on project A · rent 1000 USD for 6 months..."/><button class="hero-send" onclick="doRecord()">↗</button></div>
+<div class="hero-inp-row" style="margin-top:-4px"><label class="mic-btn" style="display:flex;align-items:center;justify-content:center;cursor:pointer" title="Upload receipt photo or PDF"><input type="file" accept="image/*,.pdf" style="display:none" id="receiptFile" onchange="handleReceiptUpload(this.files[0])"/>📎</label><div style="flex:1;display:flex;align-items:center;font-size:11px;color:var(--text3)" id="receiptStatus">Or upload a receipt photo / PDF — text will be extracted automatically</div></div>
 <div class="chips"><div class="chip" onclick="useChip(this)">ደሞዝ ከፈልና</div><div class="chip" onclick="useChip(this)">ሲሚንቶ ዓደግና</div><div class="chip" onclick="useChip(this)">ነዳዲ ሸቀጥ</div><div class="chip" onclick="useChip(this)">ዓሚል ቅድሚ ከፈለ</div><div class="chip" onclick="useChip(this)">Paid rent 6 months advance</div><div class="chip" onclick="useChip(this)">Accrue unbilled work</div></div></div>
 <div class="result-card" id="resultCard"><div class="result-hdr"><h3 id="resultTitle">ትንታነ AI</h3><span class="result-type" id="resultType">—</span></div><div class="meta-grid" id="resultMeta"></div><div class="tw" id="resultEntries" style="margin-bottom:10px"></div><div style="font-size:12px;color:var(--text3);font-style:italic;margin-bottom:8px" id="resultDesc"></div><button class="post-btn" id="postBtn" onclick="postEntry()">✅ ናብ ደፍተር ምቕማጥ — Post to Journal</button></div>
 <div class="kgrid" id="homeKpis"></div>
@@ -399,8 +402,80 @@ function renderMiniCF(){
 
 // AI RECORD
 function useChip(el){document.getElementById('mainInp').value=el.textContent;document.getElementById('mainInp').focus();}
-async function doRecord(){
-  const inp=document.getElementById('mainInp'),q=inp.value.trim();if(!q)return;
+// RECEIPT / DOCUMENT UPLOAD — extracts text from a photo or PDF, then feeds it through the
+// SAME doRecord() -> AI -> review-before-posting pipeline used for typed entries. Nothing here
+// posts to the journal directly; the user still reviews and clicks Post, same as always.
+function setReceiptStatus(msg,isError){
+  const el=document.getElementById('receiptStatus');if(!el)return;
+  el.textContent=msg;el.style.color=isError?'var(--red3)':'var(--text3)';
+}
+async function handleReceiptUpload(file){
+  if(!file)return;
+  const isPdf=file.type==='application/pdf'||file.name.toLowerCase().endsWith('.pdf');
+  try{
+    let extractedText='';
+    if(isPdf){
+      extractedText=await extractTextFromPDF(file);
+    } else if(file.type.startsWith('image/')){
+      extractedText=await extractTextFromImage(file);
+    } else {
+      setReceiptStatus('⚠️ Unsupported file type — use a photo (JPG/PNG) or PDF',true);
+      return;
+    }
+    extractedText=(extractedText||'').trim();
+    if(!extractedText){
+      setReceiptStatus('⚠️ No readable text found — try a clearer photo or type the entry manually',true);
+      return;
+    }
+    setReceiptStatus('✅ Text extracted — review below, then click Post');
+    // Put extracted text into the main input box AND auto-trigger the same AI parse used for typed entries
+    document.getElementById('mainInp').value=extractedText.slice(0,500); // cap displayed length, full text still sent
+    await doRecord(extractedText);
+  }catch(err){
+    setReceiptStatus('❌ Could not read file: '+err.message,true);
+  } finally {
+    document.getElementById('receiptFile').value=''; // allow re-uploading the same file again if needed
+  }
+}
+// Tries the PDF's real text layer first (accurate, fast). Falls back to rendering the page as an
+// image and running OCR on it ONLY if no text layer exists (i.e. a scanned receipt saved as PDF).
+async function extractTextFromPDF(file){
+  setReceiptStatus('📄 Reading PDF...');
+  if(typeof pdfjsLib==='undefined')throw new Error('PDF reader failed to load — check internet connection');
+  pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const buf=await file.arrayBuffer();
+  const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+  let fullText='';
+  for(let i=1;i<=Math.min(pdf.numPages,5);i++){ // cap at 5 pages — receipts/invoices are short
+    const page=await pdf.getPage(i);
+    const content=await page.getTextContent();
+    const pageText=content.items.map(it=>it.str).join(' ');
+    fullText+=pageText+'\n';
+  }
+  if(fullText.trim().length>15)return fullText; // real text layer found, no need for OCR
+  // No usable text layer — this PDF is likely a scanned image. Render page 1 to canvas and OCR it.
+  setReceiptStatus('📄 No text layer found — running OCR on scanned PDF (slower)...');
+  const page=await pdf.getPage(1);
+  const viewport=page.getViewport({scale:2});
+  const canvas=document.createElement('canvas');
+  canvas.width=viewport.width;canvas.height=viewport.height;
+  await page.render({canvasContext:canvas.getContext('2d'),viewport}).promise;
+  const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
+  return await extractTextFromImage(blob);
+}
+async function extractTextFromImage(fileOrBlob){
+  setReceiptStatus('🔍 Reading receipt with OCR... (may take 10-20s)');
+  if(typeof Tesseract==='undefined')throw new Error('OCR engine failed to load — check internet connection');
+  const result=await Tesseract.recognize(fileOrBlob,'eng',{
+    logger:m=>{if(m.status==='recognizing text')setReceiptStatus(`🔍 OCR: ${Math.round((m.progress||0)*100)}%`);}
+  });
+  return result.data.text;
+}
+
+async function doRecord(overrideText){
+  const inp=document.getElementById('mainInp');
+  const q=(overrideText!==undefined?overrideText:inp.value).trim();
+  if(!q)return;
   const btn=document.querySelector('.hero-send');btn.textContent='⏳';btn.disabled=true;
   try{
     const res=await fetch('/api/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:q,materials:DB.materials})});
