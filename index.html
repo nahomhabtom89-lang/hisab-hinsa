@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>ሒሳቢ ሃንሲ — Hisabi Hensi</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+Ethiopic:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root{--bg:#0a0e17;--bg2:#111827;--bg3:#1a2236;--bg4:#243048;--border:#1e2d47;--border2:#2a3f5e;--text:#e8edf5;--text2:#8fa3c0;--text3:#4d6280;--gold:#c49a2a;--gold2:#e0b84a;--gold3:#f5d070;--blue:#1a5eff;--blue2:#4080ff;--blue3:#80b0ff;--green:#0a7a3e;--green2:#12a855;--green3:#30d878;--red:#8b1a1a;--red2:#c0302a;--red3:#f07070;--orange:#b06010;--orange2:#e08020;--orange3:#ffb040;--shadow:0 8px 40px rgba(0,0,0,.6);--radius:8px}
 *{box-sizing:border-box;margin:0;padding:0}html{scroll-behavior:smooth}
@@ -129,7 +131,7 @@ tbody td{padding:9px 12px;border-bottom:1px solid var(--border);color:var(--text
 <body>
 <div id="loginScreen"><div class="login-wrap"><div class="login-brand"><span class="logo-icon">🏗️</span><h1>ሒሳቢ ሃንሲ</h1><div class="sub">Hisabi Hensi · Construction Accounting AI · Juba</div></div><div class="login-card"><h2>ኣቱ / ምዝጋብ — Login / Register</h2><div class="lf"><label>ስም ተጠቃሚ</label><input id="lu" type="text" placeholder="username" autocomplete="username"/></div><div class="lf"><label>ምስጢር</label><input id="lp" type="password" placeholder="password" autocomplete="current-password"/></div><div class="lf" id="regFields" style="display:none"><label>ስም ኩባንያ</label><input id="lb" type="text" placeholder="Riji Construction"/></div><button class="login-btn" onclick="doLogin()">🔓 ኣቱ — Login</button><div class="login-err" id="lerr">ስም ወይ ምስጢር ጌጋ</div><div class="login-switch">ሓድሽ ሕሳብ? <a onclick="toggleReg()">ምዝጋብ</a></div></div></div></div>
 <div id="mainApp"><div class="shell">
-<div class="topbar"><div class="tb-brand">🏗️ ሒሳቢ ሃንሲ</div><div class="tb-biz" id="tbBiz">—</div><div class="tb-cur"><button class="cur-btn on" id="cur-usd" onclick="setCur('USD')">USD $</button><button class="cur-btn" id="cur-ssp" onclick="setCur('SSP')">SSP £</button></div><div class="tb-alert" id="tbAlert" onclick="nav('audit',null)">⚠️ <span id="tbAlertTxt">0</span> ጉድለት</div><button class="tb-btn no-print" onclick="window.print()">🖨️</button><button class="tb-btn no-print" onclick="doLogout()" style="color:var(--red3)">ምውጻእ</button></div>
+<div class="topbar"><div class="tb-brand">🏗️ ሒሳቢ ሃንሲ</div><div class="tb-biz" id="tbBiz">—</div><select id="tbProjectSel" class="cur-btn" style="cursor:pointer;max-width:160px" onchange="setActiveProject(this.value)"><option value="">All Projects</option></select><div class="tb-cur"><button class="cur-btn on" id="cur-usd" onclick="setCur('USD')">USD $</button><button class="cur-btn" id="cur-ssp" onclick="setCur('SSP')">SSP £</button></div><div class="tb-alert" id="tbAlert" onclick="nav('audit',null)">⚠️ <span id="tbAlertTxt">0</span> ጉድለት</div><button class="tb-btn no-print" onclick="window.print()">🖨️</button><button class="tb-btn no-print" onclick="doLogout()" style="color:var(--red3)">ምውጻእ</button></div>
 <div class="sidebar" id="sidebar">
 <div class="sb-section"><div class="sb-section-label">ዕለታዊ — Daily</div>
 <div class="sb-item on" onclick="nav('home',this)"><span class="sb-ico">🎙️</span>ሓድሽ ምዝጋብ<span class="en">Record</span></div>
@@ -166,10 +168,16 @@ tbody td{padding:9px 12px;border-bottom:1px solid var(--border);color:var(--text
 <div class="kgrid" id="homeKpis"></div>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px"><div class="card"><div class="card-hdr"><span>📋</span><span>ናይ ሎሚ</span></div><div id="todayEntries"></div></div><div class="card"><div class="card-hdr"><span>📈</span><span>3-Month Forecast</span></div><div id="miniCF"></div></div></div></div>
 <div class="page" id="pg-petty"><div class="ph"><h1>💵 ንዋት ጥረ — Petty Cash</h1></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px"><div class="card"><div class="card-hdr"><span>💵</span><span>Balance</span></div><div style="font-size:32px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--gold3)" id="pettyCashBalance">0</div></div><div class="card"><div class="card-hdr"><span>➕</span><span>Replenish</span></div><div class="fg"><label>Amount</label><input id="pcRepAmt" type="number" placeholder="500"/></div><button class="btn btn-gold" onclick="replenishPetty()">➕ Replenish</button></div></div><div class="card"><div class="card-hdr"><span>💸</span><span>Record Expense</span></div><div class="fgrid"><div class="fg"><label>Description</label><input id="pcDesc" type="text" placeholder="ቡን / coffee"/></div><div class="fg"><label>Amount</label><input id="pcAmt" type="number" placeholder="10"/></div><div class="fg"><label>Category</label><select id="pcCat"><option value="Office Supplies Expense">Office</option><option value="Miscellaneous Expense">Misc</option><option value="Fuel Expense">Fuel</option><option value="Repairs and Maintenance Expense">Repairs</option></select></div></div><div class="btn-row"><button class="btn btn-gold" onclick="postPettyExpense()">✅ Record</button></div></div><div class="card"><div class="card-hdr"><span>📋</span><span>History</span></div><div id="pettyHistory"></div></div></div>
-<div class="page" id="pg-mobilemoney"><div class="ph"><h1>📱 Mobile Money</h1></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px"><div class="card"><div class="card-hdr"><span>➕</span><span>Add Transaction</span></div><div class="fg"><label>Network</label><select id="mmNet"><option value="mtn">MTN</option><option value="airtel">Airtel</option></select></div><div class="fg"><label>Type</label><select id="mmType"><option value="in">Received</option><option value="out">Sent</option></select></div><div class="fgrid"><div class="fg"><label>Amount</label><input id="mmAmt" type="number" placeholder="500"/></div><div class="fg"><label>Currency</label><select id="mmCur"><option>USD</option><option>SSP</option></select></div></div><div class="fg"><label>Reference</label><input id="mmRef" placeholder="JOHN / TXN123"/></div><div class="btn-row"><button class="btn btn-gold" onclick="addMobileMoney()">📱 Record</button></div><div id="mmSt" style="font-size:11px;margin-top:8px"></div></div><div class="card"><div class="kgrid" style="grid-template-columns:1fr 1fr;gap:8px"><div class="kpi"><div class="kpi-lbl">MTN In</div><div class="kpi-val pos" id="mtnInVal">0</div></div><div class="kpi"><div class="kpi-lbl">Airtel In</div><div class="kpi-val pos" id="airtelInVal">0</div></div><div class="kpi"><div class="kpi-lbl">Out</div><div class="kpi-val neg" id="mmOutVal">0</div></div><div class="kpi"><div class="kpi-lbl">Net</div><div class="kpi-val" id="mmNetVal">0</div></div></div></div></div><div class="card"><div class="card-hdr"><span>📋</span><span>History</span></div><div id="mmList"></div></div></div>
+<div class="page" id="pg-mobilemoney"><div class="ph"><h1>📱 Mobile Money</h1></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px"><div class="card"><div class="card-hdr"><span>➕</span><span>Add Transaction</span></div><div class="fg"><label>Network</label><select id="mmNet"><option value="mtn">MTN</option><option value="airtel">Airtel</option></select></div><div class="fg"><label>Type</label><select id="mmType"><option value="in">Received</option><option value="out">Sent</option></select></div><div class="fgrid"><div class="fg"><label>Amount</label><input id="mmAmt" type="number" placeholder="500"/></div><div class="fg"><label>Currency</label><select id="mmCur"><option>USD</option><option>SSP</option></select></div></div><div class="fg"><label>Reference</label><input id="mmRef" placeholder="JOHN / TXN123"/></div><div class="btn-row"><button class="btn btn-gold" onclick="addMobileMoney()">📱 Record</button></div><div id="mmSt" style="font-size:11px;margin-top:8px"></div></div><div class="card"><div class="kgrid" style="grid-template-columns:1fr 1fr;gap:8px"><div class="kpi"><div class="kpi-lbl">MTN In</div><div class="kpi-val pos" id="mtnInVal">0</div></div><div class="kpi"><div class="kpi-lbl">Airtel In</div><div class="kpi-val pos" id="airtelInVal">0</div></div><div class="kpi"><div class="kpi-lbl">Out</div><div class="kpi-val neg" id="mmOutVal">0</div></div><div class="kpi"><div class="kpi-lbl">Net</div><div class="kpi-val" id="mmNetVal">0</div></div></div></div></div>
+<div class="card"><div class="card-hdr"><span>🏦</span><span>Statement Reconciliation</span></div><p style="font-size:11px;color:var(--text3);margin-bottom:10px">Upload an MTN/Airtel statement export (.csv or .xlsx). Each row is matched against existing recorded transactions by amount + reference.</p><div class="fgrid"><div class="fg"><label>Statement File</label><input id="reconFile" type="file" accept=".csv,.xlsx,.xls" onchange="handleStatementUpload(event)"/></div><div class="fg"><label>Network</label><select id="reconNet"><option value="mtn">MTN</option><option value="airtel">Airtel</option></select></div></div><div id="reconSt" style="font-size:11px;margin:8px 0"></div><div id="reconResults"></div></div>
+<div class="card"><div class="card-hdr"><span>📋</span><span>History</span></div><div id="mmList"></div></div></div>
 <div class="page" id="pg-materials"><div class="ph"><h1>🧱 Materials</h1></div><div class="card"><div class="card-hdr"><span>➕</span><span>Add Material</span></div><div class="fgrid"><div class="fg"><label>Name</label><input id="matName" type="text" placeholder="ሲሚንቶ · Cement"/></div><div class="fg"><label>Category</label><select id="matCat"><option>Cement</option><option>Steel</option><option>Sand</option><option>Gravel</option><option>Timber</option><option>Fuel Stock</option><option>Paint</option><option>Other</option></select></div><div class="fg"><label>Quantity</label><input id="matQty" type="number" placeholder="100"/></div><div class="fg"><label>Unit</label><select id="matUnit"><option>bags</option><option>kg</option><option>tons</option><option>liters</option><option>m³</option><option>pieces</option><option>meters</option></select></div><div class="fg"><label>Unit Cost (blank=auto)</label><input id="matCost" type="number" placeholder="25"/></div><div class="fg"><label>Min Alert</label><input id="matMin" type="number" placeholder="20"/></div></div><div class="btn-row"><button class="btn btn-gold" onclick="addMaterial()">➕ Add</button></div><div id="matAddSt" style="font-size:11px;margin-top:8px"></div></div><div class="card"><input style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:8px 12px;font-size:12px;color:var(--text);outline:none;margin-bottom:12px" placeholder="Search..." id="matSearch" oninput="renderMaterials()"/><div id="matList"></div></div></div>
-<div class="page" id="pg-deliveries"><div class="ph"><h1>🚚 Deliveries</h1></div><div class="card"><div class="card-hdr"><span>➕</span><span>New Delivery</span></div><div class="fgrid"><div class="fg"><label>Supplier</label><input id="delSupplier" type="text" placeholder="Supplier name"/></div><div class="fg"><label>Invoice #</label><input id="delInvNo" type="text" placeholder="INV-001"/></div><div class="fg"><label>Items</label><input id="delItems" type="text" placeholder="Cement 100 bags"/></div><div class="fg"><label>Total Value</label><input id="delTotal" type="number" placeholder="5000"/></div><div class="fg"><label>Payment</label><select id="delPay"><option value="cash">Cash</option><option value="credit">Credit</option></select></div><div class="fg"><label>Date</label><input id="delDate" type="date"/></div></div><div class="btn-row"><button class="btn btn-gold" onclick="addDelivery()">✅ Record</button></div><div id="delSt" style="font-size:11px;margin-top:8px"></div></div><div class="card"><div class="card-hdr"><span>📋</span><span>Received</span></div><div id="deliveryList"></div></div></div>
-<div class="page" id="pg-workers"><div class="ph"><h1>👷 Workers &amp; Payroll</h1></div><div class="card"><div class="card-hdr"><span>➕</span><span>Add Worker</span></div><div class="fgrid"><div class="fg"><label>Name</label><input id="wkName" type="text" placeholder="Worker name"/></div><div class="fg"><label>Role</label><select id="wkRole"><option>Mason</option><option>Carpenter</option><option>Electrician</option><option>Plumber</option><option>Labourer</option><option>Driver</option><option>Site Supervisor</option><option>Engineer</option><option>Other</option></select></div><div class="fg"><label>Monthly Salary</label><input id="wkSalary" type="number" placeholder="500"/></div><div class="fg"><label>Currency</label><select id="wkCur"><option>USD</option><option>SSP</option></select></div></div><div class="btn-row"><button class="btn btn-gold" onclick="addWorker()">➕ Add</button></div><div id="wkAddSt" style="font-size:11px;margin-top:8px"></div></div><div class="card"><div class="card-hdr"><span>💰</span><span>Pay Salary</span></div><div class="fgrid"><div class="fg"><label>Worker</label><select id="payWorker"></select></div><div class="fg"><label>Month</label><input id="payMonth" type="month"/></div><div class="fg"><label>Override Amount</label><input id="payOverride" type="number" placeholder="blank=full"/></div></div><div class="btn-row"><button class="btn btn-gold" onclick="paySalary()">💰 Pay</button><button class="btn btn-outline" onclick="payAllSalaries()">💰 Pay All</button></div></div><div class="card"><div class="card-hdr"><span>👥</span><span>Workers</span></div><div id="workerList"></div></div></div>
+<div class="page" id="pg-deliveries"><div class="ph"><h1>🚚 Deliveries</h1></div><div class="card"><div class="card-hdr"><span>➕</span><span>New Delivery</span></div><div class="fgrid"><div class="fg"><label>Supplier</label><input id="delSupplier" type="text" placeholder="Supplier name"/></div><div class="fg"><label>Invoice #</label><input id="delInvNo" type="text" placeholder="INV-001"/></div><div class="fg"><label>Items</label><input id="delItems" type="text" placeholder="Cement 100 bags"/></div><div class="fg"><label>Total Value</label><input id="delTotal" type="number" step="0.01" inputmode="decimal" placeholder="5000"/></div><div class="fg"><label>Payment</label><select id="delPay"><option value="cash">Cash</option><option value="credit">Credit</option></select></div><div class="fg"><label>Date</label><input id="delDate" type="date"/></div><div class="fg"><label>Link to Pending Material Batch</label><select id="delMaterial"></select></div></div><div class="btn-row"><button class="btn btn-gold" onclick="addDelivery()">✅ Record</button></div><div id="delSt" style="font-size:11px;margin-top:8px"></div></div><div class="card"><div class="card-hdr"><span>📋</span><span>Received</span></div><div id="deliveryList"></div></div></div>
+<div class="page" id="pg-workers"><div class="ph"><h1>👷 Workers &amp; Payroll</h1><p>Uganda statutory payroll: PAYE + NSSF (5% employee / 10% employer)</p></div><div class="card"><div class="card-hdr"><span>➕</span><span>Add Worker</span></div><div class="fgrid"><div class="fg"><label>Name</label><input id="wkName" type="text" placeholder="Worker name"/></div><div class="fg"><label>Role</label><select id="wkRole"><option>Mason</option><option>Carpenter</option><option>Electrician</option><option>Plumber</option><option>Labourer</option><option>Driver</option><option>Site Supervisor</option><option>Engineer</option><option>Other</option></select></div><div class="fg"><label>Classification</label><select id="wkClass" onchange="toggleWorkerClassFields()"><option value="Permanent">Permanent (Fixed Monthly)</option><option value="Casual">Casual (Variable Labor)</option></select></div><div class="fg"><label>Currency</label><select id="wkCur"><option>USD</option><option>SSP</option></select></div></div><div class="fgrid" id="wkPermanentFields"><div class="fg"><label>Monthly Salary (Gross)</label><input id="wkSalary" type="number" placeholder="500"/></div></div><div class="fgrid" id="wkCasualFields" style="display:none"><div class="fg"><label>Daily Wage Rate</label><input id="wkDailyRate" type="number" placeholder="15"/></div></div><div class="btn-row"><button class="btn btn-gold" onclick="addWorker()">➕ Add</button></div><div id="wkAddSt" style="font-size:11px;margin-top:8px"></div></div>
+<div class="card"><div class="card-hdr"><span>⏱️</span><span>Casual Labor Timekeeping</span></div><div class="fgrid"><div class="fg"><label>Worker</label><select id="casualWorker"></select></div><div class="fg"><label>Days Worked</label><input id="casualDays" type="number" placeholder="6"/></div><div class="fg"><label>Month</label><input id="casualMonth" type="month"/></div></div><div class="btn-row"><button class="btn btn-gold" onclick="logCasualDays()">📝 Log Days</button></div><div id="casualSt" style="font-size:11px;margin-top:8px"></div></div>
+<div class="card"><div class="card-hdr"><span>💰</span><span>Phase 1: Generate Payroll (Accrual)</span></div><p style="font-size:11px;color:var(--text3);margin-bottom:10px">Calculates gross salary, PAYE, and NSSF splits. Posts to Salaries Payable / PAYE Payable / NSSF Payable liability accounts — no cash moves yet.</p><div class="fgrid"><div class="fg"><label>Worker</label><select id="payWorker"></select></div><div class="fg"><label>Month</label><input id="payMonth" type="month"/></div><div class="fg"><label>Override Gross Amount</label><input id="payOverride" type="number" placeholder="blank=auto-calculated"/></div></div><div class="btn-row"><button class="btn btn-gold" onclick="generatePayroll()">📋 Generate Payroll</button><button class="btn btn-outline" onclick="generateAllPayroll()">📋 Generate All</button></div><div id="payGenSt" style="font-size:11px;margin-top:8px"></div></div>
+<div class="card"><div class="card-hdr"><span>🏦</span><span>Phase 2: Disburse (Cash/Bank/Mobile Money)</span></div><p style="font-size:11px;color:var(--text3);margin-bottom:10px">Clears Salaries Payable by paying out the NET amount from the selected asset account.</p><div class="fgrid"><div class="fg"><label>Worker</label><select id="disburseWorker" onchange="updateDisburseBalance()"></select></div><div class="fg"><label>Pay From</label><select id="disburseFrom"><option value="Cash">Cash</option><option value="Petty Cash">Petty Cash</option><option value="Mobile Money">Mobile Money</option></select></div></div><div id="disburseLiveBalance" style="font-size:12px;color:var(--orange3);margin-bottom:10px;font-family:'JetBrains Mono',monospace;padding:8px;background:var(--bg3);border-radius:5px"></div><div class="btn-row"><button class="btn btn-green" onclick="disburseSalary()">🏦 Disburse Net Pay</button></div><div id="disburseSt" style="font-size:11px;margin-top:8px"></div></div>
+<div class="card"><div class="card-hdr"><span>👥</span><span>Workers</span></div><div id="workerList"></div></div></div>
 <div class="page" id="pg-projects"><div class="ph"><h1>🏗️ Projects</h1></div><div class="card"><div class="card-hdr"><span>➕</span><span>New Project</span></div><div class="fgrid"><div class="fg"><label>Project Name</label><input id="pjName" type="text" placeholder="Juba Clinic Construction"/></div><div class="fg"><label>Client</label><input id="pjClient" type="text" placeholder="Client name"/></div><div class="fg"><label>Contract Value</label><input id="pjValue" type="number" placeholder="500000"/></div><div class="fg"><label>Currency</label><select id="pjCur"><option>USD</option><option>SSP</option></select></div><div class="fg"><label>Location</label><input id="pjLocation" type="text" placeholder="Juba, South Sudan"/></div><div class="fg"><label>Retention %</label><input id="pjRetention" type="number" placeholder="10" value="10"/></div><div class="fg"><label>Start</label><input id="pjStart" type="date"/></div><div class="fg"><label>End</label><input id="pjEnd" type="date"/></div></div><div class="btn-row"><button class="btn btn-gold" onclick="addProject()">➕ Add Project</button></div><div id="projAddSt" style="font-size:11px;margin-top:8px"></div></div><div id="projectCards"></div></div>
 <div class="page" id="pg-invoice"><div class="ph"><h1>🧾 Invoice</h1></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:16px"><div class="card"><div class="fg"><label>Project</label><select id="invProject"></select></div><div class="fg"><label>Invoice #</label><input id="invNo" type="text" placeholder="INV-001"/></div><div class="fg"><label>Amount</label><input id="invAmt" type="number" placeholder="50000" oninput="previewInvoice()"/></div><div class="fg"><label>% Complete</label><input id="invPct" type="number" placeholder="30" oninput="previewInvoice()"/></div><div class="fg"><label>Retention %</label><input id="invRet" type="number" placeholder="10" value="10" oninput="previewInvoice()"/></div><div class="btn-row"><button class="btn btn-gold" onclick="postInvoice()">✅ Post Invoice</button><button class="btn btn-outline" onclick="window.print()">🖨️</button></div></div><div class="card"><div class="card-hdr"><span>👁️</span><span>Preview</span></div><div id="invoicePreview"></div></div></div></div>
 <div class="page" id="pg-retention"><div class="ph"><h1>🔒 Retention Management</h1></div><div class="kgrid" id="retentionKpis"></div><div class="card"><div class="card-hdr"><span>📋</span><span>By Project (Live from Journal)</span></div><div id="retentionTable"></div></div><div class="card"><div class="card-hdr"><span>✅</span><span>Release Retention</span></div><div class="fgrid"><div class="fg"><label>Project</label><select id="retProject" onchange="updateRetLiveBalance()"></select></div><div class="fg"><label>Amount to Release</label><input id="retAmt" type="number" placeholder="5000"/></div></div><div id="retLiveBalance" style="font-size:12px;color:var(--orange3);margin-bottom:10px;font-family:'JetBrains Mono',monospace;padding:8px;background:var(--bg3);border-radius:5px;display:none"></div><div class="btn-row"><button class="btn btn-gold" onclick="releaseRetention()">✅ Release</button></div></div></div>
@@ -183,13 +191,14 @@ tbody td{padding:9px 12px;border-bottom:1px solid var(--border);color:var(--text
 <div class="page" id="pg-advisor"><div class="ph"><h1>🤖 AI Advisor</h1><p>Ask anything in Tigrinya or English</p></div><div class="card"><div class="chat-wrap" id="chatMsgs"><div class="msg ai">ሰላም! ኣነ AI ሓጋዚ ሒሳብካ እየ። If I suggest a journal entry, an Apply button will appear.</div></div><div class="chat-inp-row"><input class="chat-inp" id="chatInp" placeholder="ዝደሊ ሕተት... / Ask anything..." onkeydown="if(event.key==='Enter')sendChat()"/><button class="btn btn-gold" onclick="sendChat()">↗</button></div></div></div>
 <div class="page" id="pg-audit"><div class="ph"><h1>🔍 Audit Bot</h1></div><div id="auditFindings"></div><div class="btn-row no-print"><button class="btn btn-gold" onclick="runAudit()">🔍 Run Audit</button></div></div>
 <div class="page" id="pg-depreciation"><div class="ph"><h1>📉 Depreciation</h1><p>Auto-posts on login each month</p></div><div class="card"><div class="card-hdr"><span>➕</span><span>Add Asset</span></div><div class="fgrid"><div class="fg"><label>Name</label><input id="aName" type="text" placeholder="Excavator"/></div><div class="fg"><label>Type</label><select id="aType"><option>Equipment</option><option>Vehicles</option><option>Heavy Machinery</option><option>Building</option></select></div><div class="fg"><label>Cost</label><input id="aCost" type="number" placeholder="50000"/></div><div class="fg"><label>Life (years)</label><input id="aLife" type="number" placeholder="10"/></div><div class="fg"><label>Purchase Date</label><input id="aDate" type="date"/></div></div><div class="btn-row"><button class="btn btn-gold" onclick="addAsset()">➕ Add</button></div><div id="assetAddSt" style="font-size:11px;margin-top:8px"></div></div><div class="card"><div class="card-hdr"><span>📋</span><span>Assets</span></div><div id="assetList"></div></div><div class="card"><div class="card-hdr"><span>📅</span><span>Due This Month</span></div><div id="depDueList"></div></div></div>
-<div class="page" id="pg-settings"><div class="ph"><h1>⚙️ Settings</h1></div><div class="card"><div class="fg"><label>Company Name</label><input id="bizName" type="text"/></div><div class="fg"><label>SSP/USD Rate</label><input id="sspRate" type="number" placeholder="1300" value="1300"/></div><div class="btn-row"><button class="btn btn-gold" onclick="saveSettings()">💾 Save</button></div><div id="settingsSt" style="font-size:11px;margin-top:8px"></div></div><div class="card"><div class="fg"><label>Email</label><input id="emailAddr" type="email" placeholder="you@email.com"/></div><div class="btn-row"><button class="btn btn-gold" onclick="emailReport()">📧 Email Report</button></div><div id="emailSt" style="font-size:11px;margin-top:8px"></div></div><div class="card"><div class="fgrid"><div class="fg"><label>Current Password</label><input id="op" type="password"/></div><div class="fg"><label>New Password</label><input id="np" type="password"/></div></div><div class="btn-row"><button class="btn btn-gold" onclick="changePw()">Change</button></div><div id="pwSt" style="font-size:11px;margin-top:8px"></div></div></div>
+<div class="page" id="pg-settings"><div class="ph"><h1>⚙️ Settings</h1></div><div class="card"><div class="fg"><label>Company Name</label><input id="bizName" type="text"/></div><div class="fg"><label>SSP/USD Rate</label><input id="sspRate" type="number" placeholder="1300" value="1300"/></div><div class="btn-row"><button class="btn btn-gold" onclick="saveSettings()">💾 Save</button></div><div id="settingsSt" style="font-size:11px;margin-top:8px"></div></div><div class="card"><div class="card-hdr"><span>🧮</span><span>Inventory Costing Method</span></div><p style="font-size:11px;color:var(--text3);margin-bottom:12px">Controls how material cost is calculated when consumed on a project. Applies to new consumption going forward.</p><div class="btn-row" style="margin-top:0"><button class="btn" id="costing-wac" onclick="setCostingMethod('WAC')">Weighted Average Cost</button><button class="btn" id="costing-fifo" onclick="setCostingMethod('FIFO')">FIFO</button></div></div><div class="card"><div class="fg"><label>Email</label><input id="emailAddr" type="email" placeholder="you@email.com"/></div><div class="btn-row"><button class="btn btn-gold" onclick="emailReport()">📧 Email Report</button></div><div id="emailSt" style="font-size:11px;margin-top:8px"></div></div><div class="card"><div class="fgrid"><div class="fg"><label>Current Password</label><input id="op" type="password"/></div><div class="fg"><label>New Password</label><input id="np" type="password"/></div></div><div class="btn-row"><button class="btn btn-gold" onclick="changePw()">Change</button></div><div id="pwSt" style="font-size:11px;margin-top:8px"></div></div></div>
 </div></div></div>
 <div class="toast" id="toast"></div>
 <script>
 // DATA & STATE
 let DB={entries:[],projects:[],workers:[],materials:[],assets:[],mobileMoney:[],deliveries:[],pettyCash:[],nextId:1};
 let CUR='USD',SSP_RATE=1300,BIZ_NAME='My Construction Co';
+let ACTIVE_PROJECT=''; // '' = All Projects. Otherwise = project name string, used to scope dashboard metrics
 let _pending=null,_mic=null,_isReg=false;
 
 function today(){return new Date().toISOString().split('T')[0];}
@@ -205,11 +214,12 @@ function loadDB(){
   const u=getU();if(!u[cu])return;
   try{DB=JSON.parse(u[cu].db||JSON.stringify(DB));}catch{}
   BIZ_NAME=u[cu].biz||BIZ_NAME;SSP_RATE=u[cu].sspRate||1300;
+  INV_COSTING_METHOD=u[cu].costingMethod||'WAC';
 }
 function saveData(){
   const cu=getCU();if(!cu)return;
   const u=getU();if(!u[cu])return;
-  u[cu].db=JSON.stringify(DB);u[cu].biz=BIZ_NAME;u[cu].sspRate=SSP_RATE;setU(u);
+  u[cu].db=JSON.stringify(DB);u[cu].biz=BIZ_NAME;u[cu].sspRate=SSP_RATE;u[cu].costingMethod=INV_COSTING_METHOD;setU(u);
 }
 
 function toggleReg(){
@@ -265,7 +275,7 @@ function nav(page,el){
   if(page==='jobcost')renderJobCost();
   if(page==='retention')renderRetention();
   if(page==='journal')renderJournal();
-  if(page==='settings'){document.getElementById('bizName').value=BIZ_NAME;document.getElementById('sspRate').value=SSP_RATE;}
+  if(page==='settings'){document.getElementById('bizName').value=BIZ_NAME;document.getElementById('sspRate').value=SSP_RATE;renderCostingButtons();}
 }
 function setCur(c){
   CUR=c;
@@ -275,7 +285,9 @@ function setCur(c){
 }
 
 // BALANCE ENGINE
-function getBal(){
+function getBal(projectFilter){
+  // projectFilter: undefined/null = company-wide (all entries, default — used everywhere existing code calls getBal())
+  // a project name string = only entries tagged to that project (used by the project selector scoping)
   const b={};
   function add(acct,atype,dr,cr){
     if(!b[acct])b[acct]={atype,dr:0,cr:0,net:0};
@@ -284,7 +296,8 @@ function getBal(){
     if(t==='asset'||t==='expense')b[acct].net=b[acct].dr-b[acct].cr;
     else b[acct].net=b[acct].cr-b[acct].dr;
   }
-  DB.entries.forEach(e=>{
+  const list=projectFilter?DB.entries.filter(e=>e.project===projectFilter):DB.entries;
+  list.forEach(e=>{
     (e.debits||[]).forEach(d=>add(d.acct,d.atype,d.amt,0));
     (e.credits||[]).forEach(c=>add(c.acct,c.atype,0,c.amt));
   });
@@ -292,23 +305,42 @@ function getBal(){
 }
 function sumByType(b,type){return Object.values(b).filter(v=>v.atype===type).reduce((s,v)=>s+v.net,0);}
 
-// RENDER ALL
+// PROJECT SELECTOR — scopes the home dashboard KPIs to a single project's tagged entries.
+// Note: company-wide overhead (salaries, fuel, petty cash) typically has no project tag, so
+// when a specific project is selected, those untagged costs are intentionally excluded —
+// this view shows project-tagged activity only, not "everything minus other projects."
+function renderProjectSelector(){
+  const sel=document.getElementById('tbProjectSel');if(!sel)return;
+  const prevVal=sel.value;
+  sel.innerHTML='<option value="">All Projects</option>'+DB.projects.map(p=>`<option value="${p.name}">${p.name}</option>`).join('');
+  if(DB.projects.some(p=>p.name===prevVal))sel.value=prevVal;
+  else sel.value=ACTIVE_PROJECT;
+}
+function setActiveProject(name){
+  ACTIVE_PROJECT=name||'';
+  renderHomeKpis();renderHomeAlerts();renderTodayEntries();renderMiniCF();
+  showToast(ACTIVE_PROJECT?`📍 Viewing: ${ACTIVE_PROJECT}`:'📍 Viewing: All Projects');
+}
+
+
 function renderAll(){
+  renderProjectSelector();
   renderHomeKpis();renderTodayEntries();renderMiniCF();renderHomeAlerts();
   renderWorkerList();renderPayWorkerSelect();renderProjectCards();renderInvProjectSelect();
   renderRetProjectSelect();renderMaterials();renderMobileMoneySummary();renderMobileMoneyList();
-  renderPettyBalance();renderPettyHistory();renderDeliveryList();renderJournal();
+  renderPettyBalance();renderPettyHistory();renderDeliveryList();renderJournal();renderDelMaterialSelect();
   const pb=document.getElementById('projBadge');if(pb)pb.textContent=DB.projects.length;
   const jb=document.getElementById('jBadge');if(jb)jb.textContent=DB.entries.length;
 }
 
-// HOME KPIs
+// HOME KPIs (scoped to ACTIVE_PROJECT when one is selected in the header dropdown)
 function renderHomeKpis(){
-  const b=getBal(),rev=sumByType(b,'revenue'),exp=sumByType(b,'expense'),net=rev-exp;
+  const b=getBal(ACTIVE_PROJECT||undefined),rev=sumByType(b,'revenue'),exp=sumByType(b,'expense'),net=rev-exp;
   const cash=b['Cash']?b['Cash'].net:0,ar=b['Accounts Receivable']?b['Accounts Receivable'].net:0;
   const ret=b['Retention Receivable']?b['Retention Receivable'].net:0,wip=b['Work in Progress']?b['Work in Progress'].net:0;
   const el=document.getElementById('homeKpis');if(!el)return;
-  el.innerHTML=`<div class="kpi"><div class="kpi-lbl">Revenue</div><div class="kpi-val pos">${fc(rev)}</div></div>
+  const scopeNote=ACTIVE_PROJECT?`<div style="grid-column:1/-1;font-size:10px;color:var(--gold3);margin-bottom:-4px">📍 Scoped to "${ACTIVE_PROJECT}" — project-tagged entries only. Company-wide overhead (salaries, fuel, etc. with no project tag) is excluded from this view.</div>`:'';
+  el.innerHTML=scopeNote+`<div class="kpi"><div class="kpi-lbl">Revenue</div><div class="kpi-val pos">${fc(rev)}</div></div>
     <div class="kpi"><div class="kpi-lbl">Expenses</div><div class="kpi-val neg">${fc(exp)}</div></div>
     <div class="kpi"><div class="kpi-lbl">Net Profit</div><div class="kpi-val ${net>=0?'pos':'neg'}">${fc(net)}</div></div>
     <div class="kpi"><div class="kpi-lbl">Cash</div><div class="kpi-val ${cash>=0?'':'neg'}">${fc(cash)}</div></div>
@@ -317,7 +349,7 @@ function renderHomeKpis(){
     <div class="kpi"><div class="kpi-lbl">WIP</div><div class="kpi-val">${fc(wip)}</div></div>`;
 }
 function renderHomeAlerts(){
-  const alerts=[];const b=getBal();const cash=b['Cash']?b['Cash'].net:0;
+  const alerts=[];const b=getBal(ACTIVE_PROJECT||undefined);const cash=b['Cash']?b['Cash'].net:0;
   if(cash<0)alerts.push({cls:'al-danger',ico:'🔴',title:'Negative Cash!',msg:'Cash: '+fc(cash)});
   const low=DB.materials.filter(m=>m.min>0&&m.qty<=m.min);
   if(low.length)alerts.push({cls:'al-warn',ico:'⚠️',title:'Low Stock',msg:low.map(m=>m.name+': '+m.qty+' '+m.unit).join(', ')});
@@ -328,7 +360,8 @@ function renderHomeAlerts(){
 }
 function renderTodayEntries(){
   const el=document.getElementById('todayEntries');if(!el)return;
-  const te=DB.entries.filter(e=>e.date===today());
+  let te=DB.entries.filter(e=>e.date===today());
+  if(ACTIVE_PROJECT)te=te.filter(e=>e.project===ACTIVE_PROJECT);
   if(!te.length){el.innerHTML='<div style="text-align:center;padding:16px;color:var(--text3);font-size:12px">No entries today</div>';return;}
   el.innerHTML=te.slice(-8).reverse().map(e=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px"><div><div style="color:var(--text)">${e.desc}</div><div style="font-size:10px;color:var(--text3)">${e.type}</div></div><div style="font-family:'JetBrains Mono',monospace;color:var(--gold3)">${fc(e.amount)}</div></div>`).join('');
 }
@@ -370,16 +403,31 @@ function showResult(p){
 }
 function postEntry(){
   if(!_pending)return;const p=_pending;
-  const debits=(p.entries||[]).filter(r=>(+r.debit)>0).map(r=>({acct:r.account,amt:+(+r.debit).toFixed(2),atype:(r.type||'asset').toLowerCase()}));
-  const credits=(p.entries||[]).filter(r=>(+r.credit)>0).map(r=>({acct:r.account,amt:+(+r.credit).toFixed(2),atype:(r.type||'asset').toLowerCase()}));
-  DB.entries.push({id:DB.nextId++,date:p.date||today(),desc:p.description||'Entry',type:p.type||'General',amount:p.amount||0,project:p.project||'',debits,credits});
-  if(p.materialUsage){const mat=DB.materials.find(m=>m.name.toLowerCase().includes((p.materialUsage.name||'').toLowerCase()));if(mat)mat.qty=Math.max(0,mat.qty-(p.materialUsage.qty||0));}
+  let debits=(p.entries||[]).filter(r=>(+r.debit)>0).map(r=>({acct:r.account,amt:+(+r.debit).toFixed(2),atype:(r.type||'asset').toLowerCase()}));
+  let credits=(p.entries||[]).filter(r=>(+r.credit)>0).map(r=>({acct:r.account,amt:+(+r.credit).toFixed(2),atype:(r.type||'asset').toLowerCase()}));
+  let entryAmount=p.amount||0;
+  let invMsg='';
+  if(p.materialUsage&&p.materialUsage.name){
+    // Fix #13: use real purchase-layer costing (WAC or FIFO per Settings) instead of trusting the AI's guessed amount
+    const result=consumeMaterialLayers(p.materialUsage.name,p.materialUsage.qty||0);
+    if(result.found){
+      entryAmount=+result.cost.toFixed(2);
+      // Override the WIP/Materials debit-credit pair with the REAL layer-costed amount
+      debits=debits.map(d=>d.acct==='Work in Progress'?{...d,amt:entryAmount}:d);
+      credits=credits.map(c=>c.acct==='Construction Materials'?{...c,amt:entryAmount}:c);
+      if(result.shortfall>0)invMsg=` ⚠️ Insufficient stock — ${result.shortfall} ${result.mat?result.mat.unit:''} short, costed only what was available.`;
+    } else {
+      invMsg=` ⚠️ Material "${p.materialUsage.name}" not found in inventory — stock NOT adjusted, journal used AI-estimated amount.`;
+    }
+  }
+  DB.entries.push({id:DB.nextId++,date:p.date||today(),desc:p.description||'Entry',type:p.type||'General',amount:entryAmount,project:p.project||'',debits,credits});
   if(p.prepaidMonths&&p.prepaidMonths>1){
     const mo=(p.amount||0)/p.prepaidMonths;
     for(let i=1;i<p.prepaidMonths;i++){const d=new Date(p.date||today());d.setMonth(d.getMonth()+i);
       DB.entries.push({id:DB.nextId++,date:d.toISOString().split('T')[0],desc:'Amortize: '+p.description,type:'Prepaid Amortization',amount:mo,project:'',debits:[{acct:'Rent Expense',amt:mo,atype:'expense'}],credits:[{acct:'Prepaid Rent',amt:mo,atype:'asset'}]});}
   }
   saveData();renderAll();runAudit();
+  if(invMsg)showToast(invMsg,5000);
   document.getElementById('resultCard').style.display='none';document.getElementById('mainInp').value='';
   showToast('✅ Posted to Journal!');_pending=null;
 }
@@ -432,18 +480,127 @@ function renderMobileMoneyList(){
   el.innerHTML=DB.mobileMoney.slice(-30).reverse().map(m=>`<div class="mm-row"><div class="mm-logo ${m.net}">${m.net.toUpperCase()}</div><div class="mm-body"><div class="mm-name">${m.ref||'—'}</div><div class="mm-ref">${m.date}</div></div><div class="mm-amount ${m.type}">${m.type==='in'?'+':'-'}${fc(m.amt)}</div></div>`).join('');
 }
 
-// MATERIALS
+// MOBILE MONEY STATEMENT RECONCILIATION (Failure 4)
+// Accepts an uploaded .csv or .xlsx statement export, normalizes rows into {date, amount, type, ref},
+// then matches each row against DB.mobileMoney entries by amount (within rounding tolerance) and
+// reference/date proximity, presenting a side-by-side matched / unmatched view.
+function handleStatementUpload(event){
+  const file=event.target.files[0];if(!file)return;
+  const st=document.getElementById('reconSt');
+  st.innerHTML='<span style="color:var(--text2)">⏳ Parsing statement...</span>';
+  const ext=file.name.split('.').pop().toLowerCase();
+  if(ext==='csv'){
+    if(typeof Papa==='undefined'){st.innerHTML='<span style="color:var(--red3)">CSV parser failed to load — check internet connection</span>';return;}
+    Papa.parse(file,{
+      header:true,skipEmptyLines:true,
+      complete:(results)=>processStatementRows(results.data),
+      error:(err)=>{st.innerHTML=`<span style="color:var(--red3)">Parse error: ${err.message}</span>`;}
+    });
+  } else if(ext==='xlsx'||ext==='xls'){
+    if(typeof XLSX==='undefined'){st.innerHTML='<span style="color:var(--red3)">Excel parser failed to load — check internet connection</span>';return;}
+    const reader=new FileReader();
+    reader.onload=(e)=>{
+      try{
+        const wb=XLSX.read(e.target.result,{type:'array'});
+        const sheet=wb.Sheets[wb.SheetNames[0]];
+        const rows=XLSX.utils.sheet_to_json(sheet,{defval:''});
+        processStatementRows(rows);
+      }catch(err){st.innerHTML=`<span style="color:var(--red3)">Excel parse error: ${err.message}</span>`;}
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    st.innerHTML='<span style="color:var(--red3)">Unsupported file type — use .csv or .xlsx</span>';
+  }
+}
+// Normalizes arbitrary column headers from telecom exports (varies by provider) into a standard shape
+function normalizeStatementRow(row){
+  const keys=Object.keys(row);
+  const findCol=(patterns)=>{
+    for(const k of keys){const lk=k.toLowerCase();if(patterns.some(p=>lk.includes(p)))return row[k];}
+    return null;
+  };
+  const dateRaw=findCol(['date','time']);
+  const amtRaw=findCol(['amount','value','amt']);
+  const typeRaw=findCol(['type','direction','dr/cr','drcr']);
+  const refRaw=findCol(['reference','ref','narrative','description','name','party']);
+  const amt=safeNum(amtRaw);
+  let type='in';
+  if(typeRaw){
+    const t=String(typeRaw).toLowerCase();
+    type=(t.includes('out')||t.includes('debit')||t.includes('sent')||t.includes('withdraw'))?'out':'in';
+  } else if(amt<0){type='out';}
+  let date=today();
+  if(dateRaw){
+    const parsed=new Date(dateRaw);
+    if(!isNaN(parsed))date=parsed.toISOString().split('T')[0];
+  }
+  return{date,amount:Math.abs(amt),type,ref:String(refRaw||'').trim()};
+}
+function processStatementRows(rawRows){
+  const net=document.getElementById('reconNet').value;
+  const st=document.getElementById('reconSt');
+  const rows=rawRows.map(normalizeStatementRow).filter(r=>r.amount>0);
+  if(!rows.length){st.innerHTML='<span style="color:var(--red3)">No valid transaction rows found in file</span>';return;}
+
+  const existing=DB.mobileMoney.filter(m=>m.net===net);
+  const matched=[],unmatched=[];
+  rows.forEach(row=>{
+    const match=existing.find(e=>
+      !e._reconClaimed &&
+      Math.abs(e.amt-row.amount)<0.01 &&
+      e.type===row.type &&
+      Math.abs(new Date(e.date)-new Date(row.date))<7*864e5 // within a week tolerance
+    );
+    if(match){match._reconClaimed=true;matched.push({row,match});}
+    else unmatched.push(row);
+  });
+  existing.forEach(e=>delete e._reconClaimed);
+
+  st.innerHTML=`<span style="color:var(--green3)">✅ Parsed ${rows.length} rows — ${matched.length} matched, ${unmatched.length} unmatched</span>`;
+  const resEl=document.getElementById('reconResults');
+  resEl.innerHTML=`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px">
+      <div><div class="fs-section">✅ Matched (${matched.length})</div>
+        ${matched.length?matched.map(m=>`<div class="mm-row" style="border-left:3px solid var(--green3)"><div class="mm-body"><div class="mm-name">${m.row.ref||'—'}</div><div class="mm-ref">${m.row.date} · statement ↔ ledger</div></div><div class="mm-amount ${m.row.type}">${fc(m.row.amount)}</div></div>`).join(''):'<div style="color:var(--text3);font-size:11px;padding:8px 0">None</div>'}
+      </div>
+      <div><div class="fs-section">⚠️ Unmatched in Statement (${unmatched.length})</div>
+        ${unmatched.length?unmatched.map((r,i)=>`<div class="mm-row" style="border-left:3px solid var(--orange3)"><div class="mm-body"><div class="mm-name">${r.ref||'—'}</div><div class="mm-ref">${r.date}</div></div><div class="mm-amount ${r.type}">${fc(r.amount)}</div><button class="btn btn-gold" style="font-size:10px;padding:4px 8px;margin-left:6px" onclick='importReconRow(${JSON.stringify(r).replace(/'/g,"&apos;")},"${net}")'>+ Add</button></div>`).join(''):'<div style="color:var(--text3);font-size:11px;padding:8px 0">None — fully reconciled</div>'}
+      </div>
+    </div>`;
+}
+// Lets the user one-click import an unmatched statement row as a real ledger transaction
+function importReconRow(row,net){
+  DB.mobileMoney.push({id:Date.now(),net,type:row.type,amt:row.amount,ref:row.ref||'Statement import',date:row.date});
+  DB.entries.push({id:DB.nextId++,date:row.date,desc:`Mobile Money ${row.type==='in'?'IN':'OUT'} (${net.toUpperCase()}) — ${row.ref||'Statement import'}`,type:'Mobile Money',amount:row.amount,project:'',
+    debits:row.type==='in'?[{acct:'Cash',amt:row.amount,atype:'asset'}]:[{acct:'Miscellaneous Expense',amt:row.amount,atype:'expense'}],
+    credits:row.type==='in'?[{acct:'Contract Revenue',amt:row.amount,atype:'revenue'}]:[{acct:'Cash',amt:row.amount,atype:'asset'}]});
+  saveData();renderAll();showToast(`✅ Imported ${fc(row.amount)} from statement`);
+}
+
+
+// MATERIALS — Fix #13 (WAC/FIFO costing layers) + Fix #14 (no longer double-posts with Deliveries).
+// Adding/editing a material here ONLY updates the catalog entry (name/category/min-alert/unit) and,
+// if quantity is given without a linked delivery, creates a PENDING lot awaiting delivery confirmation.
+// It does NOT post a journal entry — that happens exactly once, when the matching Delivery is recorded.
+let INV_COSTING_METHOD='WAC'; // 'WAC' = Weighted Average Cost, 'FIFO' = First-In-First-Out. Set in Settings.
+
 function addMaterial(){
   const name=document.getElementById('matName').value.trim(),cat=document.getElementById('matCat').value;
   const qty=parseFloat(document.getElementById('matQty').value)||0,unit=document.getElementById('matUnit').value;
   const cost=parseFloat(document.getElementById('matCost').value)||0,min=parseFloat(document.getElementById('matMin').value)||0;
   const st=document.getElementById('matAddSt');if(!name){st.innerHTML='<span style="color:var(--red3)">Enter name</span>';return;}
-  const existing=DB.materials.find(m=>m.name.toLowerCase()===name.toLowerCase());
-  if(existing){existing.qty+=qty;if(cost)existing.cost=cost;}
-  else DB.materials.push({id:Date.now(),name,cat,qty,unit,cost,min});
-  if(qty>0&&cost>0)DB.entries.push({id:DB.nextId++,date:today(),desc:`Purchase: ${name} ${qty} ${unit}`,type:'Material Purchase',amount:qty*cost,project:'',debits:[{acct:'Construction Materials',amt:qty*cost,atype:'asset'}],credits:[{acct:'Cash',amt:qty*cost,atype:'asset'}]});
+  let mat=DB.materials.find(m=>m.name.toLowerCase()===name.toLowerCase());
+  if(!mat){mat={id:Date.now(),name,cat,qty:0,unit,cost:cost||0,min,layers:[]};DB.materials.push(mat);}
+  else{mat.cat=cat;mat.unit=unit;mat.min=min;if(cost)mat.cost=cost;}
+  if(!mat.layers)mat.layers=[]; // purchase layers: [{qty, unitCost, date}], oldest-first for FIFO
+  let pendingMsg='';
+  if(qty>0){
+    mat.pendingQty=(mat.pendingQty||0)+qty;
+    mat.pendingCost=cost||mat.cost||0;
+    pendingMsg=` — ${qty} ${unit} PENDING delivery confirmation (no journal entry posted yet)`;
+  }
   saveData();renderAll();document.getElementById('matName').value='';document.getElementById('matQty').value='';document.getElementById('matCost').value='';
-  st.innerHTML=`<span style="color:var(--green3)">✅ ${name}</span>`;setTimeout(()=>st.innerHTML='',3000);
+  st.innerHTML=`<span style="color:var(--green3)">✅ ${name}${pendingMsg}</span>`;setTimeout(()=>st.innerHTML='',5000);
 }
 function renderMaterials(){
   const el=document.getElementById('matList');if(!el)return;
@@ -453,22 +610,108 @@ function renderMaterials(){
   el.innerHTML=items.map(m=>{
     const cls=m.qty===0&&m.min>0?'out-stock':m.qty<=m.min&&m.min>0?'low-stock':'';
     const qcls=m.qty===0?'out':m.qty<=m.min&&m.min>0?'low':'ok';
-    return `<div class="inv-row ${cls}"><div class="inv-ico">🧱</div><div style="flex:1"><div class="inv-name">${m.name}<div class="inv-detail">${m.cat} · ${fc(m.cost)}/unit · min:${m.min}</div></div></div><div class="qty-ctrl"><button class="qty-btn" onclick="adjMat(${m.id},-1)">−</button><div class="inv-qty ${qcls}" style="margin:0 6px">${m.qty} ${m.unit}</div><button class="qty-btn" onclick="adjMat(${m.id},1)">+</button></div></div>`;
+    const pendingBadge=m.pendingQty>0?`<span class="tag t-orange" style="margin-left:6px">⏳ ${m.pendingQty} ${m.unit} pending delivery</span>`:'';
+    const avgCost=getMaterialAvgCost(m);
+    return `<div class="inv-row ${cls}"><div class="inv-ico">🧱</div><div style="flex:1"><div class="inv-name">${m.name}${pendingBadge}<div class="inv-detail">${m.cat} · ${fc(avgCost)}/unit (${INV_COSTING_METHOD}) · min:${m.min} · ${(m.layers||[]).length} layer(s)</div></div></div><div class="qty-ctrl"><div class="inv-qty ${qcls}" style="margin:0 6px">${m.qty} ${m.unit}</div></div></div>`;
   }).join('');
 }
-function adjMat(id,d){const m=DB.materials.find(x=>x.id===id);if(!m)return;m.qty=Math.max(0,m.qty+d);saveData();renderMaterials();}
+// Returns the current weighted-average cost across all remaining layers (used for display regardless of method)
+function getMaterialAvgCost(m){
+  if(!m.layers||!m.layers.length)return m.cost||0;
+  const totalQty=m.layers.reduce((s,l)=>s+l.qty,0);
+  const totalVal=m.layers.reduce((s,l)=>s+l.qty*l.unitCost,0);
+  return totalQty>0?totalVal/totalQty:(m.cost||0);
+}
+// Consumes `qty` units from a material's layers using the active costing method, returns {cost, found, shortfall}
+function consumeMaterialLayers(materialName,qty){
+  const mat=DB.materials.find(mm=>mm.name.toLowerCase().includes((materialName||'').toLowerCase()));
+  if(!mat)return{cost:0,found:false,shortfall:0,mat:null};
+  if(!mat.layers)mat.layers=[];
+  const available=mat.layers.reduce((s,l)=>s+l.qty,0);
+  const shortfall=Math.max(0,qty-available);
+  let remaining=qty,totalCost=0;
+  if(INV_COSTING_METHOD==='WAC'){
+    const avg=getMaterialAvgCost(mat);
+    const consumeQty=Math.min(qty,available);
+    totalCost=consumeQty*avg;
+    // Drain layers proportionally for WAC bookkeeping (doesn't matter which layer, same avg cost)
+    for(const l of mat.layers){
+      if(remaining<=0)break;
+      const take=Math.min(l.qty,remaining);
+      l.qty-=take;remaining-=take;
+    }
+  } else { // FIFO — oldest layer first
+    for(const l of mat.layers){
+      if(remaining<=0)break;
+      const take=Math.min(l.qty,remaining);
+      totalCost+=take*l.unitCost;
+      l.qty-=take;remaining-=take;
+    }
+  }
+  mat.layers=mat.layers.filter(l=>l.qty>0.0001);
+  mat.qty=Math.max(0,mat.qty-qty);
+  return{cost:totalCost,found:true,shortfall,mat};
+}
+function setCostingMethod(method){
+  INV_COSTING_METHOD=method;saveData();renderMaterials();renderCostingButtons();
+  showToast(`✅ Costing method set to ${method}`);
+}
+function renderCostingButtons(){
+  const wac=document.getElementById('costing-wac'),fifo=document.getElementById('costing-fifo');
+  if(!wac||!fifo)return;
+  wac.className='btn '+(INV_COSTING_METHOD==='WAC'?'btn-gold':'btn-outline');
+  fifo.className='btn '+(INV_COSTING_METHOD==='FIFO'?'btn-gold':'btn-outline');
+}
 
-// DELIVERIES
+// DELIVERIES — Fix #14: this is now the SINGLE trigger that posts the journal entry and locks in
+// inventory layers. Recording a delivery for materials that have a pending batch will consume that
+// pending batch (no double-posting). If no pending batch exists, the delivery still posts normally
+// (e.g. a delivery for materials not pre-logged in the Materials tab).
+// Fix #15: explicit numeric sanitizer — strips stray commas/spaces/currency symbols before parseFloat,
+// so malformed input can't silently produce an inflated number. Returns 0 for anything unparseable.
+function safeNum(val){
+  if(typeof val==='number')return isFinite(val)?val:0;
+  const cleaned=String(val||'').replace(/[,\s$£]/g,'').trim();
+  const n=parseFloat(cleaned);
+  return isFinite(n)?n:0;
+}
 function addDelivery(){
   const supplier=document.getElementById('delSupplier').value.trim(),invNo=document.getElementById('delInvNo').value.trim();
-  const items=document.getElementById('delItems').value.trim(),total=parseFloat(document.getElementById('delTotal').value)||0;
+  const items=document.getElementById('delItems').value.trim(),total=safeNum(document.getElementById('delTotal').value);
   const pay=document.getElementById('delPay').value,date=document.getElementById('delDate').value||today();
-  const st=document.getElementById('delSt');if(!supplier||!total){st.innerHTML='<span style="color:var(--red3)">Fill required fields</span>';return;}
+  const linkedMatId=document.getElementById('delMaterial')?document.getElementById('delMaterial').value:'';
+  const st=document.getElementById('delSt');
+  if(!supplier||!total){st.innerHTML='<span style="color:var(--red3)">Fill required fields</span>';return;}
+  // Sanity guard: warn (don't silently accept) if the parsed total looks suspiciously large vs raw digit count
+  const rawDigits=String(document.getElementById('delTotal').value||'').replace(/[^\d.]/g,'');
+  if(rawDigits&&Math.abs(total-parseFloat(rawDigits))>0.01){
+    st.innerHTML='<span style="color:var(--red3)">⚠️ Could not safely parse amount — please re-enter</span>';return;
+  }
   DB.deliveries.push({id:Date.now(),supplier,invNo,items,total,pay,date});
+
+  let lockMsg='';
+  if(linkedMatId){
+    const mat=DB.materials.find(m=>String(m.id)===String(linkedMatId));
+    if(mat&&mat.pendingQty>0){
+      const unitCost=total/mat.pendingQty;
+      mat.layers=mat.layers||[];
+      mat.layers.push({qty:mat.pendingQty,unitCost,date});
+      mat.qty=(mat.qty||0)+mat.pendingQty;
+      mat.cost=unitCost;
+      lockMsg=` — locked ${mat.pendingQty} ${mat.unit} of ${mat.name} @ ${fc(unitCost)}/unit`;
+      mat.pendingQty=0;
+    }
+  }
+  // This is the ONLY place a material purchase posts to the journal now — single source of truth
   DB.entries.push({id:DB.nextId++,date,desc:`Delivery: ${supplier} — ${items||invNo}`,type:'Delivery',amount:total,project:'',
     debits:[{acct:'Construction Materials',amt:total,atype:'asset'}],
     credits:pay==='cash'?[{acct:'Cash',amt:total,atype:'asset'}]:[{acct:'Accounts Payable',amt:total,atype:'liability'}]});
-  saveData();renderAll();st.innerHTML=`<span style="color:var(--green3)">✅ ${supplier}</span>`;setTimeout(()=>st.innerHTML='',3000);
+  saveData();renderAll();st.innerHTML=`<span style="color:var(--green3)">✅ ${supplier}${lockMsg}</span>`;setTimeout(()=>st.innerHTML='',5000);
+}
+function renderDelMaterialSelect(){
+  const el=document.getElementById('delMaterial');if(!el)return;
+  const pending=DB.materials.filter(m=>m.pendingQty>0);
+  el.innerHTML='<option value="">— No linked material batch —</option>'+pending.map(m=>`<option value="${m.id}">${m.name} (${m.pendingQty} ${m.unit} pending)</option>`).join('');
 }
 function renderDeliveryList(){
   const el=document.getElementById('deliveryList');if(!el)return;
@@ -476,33 +719,178 @@ function renderDeliveryList(){
   el.innerHTML=`<table><thead><tr><th>Date</th><th>Supplier</th><th>Items</th><th>Total</th><th>Payment</th></tr></thead><tbody>${DB.deliveries.slice(-30).reverse().map(d=>`<tr><td>${d.date}</td><td>${d.supplier}</td><td>${d.items||d.invNo}</td><td style="font-family:'JetBrains Mono',monospace">${fc(d.total)}</td><td><span class="tag ${d.pay==='cash'?'t-green':'t-orange'}">${d.pay}</span></td></tr>`).join('')}</tbody></table>`;
 }
 
-// WORKERS
+// WORKERS & PAYROLL — Uganda statutory engine: PAYE (progressive bands) + NSSF (5% employee / 10% employer)
+// Two-phase accrual pipeline: Phase 1 (generatePayroll) accrues liabilities only, no cash moves.
+// Phase 2 (disburseSalary) clears Salaries Payable by paying the NET amount from a chosen asset account.
+
+// Uganda Revenue Authority monthly PAYE bands (resident individuals). Values in local currency units
+// scaled 1:1 with whatever currency the salary is recorded in (USD in this app's base ledger).
+// NOTE: these are simplified standard bands for a construction-payroll demo, not a substitute for
+// official URA guidance — flag for the business owner to confirm against current published rates.
+function calcPAYE(gross){
+  // Bands (monthly, UGX-equivalent structure expressed proportionally): 0% up to 235,000; 10% next band;
+  // 20% next band; 30% above, plus 10% surcharge portion on the top band above 10,000,000.
+  // Since this ledger operates in USD, we apply the same proportional band STRUCTURE the business can
+  // recalibrate in code if their actual local-currency thresholds differ.
+  const bands=[
+    {upTo:235,rate:0},
+    {upTo:335,rate:0.10},
+    {upTo:410,rate:0.20},
+    {upTo:Infinity,rate:0.30}
+  ];
+  let tax=0,prev=0;
+  for(const b of bands){
+    if(gross>prev){
+      const taxable=Math.min(gross,b.upTo)-prev;
+      tax+=taxable*b.rate;
+      prev=b.upTo;
+    } else break;
+  }
+  return Math.round(tax*100)/100;
+}
+function calcNSSF(gross){
+  return{employee:Math.round(gross*0.05*100)/100,employer:Math.round(gross*0.10*100)/100};
+}
+function toggleWorkerClassFields(){
+  const cls=document.getElementById('wkClass').value;
+  document.getElementById('wkPermanentFields').style.display=cls==='Permanent'?'grid':'none';
+  document.getElementById('wkCasualFields').style.display=cls==='Casual'?'grid':'none';
+}
 function addWorker(){
   const name=document.getElementById('wkName').value.trim(),role=document.getElementById('wkRole').value;
-  let salary=parseFloat(document.getElementById('wkSalary').value)||0;const cur=document.getElementById('wkCur').value;
-  const st=document.getElementById('wkAddSt');if(!name||!salary){st.innerHTML='<span style="color:var(--red3)">Fill name and salary</span>';return;}
-  if(cur==='SSP')salary=salary/SSP_RATE;
-  DB.workers.push({id:Date.now(),name,role,salary});
-  saveData();renderAll();document.getElementById('wkName').value='';document.getElementById('wkSalary').value='';
-  st.innerHTML=`<span style="color:var(--green3)">✅ ${name}</span>`;setTimeout(()=>st.innerHTML='',3000);
+  const cls=document.getElementById('wkClass').value,cur=document.getElementById('wkCur').value;
+  const st=document.getElementById('wkAddSt');
+  if(!name){st.innerHTML='<span style="color:var(--red3)">Enter name</span>';return;}
+  let worker={id:Date.now(),name,role,classification:cls,casualLog:{}};
+  if(cls==='Permanent'){
+    let salary=parseFloat(document.getElementById('wkSalary').value)||0;
+    if(!salary){st.innerHTML='<span style="color:var(--red3)">Enter monthly salary</span>';return;}
+    if(cur==='SSP')salary=salary/SSP_RATE;
+    worker.salary=salary;
+  } else {
+    let rate=parseFloat(document.getElementById('wkDailyRate').value)||0;
+    if(!rate){st.innerHTML='<span style="color:var(--red3)">Enter daily wage rate</span>';return;}
+    if(cur==='SSP')rate=rate/SSP_RATE;
+    worker.dailyRate=rate;worker.salary=0;
+  }
+  DB.workers.push(worker);
+  saveData();renderAll();document.getElementById('wkName').value='';document.getElementById('wkSalary').value='';document.getElementById('wkDailyRate').value='';
+  st.innerHTML=`<span style="color:var(--green3)">✅ ${name} (${cls})</span>`;setTimeout(()=>st.innerHTML='',3000);
+}
+function logCasualDays(){
+  const wid=parseInt(document.getElementById('casualWorker').value),days=parseFloat(document.getElementById('casualDays').value)||0;
+  const month=document.getElementById('casualMonth').value||today().slice(0,7);
+  const st=document.getElementById('casualSt');
+  const w=DB.workers.find(x=>x.id===wid);if(!w||w.classification!=='Casual'){st.innerHTML='<span style="color:var(--red3)">Select a casual worker</span>';return;}
+  if(!days){st.innerHTML='<span style="color:var(--red3)">Enter days worked</span>';return;}
+  if(!w.casualLog)w.casualLog={};
+  w.casualLog[month]=(w.casualLog[month]||0)+days;
+  saveData();renderAll();
+  st.innerHTML=`<span style="color:var(--green3)">✅ Logged ${days} days for ${w.name} (${month}) — total this month: ${w.casualLog[month]}</span>`;
+  setTimeout(()=>st.innerHTML='',4000);
+}
+function getWorkerGrossForMonth(w,month){
+  if(w.classification==='Casual'){
+    const days=(w.casualLog&&w.casualLog[month])||0;
+    return days*(w.dailyRate||0);
+  }
+  return w.salary||0;
 }
 function renderWorkerList(){
   const el=document.getElementById('workerList');if(!el)return;
   if(!DB.workers.length){el.innerHTML='<div style="text-align:center;padding:16px;color:var(--text3)">No workers</div>';return;}
-  el.innerHTML=`<table><thead><tr><th>Name</th><th>Role</th><th>Monthly</th><th>Action</th></tr></thead><tbody>${DB.workers.map(w=>`<tr><td>${w.name}</td><td>${w.role}</td><td style="font-family:'JetBrains Mono',monospace">${fc(w.salary)}</td><td><button class="btn btn-danger" style="font-size:10px;padding:4px 8px" onclick="deleteWorker(${w.id})">✕</button></td></tr>`).join('')}</tbody></table>`;
+  const thisMonth=today().slice(0,7);
+  el.innerHTML=`<table><thead><tr><th>Name</th><th>Role</th><th>Class</th><th>Rate</th><th>This Month Gross</th><th>Action</th></tr></thead><tbody>${DB.workers.map(w=>{
+    const gross=getWorkerGrossForMonth(w,thisMonth);
+    const rateDisplay=w.classification==='Casual'?`${fc(w.dailyRate||0)}/day`:`${fc(w.salary||0)}/mo`;
+    return `<tr><td>${w.name}</td><td>${w.role}</td><td><span class="tag ${w.classification==='Casual'?'t-orange':'t-blue'}">${w.classification}</span></td><td style="font-family:'JetBrains Mono',monospace">${rateDisplay}</td><td style="font-family:'JetBrains Mono',monospace">${fc(gross)}</td><td><button class="btn btn-danger" style="font-size:10px;padding:4px 8px" onclick="deleteWorker(${w.id})">✕</button></td></tr>`;
+  }).join('')}</tbody></table>`;
 }
 function deleteWorker(id){if(!confirm('Delete worker?'))return;DB.workers=DB.workers.filter(w=>w.id!==id);saveData();renderAll();}
-function renderPayWorkerSelect(){const el=document.getElementById('payWorker');if(!el)return;el.innerHTML=DB.workers.map(w=>`<option value="${w.id}">${w.name} (${fc(w.salary)}/mo)</option>`).join('');}
-function paySalary(){
-  const wid=parseInt(document.getElementById('payWorker').value),month=document.getElementById('payMonth').value;
-  const override=parseFloat(document.getElementById('payOverride').value)||0;
-  const w=DB.workers.find(x=>x.id===wid);if(!w)return;const amt=override||w.salary;
-  DB.entries.push({id:DB.nextId++,date:today(),desc:`Salary: ${w.name} (${month||today().slice(0,7)})`,type:'Payroll',amount:amt,project:'',debits:[{acct:'Salary Expense',amt,atype:'expense'}],credits:[{acct:'Cash',amt,atype:'asset'}]});
-  saveData();renderAll();showToast(`✅ Paid ${fc(amt)} to ${w.name}`);
+function renderPayWorkerSelect(){
+  const opts=DB.workers.map(w=>`<option value="${w.id}">${w.name} (${w.classification})</option>`).join('');
+  ['payWorker','disburseWorker','casualWorker'].forEach(id=>{
+    const el=document.getElementById(id);if(!el)return;
+    if(id==='casualWorker'){el.innerHTML=DB.workers.filter(w=>w.classification==='Casual').map(w=>`<option value="${w.id}">${w.name}</option>`).join('')||'<option value="">No casual workers</option>';}
+    else el.innerHTML=opts||'<option value="">No workers</option>';
+  });
 }
-function payAllSalaries(){
-  DB.workers.forEach(w=>DB.entries.push({id:DB.nextId++,date:today(),desc:`Salary: ${w.name} (${today().slice(0,7)})`,type:'Payroll',amount:w.salary,project:'',debits:[{acct:'Salary Expense',amt:w.salary,atype:'expense'}],credits:[{acct:'Cash',amt:w.salary,atype:'asset'}]}));
-  saveData();renderAll();showToast(`✅ Paid ${DB.workers.length} workers`);
+
+// PHASE 1: Generate Payroll — pure accrual, no cash movement.
+// Debit: Salary Expense (gross) + NSSF Employer Contribution Expense (10%)
+// Credit: PAYE Payable, NSSF Payable (5%+10%=15% combined), Salaries Payable (net clearing liability)
+function generatePayroll(){
+  const wid=parseInt(document.getElementById('payWorker').value),month=document.getElementById('payMonth').value||today().slice(0,7);
+  const override=parseFloat(document.getElementById('payOverride').value)||0;
+  const st=document.getElementById('payGenSt');
+  const w=DB.workers.find(x=>x.id===wid);if(!w){st.innerHTML='<span style="color:var(--red3)">Select a worker</span>';return;}
+  const gross=override||getWorkerGrossForMonth(w,month);
+  if(!gross){st.innerHTML='<span style="color:var(--red3)">No gross pay — log casual days or set salary</span>';return;}
+  const paye=calcPAYE(gross);
+  const nssf=calcNSSF(gross);
+  const netPay=gross-paye-nssf.employee;
+  DB.entries.push({id:DB.nextId++,date:today(),desc:`Payroll Accrual: ${w.name} (${month})`,type:'Payroll Accrual',amount:gross,project:'',
+    debits:[
+      {acct:'Salary Expense',amt:gross,atype:'expense'},
+      {acct:'NSSF Employer Contribution Expense',amt:nssf.employer,atype:'expense'}
+    ],
+    credits:[
+      {acct:'PAYE Payable',amt:paye,atype:'liability'},
+      {acct:'NSSF Payable',amt:nssf.employee+nssf.employer,atype:'liability'},
+      {acct:'Salaries Payable',amt:netPay,atype:'liability'}
+    ]});
+  saveData();renderAll();runAudit();
+  st.innerHTML=`<span style="color:var(--green3)">✅ Accrued ${w.name}: Gross ${fc(gross)} · PAYE ${fc(paye)} · NSSF-EE ${fc(nssf.employee)} · NSSF-ER ${fc(nssf.employer)} · Net Payable ${fc(netPay)}</span>`;
+  showToast(`✅ Payroll accrued — Net owed: ${fc(netPay)}`);
+}
+function generateAllPayroll(){
+  const month=document.getElementById('payMonth').value||today().slice(0,7);
+  let count=0;
+  DB.workers.forEach(w=>{
+    const gross=getWorkerGrossForMonth(w,month);
+    if(!gross)return;
+    const paye=calcPAYE(gross),nssf=calcNSSF(gross),netPay=gross-paye-nssf.employee;
+    DB.entries.push({id:DB.nextId++,date:today(),desc:`Payroll Accrual: ${w.name} (${month})`,type:'Payroll Accrual',amount:gross,project:'',
+      debits:[{acct:'Salary Expense',amt:gross,atype:'expense'},{acct:'NSSF Employer Contribution Expense',amt:nssf.employer,atype:'expense'}],
+      credits:[{acct:'PAYE Payable',amt:paye,atype:'liability'},{acct:'NSSF Payable',amt:nssf.employee+nssf.employer,atype:'liability'},{acct:'Salaries Payable',amt:netPay,atype:'liability'}]});
+    count++;
+  });
+  saveData();renderAll();runAudit();
+  showToast(`✅ Accrued payroll for ${count} worker(s)`);
+}
+
+// PHASE 2: Disburse — clears Salaries Payable by paying the NET amount from the chosen asset account.
+function getWorkerPayableBalance(workerName){
+  // Sum Salaries Payable credits (accrued) minus debits (already disbursed) tagged to this worker via description match
+  let credited=0,debited=0;
+  DB.entries.forEach(e=>{
+    if(!e.desc.includes(workerName))return;
+    (e.credits||[]).forEach(c=>{if(c.acct==='Salaries Payable')credited+=c.amt;});
+    (e.debits||[]).forEach(d=>{if(d.acct==='Salaries Payable')debited+=d.amt;});
+  });
+  return Math.max(0,credited-debited);
+}
+function updateDisburseBalance(){
+  const wid=parseInt(document.getElementById('disburseWorker').value);
+  const w=DB.workers.find(x=>x.id===wid);
+  const el=document.getElementById('disburseLiveBalance');if(!el)return;
+  if(!w){el.textContent='';return;}
+  const bal=getWorkerPayableBalance(w.name);
+  el.textContent=`${w.name}: ${fc(bal)} owed (Salaries Payable)`;
+  el.style.color=bal>0?'var(--orange3)':'var(--text3)';
+}
+function disburseSalary(){
+  const wid=parseInt(document.getElementById('disburseWorker').value),fromAcct=document.getElementById('disburseFrom').value;
+  const st=document.getElementById('disburseSt');
+  const w=DB.workers.find(x=>x.id===wid);if(!w){st.innerHTML='<span style="color:var(--red3)">Select a worker</span>';return;}
+  const owed=getWorkerPayableBalance(w.name);
+  if(owed<=0){st.innerHTML='<span style="color:var(--red3)">⚠️ No outstanding payable — generate payroll first</span>';return;}
+  DB.entries.push({id:DB.nextId++,date:today(),desc:`Salary Disbursement: ${w.name}`,type:'Payroll Disbursement',amount:owed,project:'',
+    debits:[{acct:'Salaries Payable',amt:owed,atype:'liability'}],
+    credits:[{acct:fromAcct,amt:owed,atype:'asset'}]});
+  saveData();renderAll();runAudit();
+  st.innerHTML=`<span style="color:var(--green3)">✅ Disbursed ${fc(owed)} to ${w.name} from ${fromAcct}</span>`;
+  showToast(`✅ Paid ${fc(owed)} to ${w.name}`);updateDisburseBalance();
 }
 
 // PROJECTS
