@@ -2,7 +2,7 @@
 // Handles: user auth, data read/write, role enforcement
 // Uses Neon Postgres via the DATABASE_URL environment variable
 
-import { Pool } from 'pg';
+const { Pool } = require('pg');
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -68,7 +68,7 @@ function isAllowed(role, action) {
 }
 
 // ─── Main handler ────────────────────────────────────────────────────────────
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
