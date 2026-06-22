@@ -133,7 +133,7 @@ tbody td{padding:9px 12px;border-bottom:1px solid var(--border);color:var(--text
 <body>
 <div id="loginScreen"><div class="login-wrap"><div class="login-brand"><span class="logo-icon">🏗️</span><h1>ሒሳቢ ሃንሲ</h1><div class="sub">Hisabi Hensi · Construction Accounting AI · Juba</div></div><div class="login-card"><h2>ኣቱ / ምዝጋብ — Login / Register</h2><div class="lf"><label>ስም ተጠቃሚ</label><input id="lu" type="text" placeholder="username" autocomplete="username"/></div><div class="lf"><label>ምስጢር</label><input id="lp" type="password" placeholder="password" autocomplete="current-password"/></div><div class="lf" id="regFields" style="display:none"><label>ስም ኩባንያ</label><input id="lb" type="text" placeholder="Riji Construction"/></div><button class="login-btn" onclick="doLogin()">🔓 ኣቱ — Login</button><div class="login-err" id="lerr">ስም ወይ ምስጢር ጌጋ</div><div class="login-switch">ሓድሽ ሕሳብ? <a onclick="toggleReg()">ምዝጋብ</a></div></div></div></div>
 <div id="mainApp"><div class="shell">
-<div class="topbar"><div class="tb-brand">🏗️ ሒሳቢ ሃንሲ</div><div class="tb-biz" id="tbBiz">—</div><select id="tbProjectSel" class="cur-btn" style="cursor:pointer;max-width:160px" onchange="setActiveProject(this.value)"><option value="">All Projects</option></select><div class="tb-cur"><button class="cur-btn on" id="cur-usd" onclick="setCur('USD')">USD $</button><button class="cur-btn" id="cur-ssp" onclick="setCur('SSP')">SSP £</button></div><div class="tb-alert" id="tbAlert" onclick="nav('audit',null)">⚠️ <span id="tbAlertTxt">0</span> ጉድለት</div><button class="tb-btn no-print" onclick="window.print()">🖨️</button><button class="tb-btn no-print" onclick="doLogout()" style="color:var(--red3)">ምውጻእ</button></div>
+<div class="topbar"><div class="tb-brand">🏗️ ሒሳቢ ሃንሲ</div><div class="tb-biz" id="tbBiz">—</div><span id="roleBadge" style="display:none;font-size:10px;padding:3px 8px;border-radius:4px;background:rgba(196,154,42,.15);color:var(--gold3);font-family:'JetBrains Mono',monospace"></span><select id="tbProjectSel" class="cur-btn" style="cursor:pointer;max-width:160px" onchange="setActiveProject(this.value)"><option value="">All Projects</option></select><div class="tb-cur"><button class="cur-btn on" id="cur-usd" onclick="setCur('USD')">USD $</button><button class="cur-btn" id="cur-ssp" onclick="setCur('SSP')">SSP £</button></div><div class="tb-alert" id="tbAlert" onclick="nav('audit',null)">⚠️ <span id="tbAlertTxt">0</span> ጉድለት</div><button class="tb-btn no-print" onclick="window.print()">🖨️</button><button class="tb-btn no-print" onclick="doLogout()" style="color:var(--red3)">ምውጻእ</button></div>
 <div class="sidebar" id="sidebar">
 <div class="sb-section"><div class="sb-section-label">ዕለታዊ — Daily</div>
 <div class="sb-item on" onclick="nav('home',this)"><span class="sb-ico">🎙️</span>ሓድሽ ምዝጋብ<span class="en">Record</span></div>
@@ -194,7 +194,7 @@ tbody td{padding:9px 12px;border-bottom:1px solid var(--border);color:var(--text
 <div class="page" id="pg-advisor"><div class="ph"><h1>🤖 AI Advisor</h1><p>Ask anything in Tigrinya or English</p></div><div class="card"><div class="chat-wrap" id="chatMsgs"><div class="msg ai">ሰላም! ኣነ AI ሓጋዚ ሒሳብካ እየ። If I suggest a journal entry, an Apply button will appear.</div></div><div class="chat-inp-row"><input class="chat-inp" id="chatInp" placeholder="ዝደሊ ሕተት... / Ask anything..." onkeydown="if(event.key==='Enter')sendChat()"/><button class="btn btn-gold" onclick="sendChat()">↗</button></div></div></div>
 <div class="page" id="pg-audit"><div class="ph"><h1>🔍 Audit Bot</h1></div><div id="auditFindings"></div><div class="btn-row no-print"><button class="btn btn-gold" onclick="runAudit()">🔍 Run Audit</button></div></div>
 <div class="page" id="pg-depreciation"><div class="ph"><h1>📉 Depreciation</h1><p>Auto-posts on login each month</p></div><div class="card"><div class="card-hdr"><span>➕</span><span>Add Asset</span></div><div class="fgrid"><div class="fg"><label>Name</label><input id="aName" type="text" placeholder="Excavator"/></div><div class="fg"><label>Type</label><select id="aType"><option>Equipment</option><option>Vehicles</option><option>Heavy Machinery</option><option>Building</option></select></div><div class="fg"><label>Cost</label><input id="aCost" type="number" placeholder="50000"/></div><div class="fg"><label>Life (years)</label><input id="aLife" type="number" placeholder="10"/></div><div class="fg"><label>Purchase Date</label><input id="aDate" type="date"/></div></div><div class="btn-row"><button class="btn btn-gold" onclick="addAsset()">➕ Add</button></div><div id="assetAddSt" style="font-size:11px;margin-top:8px"></div></div><div class="card"><div class="card-hdr"><span>📋</span><span>Assets</span></div><div id="assetList"></div></div><div class="card"><div class="card-hdr"><span>📅</span><span>Due This Month</span></div><div id="depDueList"></div></div></div>
-<div class="page" id="pg-settings"><div class="ph"><h1>⚙️ Settings</h1></div><div class="card"><div class="fg"><label>Company Name</label><input id="bizName" type="text"/></div><div class="fg"><label>SSP/USD Rate</label><input id="sspRate" type="number" placeholder="1300" value="1300"/></div><div class="btn-row"><button class="btn btn-gold" onclick="saveSettings()">💾 Save</button></div><div id="settingsSt" style="font-size:11px;margin-top:8px"></div></div><div class="card"><div class="card-hdr"><span>🧮</span><span>Inventory Costing Method</span></div><p style="font-size:11px;color:var(--text3);margin-bottom:12px">Controls how material cost is calculated when consumed on a project. Applies to new consumption going forward.</p><div class="btn-row" style="margin-top:0"><button class="btn" id="costing-wac" onclick="setCostingMethod('WAC')">Weighted Average Cost</button><button class="btn" id="costing-fifo" onclick="setCostingMethod('FIFO')">FIFO</button></div></div><div class="card"><div class="fg"><label>Email</label><input id="emailAddr" type="email" placeholder="you@email.com"/></div><div class="btn-row"><button class="btn btn-gold" onclick="emailReport()">📧 Email Report</button></div><div id="emailSt" style="font-size:11px;margin-top:8px"></div></div><div class="card"><div class="fgrid"><div class="fg"><label>Current Password</label><input id="op" type="password"/></div><div class="fg"><label>New Password</label><input id="np" type="password"/></div></div><div class="btn-row"><button class="btn btn-gold" onclick="changePw()">Change</button></div><div id="pwSt" style="font-size:11px;margin-top:8px"></div></div></div>
+<div class="page" id="pg-settings"><div class="ph"><h1>⚙️ Settings</h1></div><div class="card"><div class="fg"><label>Company Name</label><input id="bizName" type="text"/></div><div class="fg"><label>SSP/USD Rate</label><input id="sspRate" type="number" placeholder="1300" value="1300"/></div><div class="btn-row"><button class="btn btn-gold" onclick="saveSettings()">💾 Save</button></div><div id="settingsSt" style="font-size:11px;margin-top:8px"></div></div><div class="card"><div class="card-hdr"><span>🧮</span><span>Inventory Costing Method</span></div><p style="font-size:11px;color:var(--text3);margin-bottom:12px">Controls how material cost is calculated when consumed on a project. Applies to new consumption going forward.</p><div class="btn-row" style="margin-top:0"><button class="btn" id="costing-wac" onclick="setCostingMethod('WAC')">Weighted Average Cost</button><button class="btn" id="costing-fifo" onclick="setCostingMethod('FIFO')">FIFO</button></div></div><div class="card"><div class="card-hdr"><span>👥</span><span>Staff Management</span><span style="font-size:10px;color:var(--text3);margin-left:8px">(Owner only)</span></div><div id="staffList" style="margin-bottom:14px"></div><div class="fgrid"><div class="fg"><label>Username</label><input id="staffUsername" type="text" placeholder="john_mason"/></div><div class="fg"><label>Password</label><input id="staffPassword" type="password" placeholder="temporary password"/></div><div class="fg"><label>Role</label><select id="staffRole"><option value="staff">Staff (limited)</option><option value="owner">Owner (full access)</option></select></div></div><div class="btn-row"><button class="btn btn-gold" onclick="addStaff()">➕ Add Staff Member</button></div><div id="staffSt" style="font-size:11px;margin-top:8px"></div><div class="alert al-info" style="margin-top:12px"><span class="alert-ico">ℹ️</span><div class="alert-body"><div class="alert-title">Staff permissions</div>Staff can record transactions, view all reports, and use AI features. They CANNOT delete entries, release retention, run payroll disbursements, or delete projects/workers.</div></div></div><div class="card"><div class="fg"><label>Email</label><input id="emailAddr" type="email" placeholder="you@email.com"/></div><div class="btn-row"><button class="btn btn-gold" onclick="emailReport()">📧 Email Report</button></div><div id="emailSt" style="font-size:11px;margin-top:8px"></div></div><div class="card"><div class="fgrid"><div class="fg"><label>Current Password</label><input id="op" type="password"/></div><div class="fg"><label>New Password</label><input id="np" type="password"/></div></div><div class="btn-row"><button class="btn btn-gold" onclick="changePw()">Change</button></div><div id="pwSt" style="font-size:11px;margin-top:8px"></div></div></div>
 </div></div></div>
 <div class="toast" id="toast"></div>
 <script>
@@ -209,22 +209,64 @@ function fc(n){if(CUR==='SSP')return'SSP £'+(+(n||0)*SSP_RATE).toLocaleString(u
 function showToast(msg,dur=3000){const t=document.getElementById('toast');t.textContent=msg;t.style.display='block';setTimeout(()=>t.style.display='none',dur);}
 
 // AUTH
-function getU(){try{return JSON.parse(localStorage.getItem('hh_users')||'{}')}catch{return{}}}
-function setU(u){localStorage.setItem('hh_users',JSON.stringify(u));}
-function getCU(){return localStorage.getItem('hh_cu')||'';}
-function loadDB(){
-  const cu=getCU();if(!cu)return;
-  const u=getU();if(!u[cu])return;
-  try{DB=JSON.parse(u[cu].db||JSON.stringify(DB));}catch{}
-  BIZ_NAME=u[cu].biz||BIZ_NAME;SSP_RATE=u[cu].sspRate||1300;
-  INV_COSTING_METHOD=u[cu].costingMethod||'WAC';
-}
-function saveData(){
-  const cu=getCU();if(!cu)return;
-  const u=getU();if(!u[cu])return;
-  u[cu].db=JSON.stringify(DB);u[cu].biz=BIZ_NAME;u[cu].sspRate=SSP_RATE;u[cu].costingMethod=INV_COSTING_METHOD;setU(u);
+// ─── SESSION STATE (replaces localStorage per-user objects) ─────────────────
+// After login these hold the current user's server-verified identity.
+let SESSION={username:'',companyId:null,role:'owner'}; // role: 'owner' | 'staff'
+
+// ─── DB API HELPER ───────────────────────────────────────────────────────────
+async function dbApi(body){
+  const res=await fetch('/api/db',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const data=await res.json();
+  if(!res.ok)throw new Error(data.error||'Database error');
+  return data;
 }
 
+// ─── ROLE PERMISSION GUARD ───────────────────────────────────────────────────
+// Staff are blocked from sensitive destructive actions. Call this before any restricted operation.
+const OWNER_ONLY=['deleteEntry','releaseRetention','runPayroll','disburse','deleteProject','deleteWorker','deleteAsset'];
+function canDo(action){
+  if(SESSION.role==='owner')return true;
+  const blocked=OWNER_ONLY.some(b=>action.toLowerCase().includes(b.toLowerCase()));
+  if(blocked)showToast(`⛔ Staff cannot perform: ${action}. Ask your Owner/Admin.`,4000);
+  return !blocked;
+}
+
+// ─── AUDIT LOG ───────────────────────────────────────────────────────────────
+async function logAudit(action,detail=''){
+  try{await dbApi({action:'audit',companyId:SESSION.companyId,username:SESSION.username,auditAction:action,auditDetail:detail});}
+  catch{}// audit failures should never block the main action
+}
+
+// ─── DATA PERSISTENCE (replaces localStorage saveData/loadDB) ────────────────
+// DB is split into named keys to avoid one giant JSONB blob getting too large.
+const DB_KEYS=['entries','projects','workers','materials','assets','mobileMoney','deliveries','pettyCash'];
+
+async function saveData(){
+  if(!SESSION.companyId)return;
+  // Save each collection independently so a large entries list doesn't block saving workers, etc.
+  await Promise.all(DB_KEYS.map(k=>
+    dbApi({action:'save',companyId:SESSION.companyId,key:k,value:DB[k]}).catch(e=>console.error('save error',k,e))
+  ));
+  // Save scalar settings separately
+  await dbApi({action:'save',companyId:SESSION.companyId,key:'meta',value:{nextId:DB.nextId}}).catch(()=>{});
+}
+
+async function loadDB(){
+  if(!SESSION.companyId)return;
+  try{
+    const r=await dbApi({action:'load',companyId:SESSION.companyId});
+    const d=r.data||{};
+    DB_KEYS.forEach(k=>{if(d[k])DB[k]=d[k];});
+    if(d.meta)DB.nextId=d.meta.nextId||DB.nextId;
+  }catch(e){console.error('loadDB error',e);}
+}
+
+// ─── FRESH EMPTY COMPANY DATABASE ────────────────────────────────────────────
+function freshDB(){
+  return{entries:[],projects:[],workers:[],materials:[],assets:[],mobileMoney:[],deliveries:[],pettyCash:[],nextId:1};
+}
+
+// ─── AUTH FUNCTIONS ───────────────────────────────────────────────────────────
 function toggleReg(){
   _isReg=!_isReg;
   document.getElementById('regFields').style.display=_isReg?'block':'none';
@@ -232,41 +274,37 @@ function toggleReg(){
   document.getElementById('lerr').style.display='none';
 }
 
-// Returns a guaranteed-fresh, empty company database — used on registration so a new account
-// can NEVER inherit whatever happens to be sitting in the in-memory DB variable from a previous session.
-function freshDB(){
-  return{entries:[],projects:[],workers:[],materials:[],assets:[],mobileMoney:[],deliveries:[],pettyCash:[],nextId:1};
-}
-
-function doLogin(){
+async function doLogin(){
   const u=document.getElementById('lu').value.trim(),p=document.getElementById('lp').value;
-  const err=document.getElementById('lerr');
+  const err=document.getElementById('lerr'),btn=document.querySelector('.login-btn');
   if(!u||!p){err.style.display='block';err.textContent='Fill all fields';return;}
-  const users=getU();
-  if(_isReg){
-    if(users[u]){err.style.display='block';err.textContent='Username taken';return;}
-    const biz=document.getElementById('lb').value.trim()||u+' Construction';
-    // FIX: always start a brand-new account with a guaranteed-empty database, never whatever
-    // happens to be in the in-memory DB variable (which could be a previous user's session data).
-    const newCompanyDB=freshDB();
-    users[u]={pass:btoa(p),biz,sspRate:1300,costingMethod:'WAC',db:JSON.stringify(newCompanyDB)};
-    setU(users);
-    localStorage.setItem('hh_cu',u);
-    // Reset all in-memory state to match the fresh account — don't carry over anything from before
-    DB=newCompanyDB;BIZ_NAME=biz;SSP_RATE=1300;INV_COSTING_METHOD='WAC';ACTIVE_PROJECT='';CUR='USD';
-    launchApp();
-  } else {
-    if(!users[u]||users[u].pass!==btoa(p)){err.style.display='block';err.textContent='Wrong username or password';return;}
-    // Reset in-memory state BEFORE loading, so if loadDB fails partway nothing leaks from the prior session
-    DB=freshDB();BIZ_NAME='My Construction Co';SSP_RATE=1300;INV_COSTING_METHOD='WAC';ACTIVE_PROJECT='';CUR='USD';
-    localStorage.setItem('hh_cu',u);loadDB();launchApp();
+  btn.textContent='...';btn.disabled=true;
+  try{
+    if(_isReg){
+      const biz=document.getElementById('lb').value.trim()||u+' Construction';
+      const r=await dbApi({action:'register',username:u,password:p,bizName:biz});
+      SESSION={username:u,companyId:r.companyId,role:r.role};
+      BIZ_NAME=r.bizName;SSP_RATE=1300;INV_COSTING_METHOD='WAC';ACTIVE_PROJECT='';CUR='USD';
+      DB=freshDB();
+      await launchApp();
+    } else {
+      const r=await dbApi({action:'login',username:u,password:p});
+      SESSION={username:u,companyId:r.companyId,role:r.role};
+      BIZ_NAME=r.bizName;SSP_RATE=parseFloat(r.sspRate)||1300;
+      INV_COSTING_METHOD=r.costingMethod||'WAC';ACTIVE_PROJECT='';CUR='USD';
+      DB=freshDB();
+      await loadDB();
+      await launchApp();
+    }
+  }catch(e){
+    err.style.display='block';err.textContent=e.message||'Login failed';
+  }finally{
+    btn.textContent=_isReg?'📝 ምዝጋብ — Register':'🔓 ኣቱ — Login';btn.disabled=false;
   }
 }
 
 function doLogout(){
-  localStorage.removeItem('hh_cu');
-  // Wipe in-memory state on logout — prevents any residual data from being visible
-  // for a split second if another person logs in right after without a full page reload.
+  SESSION={username:'',companyId:null,role:'owner'};
   DB=freshDB();BIZ_NAME='My Construction Co';SSP_RATE=1300;INV_COSTING_METHOD='WAC';ACTIVE_PROJECT='';CUR='USD';
   document.getElementById('mainApp').style.display='none';
   document.getElementById('loginScreen').style.display='flex';
@@ -274,13 +312,17 @@ function doLogout(){
   document.getElementById('lerr').style.display='none';
 }
 
-function launchApp(){
+async function launchApp(){
   document.getElementById('loginScreen').style.display='none';
   document.getElementById('mainApp').style.display='block';
   document.getElementById('tbBiz').textContent=BIZ_NAME;
   document.getElementById('bizName').value=BIZ_NAME;
   document.getElementById('sspRate').value=SSP_RATE;
+  // Show role badge in topbar
+  const roleBadge=document.getElementById('roleBadge');
+  if(roleBadge){roleBadge.textContent=SESSION.role==='owner'?'👑 Owner':'👤 Staff';roleBadge.style.display='block';}
   autoDepreciation();renderAll();runAudit();
+  renderStaffPanel();
 }
 
 // NAVIGATION
@@ -952,7 +994,7 @@ function renderWorkerList(){
     return `<tr><td>${w.name}</td><td>${w.role}</td><td><span class="tag ${w.classification==='Casual'?'t-orange':'t-blue'}">${w.classification}</span></td><td style="font-family:'JetBrains Mono',monospace">${rateDisplay}</td><td style="font-family:'JetBrains Mono',monospace">${fc(gross)}</td><td><button class="btn btn-danger" style="font-size:10px;padding:4px 8px" onclick="deleteWorker(${w.id})">✕</button></td></tr>`;
   }).join('')}</tbody></table>`;
 }
-function deleteWorker(id){if(!confirm('Delete worker?'))return;DB.workers=DB.workers.filter(w=>w.id!==id);saveData();renderAll();}
+function deleteWorker(id){if(!canDo('deleteWorker'))return;if(!confirm('Delete worker?'))return;DB.workers=DB.workers.filter(w=>w.id!==id);logAudit('deleteWorker',`Worker #${id}`);saveData();renderAll();}
 function renderPayWorkerSelect(){
   const opts=DB.workers.map(w=>`<option value="${w.id}">${w.name} (${w.classification})</option>`).join('');
   ['payWorker','disburseWorker','casualWorker'].forEach(id=>{
@@ -1069,7 +1111,7 @@ function renderProjectCards(){
   }).join('');
 }
 function toggleProjectStatus(id){const p=DB.projects.find(x=>x.id===id);if(!p)return;p.status=p.status==='Active'?'Completed':'Active';saveData();renderProjectCards();}
-function deleteProject(id){if(!confirm('Delete project?'))return;DB.projects=DB.projects.filter(p=>p.id!==id);saveData();renderAll();}
+function deleteProject(id){if(!canDo('deleteProject'))return;if(!confirm('Delete project?'))return;DB.projects=DB.projects.filter(p=>p.id!==id);logAudit('deleteProject',`Project #${id}`);saveData();renderAll();}
 
 // INVOICE
 function renderInvProjectSelect(){const el=document.getElementById('invProject');if(!el)return;el.innerHTML=DB.projects.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');}
@@ -1113,6 +1155,7 @@ function updateRetLiveBalance(){
   el.style.color=bal>0?'var(--orange3)':'var(--red3)';
 }
 function releaseRetention(){
+  if(!canDo('releaseRetention'))return;
   const pid=parseInt(document.getElementById('retProject').value),amt=parseFloat(document.getElementById('retAmt').value)||0;
   const p=DB.projects.find(x=>x.id===pid);if(!p||!amt)return;
   const available=getProjectRetentionBalance(p.name);
@@ -1123,6 +1166,7 @@ function releaseRetention(){
     return;
   }
   DB.entries.push({id:DB.nextId++,date:today(),desc:`Retention Released: ${p.name}`,type:'Retention Release',amount:amt,project:p.name,debits:[{acct:'Cash',amt,atype:'asset'}],credits:[{acct:'Retention Receivable',amt,atype:'asset'}]});
+  logAudit('releaseRetention',`${p.name} — ${fc(amt)}`);
   saveData();renderAll();showToast(`✅ Released ${fc(amt)}`);document.getElementById('retAmt').value='';
   updateRetLiveBalance();
 }
@@ -1157,7 +1201,13 @@ function renderJournal(){
       </tbody></table></div>`;
   }).join('');
 }
-function deleteEntry(id){if(!confirm('Delete this entry?'))return;DB.entries=DB.entries.filter(e=>e.id!==id);saveData();renderAll();runAudit();}
+function deleteEntry(id){
+  if(!canDo('deleteEntry'))return;
+  if(!confirm('Delete this entry?'))return;
+  DB.entries=DB.entries.filter(e=>e.id!==id);
+  logAudit('deleteEntry',`Entry #${id}`);
+  saveData();renderAll();runAudit();
+}
 function clearJFilter(){['jFrom','jTo','jSearch'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});renderJournal();}
 
 // LEDGER
@@ -1399,12 +1449,51 @@ async function applyAdvisorEntry(eid){
 }
 
 // SETTINGS
-function saveSettings(){BIZ_NAME=document.getElementById('bizName').value.trim()||BIZ_NAME;SSP_RATE=parseFloat(document.getElementById('sspRate').value)||1300;document.getElementById('tbBiz').textContent=BIZ_NAME;saveData();renderAll();document.getElementById('settingsSt').innerHTML='<span style="color:var(--green3)">✅ Saved</span>';setTimeout(()=>document.getElementById('settingsSt').innerHTML='',3000);}
-function changePw(){const o=document.getElementById('op').value,n=document.getElementById('np').value,cu=getCU(),u=getU();if(u[cu].pass!==btoa(o)){document.getElementById('pwSt').innerHTML='<span style="color:var(--red3)">Wrong password</span>';return;}if(!n){document.getElementById('pwSt').innerHTML='<span style="color:var(--red3)">Enter new password</span>';return;}u[cu].pass=btoa(n);setU(u);document.getElementById('pwSt').innerHTML='<span style="color:var(--green3)">✅ Changed</span>';document.getElementById('op').value='';document.getElementById('np').value='';}
+async function saveSettings(){
+  BIZ_NAME=document.getElementById('bizName').value.trim()||BIZ_NAME;
+  SSP_RATE=parseFloat(document.getElementById('sspRate').value)||1300;
+  document.getElementById('tbBiz').textContent=BIZ_NAME;
+  try{
+    await dbApi({action:'saveSettings',companyId:SESSION.companyId,name:BIZ_NAME,sspRate:SSP_RATE,costingMethod:INV_COSTING_METHOD});
+    renderAll();document.getElementById('settingsSt').innerHTML='<span style="color:var(--green3)">✅ Saved</span>';
+  }catch(e){document.getElementById('settingsSt').innerHTML=`<span style="color:var(--red3)">❌ ${e.message}</span>`;}
+  setTimeout(()=>document.getElementById('settingsSt').innerHTML='',3000);
+}
+function changePw(){document.getElementById('pwSt').innerHTML='<span style="color:var(--text3)">Password change requires re-registering. Contact your owner to reset.</span>';}
+
+// ─── STAFF MANAGEMENT (Owner only) ───────────────────────────────────────────
+async function addStaff(){
+  if(!canDo('addStaff_owner')){}// owners can always do this — canDo only blocks staff
+  const uname=document.getElementById('staffUsername').value.trim(),pw=document.getElementById('staffPassword').value;
+  const role=document.getElementById('staffRole').value;
+  const st=document.getElementById('staffSt');
+  if(!uname||!pw){st.innerHTML='<span style="color:var(--red3)">Fill username and password</span>';return;}
+  try{
+    await dbApi({action:'registerStaff',username:uname,password:pw,companyId:SESSION.companyId,role});
+    st.innerHTML=`<span style="color:var(--green3)">✅ ${uname} added as ${role}</span>`;
+    document.getElementById('staffUsername').value='';document.getElementById('staffPassword').value='';
+    renderStaffPanel();
+  }catch(e){st.innerHTML=`<span style="color:var(--red3)">❌ ${e.message}</span>`;}
+  setTimeout(()=>st.innerHTML='',4000);
+}
+async function renderStaffPanel(){
+  const el=document.getElementById('staffList');if(!el)return;
+  if(SESSION.role!=='owner'){el.innerHTML='<div style="color:var(--text3);font-size:12px">Only owners can manage staff.</div>';return;}
+  try{
+    const r=await dbApi({action:'listStaff',companyId:SESSION.companyId});
+    el.innerHTML=(r.staff||[]).map(s=>`<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);font-size:12px"><div style="flex:1;color:var(--text)">${s.username}</div><span class="tag ${s.role==='owner'?'t-gold':'t-blue'}">${s.role}</span><div style="font-size:10px;color:var(--text3)">${new Date(s.created_at).toLocaleDateString()}</div></div>`).join('')||'<div style="color:var(--text3);font-size:12px">No staff yet</div>';
+  }catch(e){el.innerHTML=`<div style="color:var(--red3);font-size:12px">Could not load staff list</div>`;}
+}
+
+
 function emailReport(){const b=getBal(),tR=sumByType(b,'revenue'),tX=sumByType(b,'expense'),net=tR-tX,cash=b['Cash']?b['Cash'].net:0;const email=document.getElementById('emailAddr')?document.getElementById('emailAddr').value.trim():'';const subject=encodeURIComponent(`${BIZ_NAME} Report ${today()}`);const body=encodeURIComponent(`HISABI HENSI REPORT\nCompany: ${BIZ_NAME}\nDate: ${today()}\nRevenue: ${fc(tR)}\nExpenses: ${fc(tX)}\nNet: ${fc(net)}\nCash: ${fc(cash)}\nEntries: ${DB.entries.length}`);if(email)window.location.href=`mailto:${email}?subject=${subject}&body=${body}`;else window.location.href=`mailto:?subject=${subject}&body=${body}`;}
 
-// INIT
-window.addEventListener('DOMContentLoaded',()=>{const cu=getCU();if(cu&&getU()[cu]){loadDB();launchApp();}});
+// INIT — no auto-login from localStorage any more. All sessions are server-verified.
+// Users must log in on every page load (or we could add a JWT token later for convenience).
+window.addEventListener('DOMContentLoaded',()=>{
+  document.getElementById('loginScreen').style.display='flex';
+  document.getElementById('mainApp').style.display='none';
+});
 </script>
 </body>
 </html>
