@@ -3,6 +3,10 @@
     "api/ai.js": {
       "memory": 1024,
       "maxDuration": 30
+    },
+    "api/db.js": {
+      "memory": 1024,
+      "maxDuration": 30
     }
   }
 }
