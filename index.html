@@ -549,6 +549,55 @@ async function extractTextFromImage(fileOrBlob){
   return result.data.text;
 }
 
+// Robust JSON parser for AI responses — handles the most common ways LLMs return malformed JSON:
+// unescaped quotes in string values, trailing commas, smart quotes, missing closing braces, etc.
+function safeParseAIJson(raw){
+  if(!raw)throw new Error('Empty response from AI');
+  // Step 1: strip markdown code fences
+  raw=raw.trim().replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
+  // Step 2: extract the outermost {...} block
+  const m=raw.match(/\{[\s\S]*\}/);
+  if(!m)throw new Error('No JSON object found in AI response');
+  let json=m[0];
+  // Step 3: try direct parse first (happy path)
+  try{return JSON.parse(json);}catch(e1){
+    // Step 4: common repairs
+    try{
+      let fixed=json
+        // Replace smart/curly quotes with straight quotes
+        .replace(/[\u201C\u201D]/g,'"')
+        .replace(/[\u2018\u2019]/g,"'")
+        // Remove trailing commas before } or ]
+        .replace(/,\s*([}\]])/g,'$1')
+        // Fix unescaped newlines inside string values
+        .replace(/:\s*"([^"]*)\n([^"]*)"/g,(match,p1,p2)=>`:"${p1}\\n${p2}"`)
+        // Fix unescaped tabs
+        .replace(/\t/g,'\\t');
+      return JSON.parse(fixed);
+    }catch(e2){
+      // Step 5: last resort — extract key fields manually if JSON is too broken
+      const extract=(key)=>{
+        const r=new RegExp(`"${key}"\\s*:\\s*"([^"]*)"`, 'i');
+        const numR=new RegExp(`"${key}"\\s*:\\s*([\\d.]+)`, 'i');
+        const m2=json.match(r)||json.match(numR);
+        return m2?m2[1]:null;
+      };
+      const amount=parseFloat(extract('amount'))||0;
+      const description=extract('description')||extract('desc')||'Transaction';
+      const type=extract('type')||'General';
+      const date=extract('date')||new Date().toISOString().split('T')[0];
+      // Try to extract entries array
+      let entries=[];
+      try{
+        const eMatch=json.match(/"entries"\s*:\s*(\[[\s\S]*?\])/);
+        if(eMatch)entries=JSON.parse(eMatch[1].replace(/,\s*([}\]])/g,'$1'));
+      }catch{}
+      if(!amount&&!entries.length)throw new Error('AI returned unparseable response — please rephrase your input');
+      return{type,date,amount,currency:'USD',description,prepaidMonths:null,materialUsage:null,entries};
+    }
+  }
+}
+
 async function doRecord(overrideText){
   const inp=document.getElementById('mainInp');
   const q=(overrideText!==undefined?overrideText:inp.value).trim();
@@ -557,10 +606,9 @@ async function doRecord(overrideText){
   try{
     const res=await fetch('/api/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:q,materials:DB.materials})});
     const data=await res.json();
-    let raw=(data.result||'').trim().replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
-    const m=raw.match(/\{[\s\S]*\}/);if(!m)throw new Error('No JSON from AI');
-    _pending=JSON.parse(m[0]);showResult(_pending);
-  }catch(err){showToast('❌ '+err.message);}
+    _pending=safeParseAIJson(data.result||'');
+    showResult(_pending);
+  }catch(err){showToast('❌ '+err.message,5000);}
   btn.textContent='↗';btn.disabled=false;
 }
 // Calculates what consumeMaterialLayers WOULD return, WITHOUT mutating the real layers —
@@ -1660,9 +1708,9 @@ async function applyAdvisorEntry(eid){
   try{
     // Pass current inventory so the converter can resolve unit costs & flag material usage, same as the main recorder
     const res=await fetch('/api/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:'Convert this accounting advice to journal entry JSON: '+text,materials:DB.materials})});
-    const data=await res.json();let raw=(data.result||'').trim().replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
-    const m=raw.match(/\{[\s\S]*\}/);if(!m)throw new Error('Could not parse');
-    const p=JSON.parse(m[0]);if(!p.entries||!p.entries.length)throw new Error('No entries');
+    const data=await res.json();
+    const p=safeParseAIJson(data.result||'');
+    if(!p.entries||!p.entries.length)throw new Error('No journal entries in AI response — try rephrasing');
     document.getElementById('applyLoad').remove();
     let deb=p.entries.filter(r=>(+r.debit)>0).map(r=>({acct:r.account,amt:+(+r.debit).toFixed(2),atype:(r.type||'asset').toLowerCase()}));
     let cred=p.entries.filter(r=>(+r.credit)>0).map(r=>({acct:r.account,amt:+(+r.credit).toFixed(2),atype:(r.type||'asset').toLowerCase()}));
