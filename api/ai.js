@@ -162,4 +162,4 @@ function correctDepreciationInversion(rawText) {
     // If parsing fails for any reason, fall back to the original text untouched
     return rawText;
   }
-}
+} 
