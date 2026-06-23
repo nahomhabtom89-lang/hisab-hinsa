@@ -43,6 +43,208 @@ Give clear, practical accounting advice. Be concise and direct.`;
       systemText = systemPrompt;
 
     } else {
+      const matContext = materials && materials.length > 0
+        ? `\nCURRENT INVENTORY:\n${materials.map(m => `- ${m.name}: ${m.qty} ${m.unit} @ $${m.cost}/unit`).join('\n')}`
+        : '';
+
+      systemText = `You are an expert construction accounting AI for a company in Juba, South Sudan and Asmara, Eritrea. You understand Eritrean Tigrinya (Asmara dialect) and English.
+${matContext}
+
+CRITICAL NUMBER RULES:
+- Read the EXACT number the user typed. "4500" = 4500, not 3, not 45, not 4.5.
+- Numbers with commas: 7,500 = 7500. Remove commas before using.
+- NEVER use SSP prices as USD amounts.
+- The "amount" field in JSON must equal the number the user stated.
+- SELF-CHECK before returning: does your "amount" match what the user said? If not, fix it.
+
+CRITICAL BALANCE RULE — THIS IS THE MOST IMPORTANT RULE:
+- Total of all "debit" values MUST equal total of all "credit" values EXACTLY.
+- Every single entry must have: sum(debits) == sum(credits) == amount.
+- SELF-CHECK: add up all debit values, add up all credit values. They must be equal. If not, fix before returning.
+- Example: amount=4500 → one entry debit=4500, one entry credit=4500. NOT debit=3, credit=4500.
+
+CRITICAL JSON RULES:
+- Return ONLY the JSON object, nothing else
+- No markdown fences, no explanatory text
+- All strings use straight double quotes "
+- No trailing commas
+- The "type" field at the top level must be a transaction category like "Payroll", "Purchase", "Invoice" etc — NEVER the word "string"
+
+Return this exact structure:
+{"type":"Payroll","date":"YYYY-MM-DD","amount":4500,"currency":"USD","description":"Daily laborers salary","prepaidMonths":null,"materialUsage":null,"entries":[{"account":"Salary Expense","type":"expense","debit":4500,"credit":0},{"account":"Cash","type":"asset","debit":0,"credit":4500}]}
+
+ACCOUNTING RULES:
+1. Debits = Credits ALWAYS — amount must appear in BOTH a debit and a credit
+2. Pay cash → Cr Cash (credit=amount), Dr expense/asset (debit=amount)
+3. Receive cash → Dr Cash (debit=amount), Cr Revenue (credit=amount)
+4. Salary/ደሞዝ/laborers/wages → Dr Salary Expense (debit=amount), Cr Cash (credit=amount). Type="Payroll"
+5. Rent ADVANCE "for X months" → Dr Prepaid Rent (debit=amount), Cr Cash (credit=amount), prepaidMonths=X, Type="Prepaid Rent"
+6. Consume prepaid rent → Dr Rent Expense (debit=amount), Cr Prepaid Rent (credit=amount), Type="Rent Expense"
+7. Buy materials cash → Dr Construction Materials (debit=amount), Cr Cash (credit=amount)
+8. Buy materials credit → Dr Construction Materials (debit=amount), Cr Accounts Payable (credit=amount)
+9. USE materials on site → Dr Work in Progress (debit=amount), Cr Construction Materials (credit=amount)
+10. Client pays → Dr Cash (debit=amount), Cr Contract Revenue (credit=amount)
+11. Invoice to client → Dr Accounts Receivable (debit=amount), Cr Contract Revenue (credit=amount)
+12. Equipment purchase cash → Dr Equipment (debit=amount), Cr Cash (credit=amount)
+13. Loan received → Dr Cash (debit=amount), Cr Loan Payable (credit=amount)
+14. Fuel → Dr Fuel Expense (debit=amount), Cr Cash (credit=amount)
+15. Owner capital → Dr Cash (debit=amount), Cr Owner Capital (credit=amount)
+16. Depreciation → Dr Depreciation Expense (debit=amount, type=expense), Cr Accumulated Depreciation (credit=amount, type=contra-asset)
+17. Subcontractor → Dr Subcontractor Expense (debit=amount), Cr Cash (credit=amount)
+
+Today: ${new Date().toISOString().split('T')[0]}
+
+FINAL SELF-CHECK before responding:
+1. Is "amount" the exact number the user stated? ✓
+2. Do all debits sum to equal all credits? ✓
+3. Does each individual debit/credit equal the amount (for simple single transactions)? ✓
+4. Is "type" a real transaction category, not the word "string"? ✓`;
+    }
+
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${GROQ_KEY}`
+      },
+      body: JSON.stringify({
+        model: "llama-3.3-70b-versatile",
+        messages: [
+          { role: "system", content: systemText },
+          { role: "user", content: prompt }
+        ],
+        temperature: 0.05,
+        max_tokens: 1024
+      })
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      console.error("Groq error:", err);
+      return res.status(500).json({ error: "AI service error", details: err });
+    }
+
+    const data = await response.json();
+    let text = data?.choices?.[0]?.message?.content || "";
+
+    // SERVER-SIDE VALIDATION AND AUTO-CORRECTION
+    // Parse, validate, and fix common AI mistakes before sending to browser
+    if (mode !== "advisor") {
+      text = validateAndFixEntry(text);
+    }
+
+    return res.status(200).json({ result: text });
+
+  } catch (err) {
+    console.error("Handler error:", err);
+    return res.status(500).json({ error: "Internal server error", details: err.message });
+  }
+}
+
+// Server-side correction: parses AI JSON, fixes unbalanced entries, wrong amounts, wrong type field,
+// and depreciation inversions before the response ever reaches the browser.
+function validateAndFixEntry(rawText) {
+  try {
+    let cleaned = rawText.trim()
+      .replace(/^```json\s*/i, "").replace(/^```\s*/, "").replace(/```\s*$/, "").trim();
+    const match = cleaned.match(/\{[\s\S]*\}/);
+    if (!match) return rawText;
+
+    let parsed;
+    try { parsed = JSON.parse(match[0]); }
+    catch (e) {
+      // Try fixing trailing commas and smart quotes
+      try {
+        const fixed = match[0]
+          .replace(/[\u201C\u201D]/g, '"').replace(/[\u2018\u2019]/g, "'")
+          .replace(/,\s*([}\]])/g, '$1');
+        parsed = JSON.parse(fixed);
+      } catch { return rawText; }
+    }
+
+    if (!parsed || !Array.isArray(parsed.entries)) return rawText;
+
+    // Fix 1: "type" field is literally "string" — replace with a proper category
+    if (!parsed.type || parsed.type.toLowerCase() === 'string') {
+      const desc = (parsed.description || '').toLowerCase();
+      if (desc.includes('salary') || desc.includes('wage') || desc.includes('labor')) parsed.type = 'Payroll';
+      else if (desc.includes('rent')) parsed.type = 'Rent';
+      else if (desc.includes('material') || desc.includes('cement') || desc.includes('steel')) parsed.type = 'Material Purchase';
+      else if (desc.includes('fuel')) parsed.type = 'Fuel';
+      else if (desc.includes('invoice')) parsed.type = 'Invoice';
+      else if (desc.includes('depreciation')) parsed.type = 'Depreciation';
+      else parsed.type = 'General';
+    }
+
+    // Fix 2: entries where debit or credit values are wrong (e.g. debit=3 when amount=4500)
+    const amount = parsed.amount || 0;
+    if (amount > 0 && parsed.entries.length >= 2) {
+      const totalDr = parsed.entries.reduce((s, e) => s + (parseFloat(e.debit) || 0), 0);
+      const totalCr = parsed.entries.reduce((s, e) => s + (parseFloat(e.credit) || 0), 0);
+      const isUnbalanced = Math.abs(totalDr - totalCr) > 0.01;
+      const isWrongAmount = Math.abs(totalDr - amount) > 0.01 && Math.abs(totalCr - amount) > 0.01;
+
+      if (isUnbalanced || isWrongAmount) {
+        // For simple 2-entry transactions, just force the amount onto both sides correctly
+        if (parsed.entries.length === 2) {
+          const drEntry = parsed.entries.find(e => (parseFloat(e.debit) || 0) > 0 || (parseFloat(e.credit) || 0) === 0);
+          const crEntry = parsed.entries.find(e => (parseFloat(e.credit) || 0) > 0 || (parseFloat(e.debit) || 0) === 0);
+          if (drEntry && crEntry) {
+            drEntry.debit = amount; drEntry.credit = 0;
+            crEntry.credit = amount; crEntry.debit = 0;
+          }
+        }
+      }
+    }
+
+    // Fix 3: depreciation inversion
+    parsed.entries = parsed.entries.map(line => {
+      const acct = (line.account || "").toLowerCase();
+      if (acct.includes("depreciation expense") && (parseFloat(line.credit) || 0) > 0 && (parseFloat(line.debit) || 0) === 0) {
+        return { ...line, debit: line.credit, credit: 0, type: "expense" };
+      }
+      if (acct.includes("accumulated depreciation") && (parseFloat(line.debit) || 0) > 0 && (parseFloat(line.credit) || 0) === 0) {
+        return { ...line, credit: line.debit, debit: 0, type: "contra-asset" };
+      }
+      return line;
+    });
+
+    return JSON.stringify(parsed);
+  } catch {
+    return rawText;
+  }
+}
+
+
+    if (mode === "advisor") {
+      systemText = `You are an expert construction accounting advisor for a company operating in East Africa (Juba, South Sudan and Asmara, Eritrea).
+
+LANGUAGE RULES — follow these exactly:
+- If the user writes in Tigrinya, reply in Tigrinya using the ERITREAN (Asmara) dialect specifically — NOT the Tigray/Ethiopian dialect.
+- Key Eritrean Tigrinya distinctions to follow:
+  * Use "ኣነ" not "አነ" for "I"
+  * Use "ይኹን" not "ይሁን" for "let it be / okay"
+  * Use "ሕሳብ" for accounting/account (not "ሂሳብ" which is the Amharic/Tigray form)
+  * Use "ስራሕ" for work (not "ስራ")
+  * Use "ዋጋ" for price/cost
+  * Use "ክፍሊት" for payment
+  * Use "ገንዘብ" for money
+  * Use "ሕቶ" for question
+  * Formal polite address: use "ኣንቱ" not "አንተ"
+  * Use Eritrean business terminology as used in Asmara commercial context
+- If the user writes in English, reply in English
+- Never mix Tigray dialect words into your Tigrinya responses
+- Keep accounting terms clear — if a Tigrinya accounting term might be unfamiliar, you may add the English term in brackets e.g. "ሓሳብ ደፍተር (journal entry)"
+
+Company data:
+${context || ""}
+
+Give clear, practical accounting advice. Be concise and direct.`;
+
+    } else if (systemPrompt) {
+      systemText = systemPrompt;
+
+    } else {
       // Build materials context for AI
       const matContext = materials && materials.length > 0
         ? `\nCURRENT INVENTORY (use these unit costs for material usage):\n${materials.map(m => `- ${m.name}: ${m.qty} ${m.unit} @ $${m.cost}/unit`).join('\n')}`
@@ -146,50 +348,3 @@ ALWAYS return valid JSON. NEVER return an error. If unsure about amount, use bes
   }
 }
 
-// Detects a depreciation entry and, if Accumulated Depreciation/Depreciation Expense
-// were generated on the wrong side, swaps debit/credit values back to correct double-entry form.
-function correctDepreciationInversion(rawText) {
-  try {
-    let cleaned = rawText.trim()
-      .replace(/^```json\s*/i, "")
-      .replace(/^```\s*/, "")
-      .replace(/```\s*$/, "")
-      .trim();
-    const match = cleaned.match(/\{[\s\S]*\}/);
-    if (!match) return rawText;
-
-    const parsed = JSON.parse(match[0]);
-    if (!parsed.entries || !Array.isArray(parsed.entries)) return rawText;
-
-    let touched = false;
-    parsed.entries = parsed.entries.map(line => {
-      const acct = (line.account || "").toLowerCase();
-      const isDepExpense = acct.includes("depreciation expense");
-      const isAccumDep = acct.includes("accumulated depreciation");
-
-      if (isDepExpense && (+line.credit || 0) > 0 && (+line.debit || 0) === 0) {
-        // Was wrongly credited — flip to debit
-        line = { ...line, debit: line.credit, credit: 0, type: "expense" };
-        touched = true;
-      } else if (isDepExpense) {
-        line = { ...line, type: "expense" };
-      }
-
-      if (isAccumDep && (+line.debit || 0) > 0 && (+line.credit || 0) === 0) {
-        // Was wrongly debited — flip to credit
-        line = { ...line, credit: line.debit, debit: 0, type: "contra-asset" };
-        touched = true;
-      } else if (isAccumDep) {
-        line = { ...line, type: "contra-asset" };
-      }
-
-      return line;
-    });
-
-    if (!touched) return rawText;
-    return JSON.stringify(parsed);
-  } catch {
-    // If parsing fails for any reason, fall back to the original text untouched
-    return rawText;
-  }
-}
