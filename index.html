@@ -192,7 +192,41 @@ tbody td{padding:9px 12px;border-bottom:1px solid var(--border);color:var(--text
 <div class="page" id="pg-cashflow"><div class="ph"><h1>📈 Cash Flow Forecast</h1></div><div class="card"><div class="card-hdr"><span>📈</span><span>3-Month Forecast (incl. depreciation)</span></div><div id="cfFull"></div></div></div>
 <div class="page" id="pg-jobcost"><div class="ph"><h1>🔢 Job Costing + WIP</h1></div><div id="jobCostCards"></div></div>
 <div class="page" id="pg-advisor"><div class="ph"><h1>🤖 AI Advisor</h1><p>Ask anything in Tigrinya or English</p></div><div class="card"><div class="chat-wrap" id="chatMsgs"><div class="msg ai">ሰላም! ኣነ AI ሓጋዚ ሒሳብካ እየ። If I suggest a journal entry, an Apply button will appear.</div></div><div class="chat-inp-row"><input class="chat-inp" id="chatInp" placeholder="ዝደሊ ሕተት... / Ask anything..." onkeydown="if(event.key==='Enter')sendChat()"/><button class="btn btn-gold" onclick="sendChat()">↗</button></div></div></div>
-<div class="page" id="pg-audit"><div class="ph"><h1>🔍 Audit Bot</h1></div><div id="auditFindings"></div><div class="btn-row no-print"><button class="btn btn-gold" onclick="runAudit()">🔍 Run Audit</button></div></div>
+<div class="page" id="pg-audit">
+<div class="ph"><h1>🔍 Audit & Controls</h1><p>Audit bot · Activity log · Month-end checklist · AR aging</p></div>
+<div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap">
+  <button class="btn btn-gold" id="atab-bot" onclick="switchAuditTab('bot')">🔍 Audit Bot</button>
+  <button class="btn btn-outline" id="atab-log" onclick="switchAuditTab('log')">📋 Activity Log</button>
+  <button class="btn btn-outline" id="atab-month" onclick="switchAuditTab('month')">📅 Month-End</button>
+  <button class="btn btn-outline" id="atab-ar" onclick="switchAuditTab('ar')">💰 AR Aging</button>
+</div>
+<div id="audit-tab-bot">
+  <div id="auditFindings"></div>
+  <div class="btn-row no-print"><button class="btn btn-gold" onclick="runAudit()">🔍 Run Audit</button></div>
+</div>
+<div id="audit-tab-log" style="display:none">
+  <div class="card"><div class="card-hdr"><span>📋</span><span>Activity Log</span><span style="font-size:10px;color:var(--text3);margin-left:8px">All sensitive actions by all users</span></div><div id="activityLogList"><div style="text-align:center;padding:16px;color:var(--text3);font-size:12px">Loading...</div></div></div>
+  <div class="card"><div class="card-hdr"><span>↩️</span><span>Reverse a Journal Entry</span><span style="font-size:10px;color:var(--text3);margin-left:8px">Creates a correcting entry — never deletes</span></div>
+  <p style="font-size:11px;color:var(--text3);margin-bottom:12px">Select any posted entry to create an equal and opposite reversing entry. The original stays in the ledger for a complete audit trail.</p>
+  <div class="fg"><label>Entry to Reverse</label><select id="reverseEntrySelect" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:9px 12px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none"></select></div>
+  <div class="fg"><label>Reason for Reversal</label><input id="reverseReason" type="text" placeholder="e.g. Wrong amount entered, duplicate posting..."/></div>
+  <div class="btn-row"><button class="btn btn-gold" onclick="reverseEntry()">↩️ Post Reversal Entry</button></div>
+  <div id="reverseSt" style="font-size:11px;margin-top:8px"></div></div>
+</div>
+<div id="audit-tab-month" style="display:none">
+  <div class="card"><div class="card-hdr"><span>📅</span><span>Month-End Close Checklist</span></div>
+  <p style="font-size:11px;color:var(--text3);margin-bottom:16px">Complete these steps at the end of every month before closing the books.</p>
+  <div id="monthEndChecklist"></div>
+  <div class="btn-row"><button class="btn btn-gold" onclick="runMonthEnd()">▶️ Run All Checks</button></div></div>
+  <div class="card"><div class="card-hdr"><span>📊</span><span>Variance Alerts</span><span style="font-size:10px;color:var(--text3);margin-left:8px">Unusual movements vs prior month</span></div>
+  <div id="varianceAlerts"></div></div>
+</div>
+<div id="audit-tab-ar" style="display:none">
+  <div class="kgrid" id="arKpis"></div>
+  <div class="card"><div class="card-hdr"><span>💰</span><span>AR Aging Report</span><span style="font-size:10px;color:var(--text3);margin-left:8px">By project / invoice date</span></div>
+  <div id="arAgingTable"></div></div>
+</div>
+</div>
 <div class="page" id="pg-depreciation"><div class="ph"><h1>📉 Depreciation</h1><p>Auto-posts on login each month</p></div><div class="card"><div class="card-hdr"><span>➕</span><span>Add Asset</span></div><div class="fgrid"><div class="fg"><label>Name</label><input id="aName" type="text" placeholder="Excavator"/></div><div class="fg"><label>Type</label><select id="aType"><option>Equipment</option><option>Vehicles</option><option>Heavy Machinery</option><option>Building</option></select></div><div class="fg"><label>Cost</label><input id="aCost" type="number" placeholder="50000"/></div><div class="fg"><label>Life (years)</label><input id="aLife" type="number" placeholder="10"/></div><div class="fg"><label>Purchase Date</label><input id="aDate" type="date"/></div></div><div class="btn-row"><button class="btn btn-gold" onclick="addAsset()">➕ Add</button></div><div id="assetAddSt" style="font-size:11px;margin-top:8px"></div></div><div class="card"><div class="card-hdr"><span>📋</span><span>Assets</span></div><div id="assetList"></div></div><div class="card"><div class="card-hdr"><span>📅</span><span>Due This Month</span></div><div id="depDueList"></div></div></div>
 <div class="page" id="pg-settings"><div class="ph"><h1>⚙️ Settings</h1></div><div class="card"><div class="fg"><label>Company Name</label><input id="bizName" type="text"/></div><div class="fg"><label>SSP/USD Rate</label><input id="sspRate" type="number" placeholder="1300" value="1300"/></div><div class="btn-row"><button class="btn btn-gold" onclick="saveSettings()">💾 Save</button></div><div id="settingsSt" style="font-size:11px;margin-top:8px"></div></div><div class="card"><div class="card-hdr"><span>🧮</span><span>Inventory Costing Method</span></div><p style="font-size:11px;color:var(--text3);margin-bottom:12px">Controls how material cost is calculated when consumed on a project. Applies to new consumption going forward.</p><div class="btn-row" style="margin-top:0"><button class="btn" id="costing-wac" onclick="setCostingMethod('WAC')">Weighted Average Cost</button><button class="btn" id="costing-fifo" onclick="setCostingMethod('FIFO')">FIFO</button></div></div><div class="card"><div class="card-hdr"><span>👥</span><span>Staff Management</span><span style="font-size:10px;color:var(--text3);margin-left:8px">(Owner only)</span></div><div id="staffList" style="margin-bottom:14px"></div><div class="fgrid"><div class="fg"><label>Username</label><input id="staffUsername" type="text" placeholder="john_mason"/></div><div class="fg"><label>Password</label><input id="staffPassword" type="password" placeholder="temporary password"/></div><div class="fg"><label>Role</label><select id="staffRole"><option value="staff">Staff (limited)</option><option value="owner">Owner (full access)</option></select></div></div><div class="btn-row"><button class="btn btn-gold" onclick="addStaff()">➕ Add Staff Member</button></div><div id="staffSt" style="font-size:11px;margin-top:8px"></div><div class="alert al-info" style="margin-top:12px"><span class="alert-ico">ℹ️</span><div class="alert-body"><div class="alert-title">Staff permissions</div>Staff can record transactions, view all reports, and use AI features. They CANNOT delete entries, release retention, run payroll disbursements, or delete projects/workers.</div></div></div><div class="card"><div class="fg"><label>Email</label><input id="emailAddr" type="email" placeholder="you@email.com"/></div><div class="btn-row"><button class="btn btn-gold" onclick="emailReport()">📧 Email Report</button></div><div id="emailSt" style="font-size:11px;margin-top:8px"></div></div><div class="card"><div class="fgrid"><div class="fg"><label>Current Password</label><input id="op" type="password"/></div><div class="fg"><label>New Password</label><input id="np" type="password"/></div></div><div class="btn-row"><button class="btn btn-gold" onclick="changePw()">Change</button></div><div id="pwSt" style="font-size:11px;margin-top:8px"></div></div></div>
 </div></div></div>
@@ -339,6 +373,7 @@ function nav(page,el){
   if(page==='jobcost')renderJobCost();
   if(page==='retention')renderRetention();
   if(page==='journal')renderJournal();
+  if(page==='audit'){runAudit();switchAuditTab('bot');}
   if(page==='settings'){document.getElementById('bizName').value=BIZ_NAME;document.getElementById('sspRate').value=SSP_RATE;renderCostingButtons();}
 }
 function setCur(c){
@@ -1396,7 +1431,213 @@ function runAudit(){
   const tbAlert=document.getElementById('tbAlert');if(tbAlert){tbAlert.style.display=high>0?'block':'none';const txt=document.getElementById('tbAlertTxt');if(txt)txt.textContent=high;}
 }
 
-// AI ADVISOR CHAT
+// ─── AUDIT TAB SWITCHING ─────────────────────────────────────────────────────
+function switchAuditTab(tab){
+  ['bot','log','month','ar'].forEach(t=>{
+    const el=document.getElementById('audit-tab-'+t);if(el)el.style.display=t===tab?'block':'none';
+    const btn=document.getElementById('atab-'+t);if(btn)btn.className='btn '+(t===tab?'btn-gold':'btn-outline');
+  });
+  if(tab==='log'){loadActivityLog();renderReverseSelect();}
+  if(tab==='month'){runMonthEnd();renderVarianceAlerts();}
+  if(tab==='ar'){renderARaging();}
+}
+
+// ─── ACTIVITY LOG (reads from server audit log + local entry history) ─────────
+async function loadActivityLog(){
+  const el=document.getElementById('activityLogList');if(!el)return;
+  el.innerHTML='<div style="text-align:center;padding:12px;color:var(--text3);font-size:12px">Loading...</div>';
+  try{
+    const r=await dbApi({action:'auditLog',companyId:SESSION.companyId});
+    const logs=r.log||[];
+    if(!logs.length){el.innerHTML='<div style="text-align:center;padding:16px;color:var(--text3)">No activity logged yet</div>';return;}
+    el.innerHTML=logs.map(l=>`<div style="display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--border);font-size:12px">
+      <span class="tag t-blue" style="flex-shrink:0;margin-top:2px">${l.username||'—'}</span>
+      <div style="flex:1"><div style="color:var(--text)">${l.action}</div><div style="font-size:10px;color:var(--text3)">${l.detail||''}</div></div>
+      <div style="font-size:10px;color:var(--text3);white-space:nowrap">${new Date(l.created_at).toLocaleString()}</div>
+    </div>`).join('');
+  }catch(e){el.innerHTML=`<div style="color:var(--red3);font-size:12px;padding:8px">Could not load activity log: ${e.message}</div>`;}
+}
+
+// ─── ENTRY REVERSAL (accounting-correct alternative to silent delete) ─────────
+function renderReverseSelect(){
+  const el=document.getElementById('reverseEntrySelect');if(!el)return;
+  const entries=[...DB.entries].filter(e=>!e.isReversal).reverse().slice(0,100);
+  el.innerHTML=entries.map(e=>`<option value="${e.id}">#${e.id} · ${e.date} · ${e.desc.slice(0,40)} · ${fc(e.amount)}</option>`).join('');
+}
+function reverseEntry(){
+  const sel=document.getElementById('reverseEntrySelect');
+  const reason=document.getElementById('reverseReason').value.trim();
+  const st=document.getElementById('reverseSt');
+  if(!sel.value){st.innerHTML='<span style="color:var(--red3)">Select an entry to reverse</span>';return;}
+  if(!reason){st.innerHTML='<span style="color:var(--red3)">Enter a reason for the reversal</span>';return;}
+  const orig=DB.entries.find(e=>e.id===parseInt(sel.value));
+  if(!orig){st.innerHTML='<span style="color:var(--red3)">Entry not found</span>';return;}
+  // Create the exact mirror image — every debit becomes a credit and vice versa
+  const reversalEntry={
+    id:DB.nextId++,
+    date:today(),
+    desc:`REVERSAL of #${orig.id}: ${orig.desc} — Reason: ${reason}`,
+    type:'Reversal',
+    amount:orig.amount,
+    project:orig.project||'',
+    isReversal:true,
+    reversesId:orig.id,
+    debits:(orig.credits||[]).map(c=>({acct:c.acct,amt:c.amt,atype:c.atype})),
+    credits:(orig.debits||[]).map(d=>({acct:d.acct,amt:d.amt,atype:d.atype}))
+  };
+  DB.entries.push(reversalEntry);
+  logAudit('reverseEntry',`Reversed #${orig.id}: ${orig.desc} — ${reason}`);
+  saveData();renderAll();runAudit();
+  st.innerHTML=`<span style="color:var(--green3)">✅ Reversal entry #${reversalEntry.id} posted — original #${orig.id} preserved in ledger</span>`;
+  document.getElementById('reverseReason').value='';
+  renderReverseSelect();
+  setTimeout(()=>st.innerHTML='',5000);
+}
+
+// ─── MONTH-END CLOSE CHECKLIST ────────────────────────────────────────────────
+function runMonthEnd(){
+  const el=document.getElementById('monthEndChecklist');if(!el)return;
+  const b=getBal();
+  const now=new Date(),thisM=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  const checks=[
+    {
+      label:'Bank/Cash reconciliation',
+      desc:'Verify Cash account balance matches actual bank statement',
+      status:()=>{const cash=b['Cash']?b['Cash'].net:0;return cash>=0?'warn':'fail';},
+      detail:()=>{const cash=b['Cash']?b['Cash'].net:0;return `Current Cash balance: ${fc(cash)}${cash<0?' ⚠️ Negative — investigate immediately':' — verify against bank statement'}`;}
+    },
+    {
+      label:'Depreciation posted',
+      desc:'Monthly depreciation entries for all assets',
+      status:()=>{const due=DB.assets.filter(a=>a.lastPostedMonth!==thisM);return due.length===0?'pass':'fail';},
+      detail:()=>{const due=DB.assets.filter(a=>a.lastPostedMonth!==thisM);return due.length===0?'All assets depreciated for '+thisM:`${due.length} asset(s) not yet depreciated: ${due.map(a=>a.name).join(', ')}`;}
+    },
+    {
+      label:'No unbalanced entries',
+      desc:'All journal entries must have equal debits and credits',
+      status:()=>{const bad=DB.entries.filter(e=>{const dr=(e.debits||[]).reduce((s,d)=>s+d.amt,0),cr=(e.credits||[]).reduce((s,c)=>s+c.amt,0);return Math.abs(dr-cr)>0.05;});return bad.length===0?'pass':'fail';},
+      detail:()=>{const bad=DB.entries.filter(e=>{const dr=(e.debits||[]).reduce((s,d)=>s+d.amt,0),cr=(e.credits||[]).reduce((s,c)=>s+c.amt,0);return Math.abs(dr-cr)>0.05;});return bad.length===0?'All entries balanced':`${bad.length} unbalanced entry/entries — go to Audit Bot`;}
+    },
+    {
+      label:'Prepaid amortization current',
+      desc:'Prepaid expenses amortized through this month',
+      status:()=>{const prepaid=DB.entries.filter(e=>e.type==='Prepaid Amortization'&&e.date.slice(0,7)===thisM);return prepaid.length>0?'pass':'warn';},
+      detail:()=>{const prepaid=DB.entries.filter(e=>e.type==='Prepaid Amortization'&&e.date.slice(0,7)===thisM);return prepaid.length>0?`${prepaid.length} amortization entries posted this month`:'No amortization entries this month — check if any prepaid expenses exist';}
+    },
+    {
+      label:'AR reviewed',
+      desc:'Accounts receivable balances checked and aged',
+      status:()=>{const ar=b['Accounts Receivable']?b['Accounts Receivable'].net:0;return ar>0?'warn':'pass';},
+      detail:()=>{const ar=b['Accounts Receivable']?b['Accounts Receivable'].net:0;return ar>0?`${fc(ar)} outstanding AR — review aging tab and follow up with clients`:'No outstanding AR';}
+    },
+    {
+      label:'Payroll processed',
+      desc:'All workers paid or accrued for the month',
+      status:()=>{const paid=DB.entries.filter(e=>e.type==='Payroll'&&e.date.slice(0,7)===thisM);return paid.length>=DB.workers.length&&DB.workers.length>0?'pass':DB.workers.length===0?'pass':'warn';},
+      detail:()=>{const paid=DB.entries.filter(e=>e.type==='Payroll'&&e.date.slice(0,7)===thisM);return `${paid.length} payroll entries this month, ${DB.workers.length} workers registered`;}
+    },
+    {
+      label:'Low stock reviewed',
+      desc:'Materials below minimum stock level addressed',
+      status:()=>{const low=DB.materials.filter(m=>m.min>0&&m.qty<=m.min);return low.length===0?'pass':'warn';},
+      detail:()=>{const low=DB.materials.filter(m=>m.min>0&&m.qty<=m.min);return low.length===0?'All materials above minimum stock':low.map(m=>`${m.name}: ${m.qty} ${m.unit} (min ${m.min})`).join(', ');}
+    },
+    {
+      label:'Retention balances correct',
+      desc:'Retention held matches invoiced retention amounts by project',
+      status:()=>{const b2=getBal();const ret=b2['Retention Receivable']?b2['Retention Receivable'].net:0;return ret>=0?'pass':'fail';},
+      detail:()=>{const b2=getBal();const ret=b2['Retention Receivable']?b2['Retention Receivable'].net:0;return ret>=0?`Retention Receivable: ${fc(ret)}`:`⚠️ Retention Receivable is negative (${fc(ret)}) — releases exceeded amounts held`;}
+    }
+  ];
+  const statusIcon={pass:'✅',warn:'⚠️',fail:'❌'};
+  const statusCls={pass:'al-ok',warn:'al-warn',fail:'al-danger'};
+  const passCount=checks.filter(c=>c.status()==='pass').length;
+  el.innerHTML=`<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding:12px;background:var(--bg3);border-radius:6px;border:1px solid var(--border)">
+    <div style="font-size:28px;font-weight:700;font-family:'JetBrains Mono',monospace;color:${passCount===checks.length?'var(--green3)':passCount>=checks.length*0.7?'var(--orange3)':'var(--red3)'}">${passCount}/${checks.length}</div>
+    <div><div style="font-size:13px;font-weight:600;color:var(--text)">Month-End Checks Passed</div><div style="font-size:11px;color:var(--text3)">${thisM} · ${passCount===checks.length?'✅ Ready to close':'⚠️ Resolve issues before closing'}</div></div>
+  </div>`+
+  checks.map(c=>{const s=c.status();return`<div class="alert ${statusCls[s]}" style="margin-bottom:8px"><span class="alert-ico">${statusIcon[s]}</span><div class="alert-body"><div class="alert-title">${c.label}</div><div>${c.detail()}</div><div style="font-size:10px;opacity:.7;margin-top:2px">${c.desc}</div></div></div>`;}).join('');
+}
+
+// ─── VARIANCE ALERTS ──────────────────────────────────────────────────────────
+function renderVarianceAlerts(){
+  const el=document.getElementById('varianceAlerts');if(!el)return;
+  const now=new Date();
+  const thisM=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  const lastM=new Date(now.getFullYear(),now.getMonth()-1,1);
+  const prevM=lastM.getFullYear()+'-'+String(lastM.getMonth()+1).padStart(2,'0');
+  // Group entries by month and account type
+  function monthSum(ym,atype){
+    return DB.entries.filter(e=>e.date.slice(0,7)===ym).reduce((s,e)=>{
+      const d=(e.debits||[]).filter(d=>d.atype===atype).reduce((ss,d)=>ss+d.amt,0);
+      return s+d;
+    },0);
+  }
+  function monthAcct(ym,acct){
+    return DB.entries.filter(e=>e.date.slice(0,7)===ym).reduce((s,e)=>{
+      return s+(e.debits||[]).filter(d=>d.acct===acct).reduce((ss,d)=>ss+d.amt,0);
+    },0);
+  }
+  const checks=[
+    {label:'Total Expenses',cur:monthSum(thisM,'expense'),prev:monthSum(prevM,'expense'),threshold:0.5},
+    {label:'Fuel Expense',cur:monthAcct(thisM,'Fuel Expense'),prev:monthAcct(prevM,'Fuel Expense'),threshold:0.5},
+    {label:'Salary Expense',cur:monthAcct(thisM,'Salary Expense'),prev:monthAcct(prevM,'Salary Expense'),threshold:0.2},
+    {label:'Miscellaneous Expense',cur:monthAcct(thisM,'Miscellaneous Expense'),prev:monthAcct(prevM,'Miscellaneous Expense'),threshold:0.3},
+    {label:'Construction Materials',cur:monthAcct(thisM,'Construction Materials'),prev:monthAcct(prevM,'Construction Materials'),threshold:0.6},
+  ];
+  const alerts=checks.filter(c=>c.prev>0&&Math.abs(c.cur-c.prev)/c.prev>c.threshold);
+  if(!alerts.length&&monthSum(thisM,'expense')===0){el.innerHTML='<div style="text-align:center;padding:16px;color:var(--text3);font-size:12px">No data yet for variance comparison</div>';return;}
+  if(!alerts.length){el.innerHTML='<div class="alert al-ok"><span class="alert-ico">✅</span><div class="alert-body">No unusual variances detected vs prior month</div></div>';return;}
+  el.innerHTML=alerts.map(a=>{
+    const pct=Math.round((a.cur-a.prev)/a.prev*100);
+    const up=pct>0;
+    return`<div class="alert ${up?'al-danger':'al-warn'}"><span class="alert-ico">${up?'📈':'📉'}</span><div class="alert-body"><div class="alert-title">${a.label} ${up?'spike':'drop'}: ${up?'+':''}${pct}% vs last month</div><div>This month: ${fc(a.cur)} · Last month: ${fc(a.prev)} · Difference: ${fc(Math.abs(a.cur-a.prev))}</div></div></div>`;
+  }).join('');
+}
+
+// ─── AR AGING REPORT ──────────────────────────────────────────────────────────
+function renderARaging(){
+  const arKpis=document.getElementById('arKpis'),arTable=document.getElementById('arAgingTable');
+  if(!arKpis||!arTable)return;
+  const nowMs=new Date().getTime();
+  // Find all invoice entries (AR debits = money owed to us by clients)
+  const invoices=[];
+  DB.entries.filter(e=>e.type==='Invoice'||e.type==='Payroll Accrual').forEach(e=>{
+    const arDebit=(e.debits||[]).find(d=>d.acct==='Accounts Receivable');
+    if(!arDebit)return;
+    // Check if this invoice has been fully or partially collected (Cash Dr from client payment)
+    const collected=DB.entries.filter(x=>x.project===e.project&&(x.type==='Mobile Money'||x.desc.toLowerCase().includes('payment')||(x.debits||[]).some(d=>d.acct==='Cash'&&(x.credits||[]).some(c=>c.acct==='Accounts Receivable')))).reduce((s,x)=>{
+      return s+(x.credits||[]).filter(c=>c.acct==='Accounts Receivable').reduce((ss,c)=>ss+c.amt,0);
+    },0);
+    const outstanding=Math.max(0,arDebit.amt-collected);
+    if(outstanding<0.01)return;// fully collected
+    const ageDays=Math.floor((nowMs-new Date(e.date).getTime())/(864e5));
+    invoices.push({id:e.id,date:e.date,desc:e.desc,project:e.project||'—',amount:arDebit.amt,outstanding,ageDays});
+  });
+  // Bucket into aging bands
+  const current=invoices.filter(i=>i.ageDays<=30);
+  const d31_60=invoices.filter(i=>i.ageDays>30&&i.ageDays<=60);
+  const d61_90=invoices.filter(i=>i.ageDays>60&&i.ageDays<=90);
+  const over90=invoices.filter(i=>i.ageDays>90);
+  const totalAR=invoices.reduce((s,i)=>s+i.outstanding,0);
+  const overdue=d31_60.concat(d61_90,over90).reduce((s,i)=>s+i.outstanding,0);
+  arKpis.innerHTML=`
+    <div class="kpi"><div class="kpi-lbl">Total AR</div><div class="kpi-val warn">${fc(totalAR)}</div></div>
+    <div class="kpi"><div class="kpi-lbl">Current (0-30d)</div><div class="kpi-val pos">${fc(current.reduce((s,i)=>s+i.outstanding,0))}</div></div>
+    <div class="kpi"><div class="kpi-lbl">31-60 Days</div><div class="kpi-val warn">${fc(d31_60.reduce((s,i)=>s+i.outstanding,0))}</div></div>
+    <div class="kpi"><div class="kpi-lbl">61-90 Days</div><div class="kpi-val neg">${fc(d61_90.reduce((s,i)=>s+i.outstanding,0))}</div></div>
+    <div class="kpi"><div class="kpi-lbl">Over 90 Days</div><div class="kpi-val neg" style="color:var(--red3)">${fc(over90.reduce((s,i)=>s+i.outstanding,0))}</div></div>`;
+  if(!invoices.length){arTable.innerHTML='<div style="text-align:center;padding:24px;color:var(--text3)">No outstanding AR — all invoices collected or no invoices posted yet</div>';return;}
+  const bandRow=(label,items,cls)=>items.length?`<tr style="background:var(--bg3)"><td colspan="5" style="font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);padding:8px 12px">${label}</td></tr>`+items.map(i=>`<tr><td>${i.date}</td><td>${i.project}</td><td style="font-size:11px;color:var(--text2)">${i.desc.slice(0,45)}</td><td style="font-family:'JetBrains Mono',monospace">${fc(i.outstanding)}</td><td><span class="tag ${cls}">${i.ageDays}d</span></td></tr>`).join(''):'';
+  arTable.innerHTML=`<table><thead><tr><th>Invoice Date</th><th>Project</th><th>Description</th><th>Outstanding</th><th>Age</th></tr></thead><tbody>
+    ${bandRow('Current — 0 to 30 days',current,'t-green')}
+    ${bandRow('Overdue — 31 to 60 days',d31_60,'t-gold')}
+    ${bandRow('Overdue — 61 to 90 days',d61_90,'t-orange')}
+    ${bandRow('Critical — Over 90 days',over90,'t-red')}
+  </tbody></table>`;
+}
+
+
 async function sendChat(){
   const inp=document.getElementById('chatInp'),q=inp.value.trim();if(!q)return;inp.value='';
   const msgs=document.getElementById('chatMsgs');
