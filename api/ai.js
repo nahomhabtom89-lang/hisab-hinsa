@@ -60,6 +60,14 @@ NOTE ON INPUT SOURCE: the prompt may be a clean typed sentence OR raw OCR/scanne
 - If multiple plausible totals exist and it's ambiguous, prefer the largest clearly-labeled total over a subtotal
 ${matContext}
 
+CRITICAL JSON RULES — your response will be parsed by JSON.parse() directly:
+- Return ONLY the JSON object, nothing else before or after it
+- All string values must use straight double quotes " not smart/curly quotes
+- Escape any apostrophes or quotes inside string values with a backslash: \"
+- Never use newlines inside string values — use a space instead
+- No trailing commas after the last item in arrays or objects
+- The "description" field must be a single clean string with no special characters
+
 Return ONLY valid JSON — no markdown, no text outside JSON:
 {"type":"string","date":"YYYY-MM-DD","amount":number_USD,"currency":"USD","description":"description","prepaidMonths":null,"materialUsage":null,"entries":[{"account":"name","type":"asset|liability|equity|revenue|expense|contra-asset","debit":0,"credit":0}]}
 
