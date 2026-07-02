@@ -9,7 +9,7 @@ module.exports = async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   try {
-    const { prompt, mode, context, systemPrompt, materials, projects } = req.body;
+    const { prompt, mode, context, systemPrompt, materials, projects, products, appMode } = req.body;
     if (!prompt) return res.status(400).json({ error: "prompt is required" });
     const GROQ_KEY = process.env.GROQ_KEY;
     if (!GROQ_KEY) return res.status(500).json({ error: "GROQ_KEY not set" });
@@ -33,6 +33,38 @@ module.exports = async function handler(req, res) {
             "- " + m.name + ": " + m.qty + " " + m.unit + " @ $" + m.cost + "/unit"
           ).join("\n")
         : "";
+
+      const productContext = (products && products.length > 0)
+        ? "\nCURRENT STOCK:\n" + products.map(p =>
+            "- " + p.name + " (SKU:" + (p.sku||"—") + "): " + p.qty + " " + p.unit + " · cost $" + p.cost_price + " · sale $" + p.sale_price
+          ).join("\n")
+        : "";
+
+      // RETAIL MODE — short-circuit with retail-specific prompt
+      if (appMode === "retail") {
+        systemText =
+          "You are a retail shop accounting AI for a business in East Africa. You understand Tigrinya and English.\n" +
+          productContext + "\n\n" +
+          "CRITICAL NUMBER RULE: Use the EXACT number the user typed.\n" +
+          "CRITICAL BALANCE RULE: All debits must equal all credits must equal the amount.\n" +
+          "CRITICAL JSON RULE: Return ONLY valid JSON. No markdown. No text outside JSON.\n\n" +
+          'Return this exact structure:\n{"type":"Stock Purchase","date":"YYYY-MM-DD","amount":500,"currency":"USD","description":"Received 100 bags sugar","project":null,"prepaidMonths":null,"materialUsage":null,"entries":[{"account":"Inventory (Stock)","type":"asset","debit":500,"credit":0},{"account":"Accounts Payable","type":"liability","debit":0,"credit":500}]}\n\n' +
+          "RETAIL ACCOUNTING RULES:\n" +
+          "1. Debits = Credits ALWAYS.\n" +
+          "2. Buy stock on CREDIT: Dr Inventory (Stock), Cr Accounts Payable. type=Stock Purchase\n" +
+          "3. Buy stock CASH: Dr Inventory (Stock), Cr Cash. type=Stock Purchase\n" +
+          "4. Pay supplier (settle AP): Dr Accounts Payable, Cr Cash. type=Supplier Payment\n" +
+          "5. Cash sale: Dr Cash, Cr Retail Sales Revenue AND Dr Cost of Goods Sold, Cr Inventory (Stock). type=POS Sale\n" +
+          "6. Pay staff wages: Dr Wages & Salaries Expense, Cr Cash. type=Payroll\n" +
+          "7. Pay rent: Dr Rent Expense, Cr Cash. type=Rent\n" +
+          "8. Pay utilities: Dr Utilities Expense, Cr Cash. type=Utilities\n" +
+          "9. Owner deposits capital: Dr Cash, Cr Owner Capital. type=Capital\n" +
+          "10. Loan received: Dr Cash, Cr Loan Payable. type=Loan\n" +
+          "11. Stock write-off (damaged/expired): Dr Stock Write-off, Cr Inventory (Stock). type=Stock Adjustment\n" +
+          "12. Depreciation: Dr Depreciation Expense, Cr Accumulated Depreciation - Equipment. type=Depreciation\n" +
+          "13. SSP currency: divide by 1300 to get USD.\n\n" +
+          "Today: " + new Date().toISOString().split("T")[0];
+      }
 
       // Build project context string so AI can tag entries to the right project
       const projectContext = (projects && projects.length > 0)
