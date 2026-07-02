@@ -386,3 +386,263 @@ module.exports = async function handler(req, res) {
     return res.status(500).json({ error: 'Database error', detail: err.message });
   }
 };
+
+// ── RETAIL MODE ADDITIONS ────────────────────────────────────────────────────
+
+const RETAIL_ACCOUNTS = [
+  // Current Assets
+  { code:'1000', name:'Cash',                     parent_group:'Current Assets',    account_type:'asset',    is_system:true },
+  { code:'1010', name:'Bank Account',             parent_group:'Current Assets',    account_type:'asset',    is_system:true },
+  { code:'1020', name:'Mobile Money',             parent_group:'Current Assets',    account_type:'asset',    is_system:true },
+  { code:'1030', name:'Accounts Receivable',      parent_group:'Current Assets',    account_type:'asset',    is_system:true },
+  { code:'1050', name:'Inventory (Stock)',         parent_group:'Current Assets',    account_type:'asset',    is_system:true },
+  { code:'1060', name:'Prepaid Expenses',         parent_group:'Current Assets',    account_type:'asset',    is_system:true },
+  // Non-current Assets
+  { code:'1500', name:'Shop Equipment',           parent_group:'Non-current Assets',account_type:'asset',    is_system:true },
+  { code:'1510', name:'Furniture & Fixtures',     parent_group:'Non-current Assets',account_type:'asset',    is_system:true },
+  { code:'1530', name:'Accumulated Depreciation - Equipment', parent_group:'Non-current Assets',account_type:'contra-asset',is_system:true },
+  // Liabilities
+  { code:'2000', name:'Accounts Payable',         parent_group:'Liabilities',       account_type:'liability',is_system:true },
+  { code:'2010', name:'Salaries Payable',         parent_group:'Liabilities',       account_type:'liability',is_system:true },
+  { code:'2020', name:'PAYE Payable',             parent_group:'Liabilities',       account_type:'liability',is_system:true },
+  { code:'2030', name:'NSSF Payable',             parent_group:'Liabilities',       account_type:'liability',is_system:true },
+  { code:'2040', name:'VAT Payable',              parent_group:'Liabilities',       account_type:'liability',is_system:true },
+  // Equity
+  { code:'3000', name:'Owner Capital',            parent_group:'Equity',            account_type:'equity',   is_system:true },
+  { code:'3010', name:'Retained Earnings',        parent_group:'Equity',            account_type:'equity',   is_system:true },
+  // Revenue
+  { code:'4000', name:'Retail Sales Revenue',     parent_group:'Revenue',           account_type:'revenue',  is_system:true },
+  { code:'4010', name:'Other Income',             parent_group:'Revenue',           account_type:'revenue',  is_system:true },
+  // Direct Expenses
+  { code:'5000', name:'Cost of Goods Sold',       parent_group:'Expense (Direct)',  account_type:'expense',  is_system:true },
+  { code:'5010', name:'Stock Write-off',          parent_group:'Expense (Direct)',  account_type:'expense',  is_system:true },
+  { code:'5020', name:'Freight & Delivery In',    parent_group:'Expense (Direct)',  account_type:'expense',  is_system:true },
+  // Indirect Expenses
+  { code:'6000', name:'Wages & Salaries Expense', parent_group:'Expense (Indirect)',account_type:'expense',  is_system:true },
+  { code:'6010', name:'Rent Expense',             parent_group:'Expense (Indirect)',account_type:'expense',  is_system:true },
+  { code:'6020', name:'Utilities Expense',        parent_group:'Expense (Indirect)',account_type:'expense',  is_system:true },
+  { code:'6030', name:'Repairs & Maintenance',    parent_group:'Expense (Indirect)',account_type:'expense',  is_system:true },
+  { code:'6040', name:'Advertising Expense',      parent_group:'Expense (Indirect)',account_type:'expense',  is_system:true },
+  { code:'6050', name:'Depreciation Expense',     parent_group:'Expense (Indirect)',account_type:'expense',  is_system:true },
+  { code:'6060', name:'Miscellaneous Expense',    parent_group:'Expense (Indirect)',account_type:'expense',  is_system:true },
+  { code:'6070', name:'NSSF Employer Contribution',parent_group:'Expense (Indirect)',account_type:'expense', is_system:true },
+];
+
+async function seedRetailAccounts(companyId) {
+  for (const a of RETAIL_ACCOUNTS) {
+    await query(`
+      INSERT INTO hh_chart_of_accounts(company_id,code,name,parent_group,account_type,is_system)
+      VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(company_id,name) DO NOTHING
+    `, [companyId, a.code, a.name, a.parent_group, a.account_type, a.is_system]);
+  }
+}
+
+async function ensureRetailTables() {
+  await query(`
+    CREATE TABLE IF NOT EXISTS hh_products (
+      id SERIAL PRIMARY KEY,
+      company_id INTEGER NOT NULL REFERENCES hh_companies(id),
+      sku TEXT,
+      barcode TEXT,
+      name TEXT NOT NULL,
+      category TEXT DEFAULT 'General',
+      sale_price NUMERIC DEFAULT 0,
+      cost_price NUMERIC DEFAULT 0,
+      qty NUMERIC DEFAULT 0,
+      min_qty NUMERIC DEFAULT 0,
+      unit TEXT DEFAULT 'unit',
+      costing_method TEXT DEFAULT 'WAC',
+      layers JSONB DEFAULT '[]',
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(company_id, name)
+    );
+    CREATE TABLE IF NOT EXISTS hh_pos_sales (
+      id SERIAL PRIMARY KEY,
+      company_id INTEGER NOT NULL REFERENCES hh_companies(id),
+      sale_date DATE DEFAULT CURRENT_DATE,
+      items JSONB NOT NULL DEFAULT '[]',
+      subtotal NUMERIC DEFAULT 0,
+      discount NUMERIC DEFAULT 0,
+      total NUMERIC DEFAULT 0,
+      payment_method TEXT DEFAULT 'cash',
+      cashier TEXT,
+      journal_entry_id INTEGER,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS hh_purchase_orders (
+      id SERIAL PRIMARY KEY,
+      company_id INTEGER NOT NULL REFERENCES hh_companies(id),
+      supplier TEXT NOT NULL,
+      po_date DATE DEFAULT CURRENT_DATE,
+      items JSONB NOT NULL DEFAULT '[]',
+      total NUMERIC DEFAULT 0,
+      status TEXT DEFAULT 'pending',
+      payment_method TEXT DEFAULT 'credit',
+      notes TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  `);
+}
+
+// Patch the main handler to handle retail actions and mode-aware registration
+const _originalHandler = module.exports;
+module.exports = async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  try {
+    await ensureTables();
+    await ensureRetailTables();
+    const body = req.body || {};
+    const { action } = body;
+
+    // ── REGISTER WITH MODE ────────────────────────────────────────────────────
+    if (action === 'register') {
+      const { username, password, bizName, appMode } = body;
+      if (!username || !password || !bizName) return res.status(400).json({ error: 'Missing fields' });
+      const ex = await query('SELECT id FROM hh_users WHERE username=$1', [username]);
+      if (ex.rows.length) return res.status(409).json({ error: 'Username taken' });
+      const ur = await query('INSERT INTO hh_users(username,password_b64) VALUES($1,$2) RETURNING id', [username, btoa(password)]);
+      const uid = ur.rows[0].id;
+      const mode = appMode === 'retail' ? 'retail' : 'construction';
+      const cr = await query('INSERT INTO hh_companies(name,costing_method) VALUES($1,$2) RETURNING id', [bizName, 'WAC']);
+      const cid = cr.rows[0].id;
+      // Store mode in company
+      await query('ALTER TABLE hh_companies ADD COLUMN IF NOT EXISTS app_mode TEXT DEFAULT \'construction\'');
+      await query('UPDATE hh_companies SET app_mode=$1 WHERE id=$2', [mode, cid]);
+      await query('INSERT INTO hh_user_companies(user_id,company_id,role) VALUES($1,$2,$3)', [uid, cid, 'owner']);
+      if (mode === 'retail') {
+        await seedRetailAccounts(cid);
+      } else {
+        await seedChartOfAccounts(cid);
+      }
+      return res.status(200).json({ ok: true, userId: uid, companyId: cid, role: 'owner', bizName, appMode: mode });
+    }
+
+    // ── LOGIN WITH MODE ───────────────────────────────────────────────────────
+    if (action === 'login') {
+      const { username, password } = body;
+      if (!username || !password) return res.status(400).json({ error: 'Missing fields' });
+      const ur = await query('SELECT * FROM hh_users WHERE username=$1', [username]);
+      if (!ur.rows.length || ur.rows[0].password_b64 !== btoa(password))
+        return res.status(401).json({ error: 'Wrong username or password' });
+      const uid = ur.rows[0].id;
+      await query('ALTER TABLE hh_companies ADD COLUMN IF NOT EXISTS app_mode TEXT DEFAULT \'construction\'').catch(()=>{});
+      const cr = await query(`
+        SELECT uc.company_id, uc.role, uc.project_scope, c.name as biz_name, c.ssp_rate, c.costing_method,
+               COALESCE(c.app_mode,'construction') as app_mode
+        FROM hh_user_companies uc JOIN hh_companies c ON c.id=uc.company_id
+        WHERE uc.user_id=$1 ORDER BY c.created_at
+      `, [uid]);
+      return res.status(200).json({ ok: true, userId: uid, companies: cr.rows });
+    }
+
+    // ── SWITCH MODE ───────────────────────────────────────────────────────────
+    if (action === 'switchMode') {
+      const { companyId, appMode } = body;
+      if (!companyId || !appMode) return res.status(400).json({ error: 'Missing fields' });
+      const mode = appMode === 'retail' ? 'retail' : 'construction';
+      await query('ALTER TABLE hh_companies ADD COLUMN IF NOT EXISTS app_mode TEXT DEFAULT \'construction\'').catch(()=>{});
+      await query('UPDATE hh_companies SET app_mode=$1 WHERE id=$2', [mode, parseInt(companyId)]);
+      // Seed the new mode's accounts (ON CONFLICT DO NOTHING so no duplicates)
+      if (mode === 'retail') await seedRetailAccounts(parseInt(companyId));
+      else await seedChartOfAccounts(parseInt(companyId));
+      return res.status(200).json({ ok: true, appMode: mode });
+    }
+
+    // ── PRODUCTS (RETAIL) ─────────────────────────────────────────────────────
+    if (action === 'listProducts') {
+      const { companyId } = body;
+      if (!companyId) return res.status(400).json({ error: 'Missing companyId' });
+      const r = await query('SELECT * FROM hh_products WHERE company_id=$1 ORDER BY name', [parseInt(companyId)]);
+      return res.status(200).json({ ok: true, products: r.rows });
+    }
+    if (action === 'saveProduct') {
+      const { companyId, id, sku, barcode, name, category, sale_price, cost_price, qty, min_qty, unit } = body;
+      if (!companyId || !name) return res.status(400).json({ error: 'Missing fields' });
+      if (id) {
+        await query(`UPDATE hh_products SET sku=$1,barcode=$2,name=$3,category=$4,sale_price=$5,
+          cost_price=$6,qty=$7,min_qty=$8,unit=$9 WHERE id=$10 AND company_id=$11`,
+          [sku,barcode,name,category||'General',sale_price||0,cost_price||0,qty||0,min_qty||0,unit||'unit',parseInt(id),parseInt(companyId)]);
+      } else {
+        const r = await query(`INSERT INTO hh_products(company_id,sku,barcode,name,category,sale_price,cost_price,qty,min_qty,unit,layers)
+          VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'[]') ON CONFLICT(company_id,name)
+          DO UPDATE SET sku=$2,barcode=$3,sale_price=$6,cost_price=$7,qty=$8,min_qty=$9,unit=$10 RETURNING id`,
+          [parseInt(companyId),sku||null,barcode||null,name,category||'General',sale_price||0,cost_price||0,qty||0,min_qty||0,unit||'unit']);
+        return res.status(200).json({ ok: true, productId: r.rows[0]?.id });
+      }
+      return res.status(200).json({ ok: true });
+    }
+    if (action === 'deleteProduct') {
+      const { productId } = body;
+      if (!productId) return res.status(400).json({ error: 'Missing productId' });
+      await query('DELETE FROM hh_products WHERE id=$1', [parseInt(productId)]);
+      return res.status(200).json({ ok: true });
+    }
+    if (action === 'lookupBarcode') {
+      const { companyId, barcode } = body;
+      if (!companyId || !barcode) return res.status(400).json({ error: 'Missing fields' });
+      const r = await query('SELECT * FROM hh_products WHERE company_id=$1 AND (barcode=$2 OR sku=$2)', [parseInt(companyId), barcode]);
+      if (!r.rows.length) return res.status(404).json({ error: 'Product not found' });
+      return res.status(200).json({ ok: true, product: r.rows[0] });
+    }
+    if (action === 'receiveStock') {
+      // Receive supplier delivery — add cost layer to product
+      const { companyId, productId, qty, unitCost, supplier, paymentMethod } = body;
+      if (!companyId || !productId || !qty || !unitCost) return res.status(400).json({ error: 'Missing fields' });
+      const r = await query('SELECT * FROM hh_products WHERE id=$1 AND company_id=$2', [parseInt(productId), parseInt(companyId)]);
+      if (!r.rows.length) return res.status(404).json({ error: 'Product not found' });
+      const product = r.rows[0];
+      const layers = Array.isArray(product.layers) ? product.layers : JSON.parse(product.layers || '[]');
+      layers.push({ qty: parseFloat(qty), unitCost: parseFloat(unitCost), date: new Date().toISOString().split('T')[0] });
+      const newQty = (parseFloat(product.qty) || 0) + parseFloat(qty);
+      await query('UPDATE hh_products SET qty=$1, layers=$2::jsonb WHERE id=$3',
+        [newQty, JSON.stringify(layers), parseInt(productId)]);
+      return res.status(200).json({ ok: true, newQty });
+    }
+
+    // ── POS SALES (RETAIL) ────────────────────────────────────────────────────
+    if (action === 'savePOSSale') {
+      const { companyId, items, subtotal, discount, total, paymentMethod, cashier, journalEntryId } = body;
+      if (!companyId || !items) return res.status(400).json({ error: 'Missing fields' });
+      const r = await query(`INSERT INTO hh_pos_sales(company_id,items,subtotal,discount,total,payment_method,cashier,journal_entry_id)
+        VALUES($1,$2::jsonb,$3,$4,$5,$6,$7,$8) RETURNING id`,
+        [parseInt(companyId), JSON.stringify(items), subtotal||0, discount||0, total||0, paymentMethod||'cash', cashier||'', journalEntryId||null]);
+      return res.status(200).json({ ok: true, saleId: r.rows[0].id });
+    }
+    if (action === 'listPOSSales') {
+      const { companyId, limit } = body;
+      if (!companyId) return res.status(400).json({ error: 'Missing companyId' });
+      const r = await query('SELECT * FROM hh_pos_sales WHERE company_id=$1 ORDER BY created_at DESC LIMIT $2',
+        [parseInt(companyId), parseInt(limit)||100]);
+      return res.status(200).json({ ok: true, sales: r.rows });
+    }
+
+    // ── PURCHASE ORDERS (RETAIL) ──────────────────────────────────────────────
+    if (action === 'savePurchaseOrder') {
+      const { companyId, supplier, po_date, items, total, paymentMethod, notes } = body;
+      if (!companyId || !supplier) return res.status(400).json({ error: 'Missing fields' });
+      const r = await query(`INSERT INTO hh_purchase_orders(company_id,supplier,po_date,items,total,payment_method,notes)
+        VALUES($1,$2,$3,$4::jsonb,$5,$6,$7) RETURNING id`,
+        [parseInt(companyId), supplier, po_date||new Date().toISOString().split('T')[0],
+         JSON.stringify(items||[]), total||0, paymentMethod||'credit', notes||'']);
+      return res.status(200).json({ ok: true, poId: r.rows[0].id });
+    }
+    if (action === 'listPurchaseOrders') {
+      const { companyId } = body;
+      if (!companyId) return res.status(400).json({ error: 'Missing companyId' });
+      const r = await query('SELECT * FROM hh_purchase_orders WHERE company_id=$1 ORDER BY created_at DESC LIMIT 100', [parseInt(companyId)]);
+      return res.status(200).json({ ok: true, orders: r.rows });
+    }
+
+    // ── PASS THROUGH to original handler for all other actions ────────────────
+    return await _originalHandler(req, res);
+
+  } catch (err) {
+    console.error('Retail handler error:', err);
+    return res.status(500).json({ error: 'Database error', detail: err.message });
+  }
+};
