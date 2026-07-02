@@ -393,21 +393,66 @@ async function doLogin(){
   finally{btn.textContent=_isReg?'📝 Register':'🔓 ኣቱ — Login';btn.disabled=false;}
 }
 function showCompanyScreen(){
-  document.getElementById('loginScreen').style.display='none';document.getElementById('companyScreen').style.display='flex';
+  document.getElementById('loginScreen').style.display='none';
+  document.getElementById('companyScreen').style.display='flex';
   const el=document.getElementById('companyList');
-  el.innerHTML=SESSION.companies.map(c=>`<div class="company-card" onclick='enterCompany(${JSON.stringify(c)})'><div class="cc-ico">🏢</div><div><div class="cc-name">${c.biz_name}</div><div class="cc-role">${c.role}${c.project_scope?' · scoped':' · all projects'}</div></div></div>`).join('')+`<div class="company-card add-new" onclick="document.getElementById('newCoForm').style.display='block'"><div class="cc-ico">➕</div><div><div class="cc-name">New Company</div><div class="cc-role">Create workspace</div></div></div>`;
+  // Deduplicate by company_id before rendering
+  const seen=new Set();
+  SESSION.companies=SESSION.companies.filter(c=>{
+    if(seen.has(c.company_id))return false;
+    seen.add(c.company_id);return true;
+  });
+  // Store in global map — avoids JSON serialization bugs in onclick attributes
+  window._coMap={};
+  SESSION.companies.forEach((c,i)=>{window._coMap[i]=c;});
+  el.innerHTML=SESSION.companies.map((c,i)=>`
+    <div class="company-card" onclick="pickCompany(${i})">
+      <div class="cc-ico">🏢</div>
+      <div>
+        <div class="cc-name">${c.biz_name}</div>
+        <div class="cc-role">${c.role}${c.project_scope?' · scoped':' · all projects'} · ${(c.app_mode||'construction')==='retail'?'🛒 Retail':'🏗️ Construction'}</div>
+      </div>
+    </div>`).join('')+
+    `<div class="company-card add-new" onclick="document.getElementById('newCoForm').style.display='block'">
+      <div class="cc-ico">➕</div>
+      <div><div class="cc-name">New Company</div><div class="cc-role">Create a new workspace</div></div>
+    </div>`;
+}
+function pickCompany(i){
+  const c=window._coMap&&window._coMap[i];
+  if(!c){console.error('pickCompany: no company at index',i);return;}
+  enterCompany(c);
 }
 async function createCompany(){const name=document.getElementById('newCoName').value.trim(),err=document.getElementById('newCoErr');if(!name){err.style.display='block';err.textContent='Enter company name';return;}try{const r=await dbApi({action:'createCompany',userId:SESSION.userId,bizName:name});const c={company_id:r.companyId,role:'owner',project_scope:null,biz_name:r.bizName,ssp_rate:1300,costing_method:'WAC'};SESSION.companies.push(c);await enterCompany(c);}catch(e){err.style.display='block';err.textContent=e.message;}}
 async function enterCompany(c){
+  // Canonical implementation — all other enterCompany definitions below delegate here via _enterCompanyCore
+  await _enterCompanyCore(c);
+}
+async function _enterCompanyCore(c){
   SESSION.companyId=c.company_id;SESSION.role=c.role;SESSION.projectScope=c.project_scope||null;
+  APP_MODE=c.app_mode||'construction';
   BIZ_NAME=c.biz_name;SSP_RATE=parseFloat(c.ssp_rate)||1300;INV_COSTING_METHOD=c.costing_method||'WAC';
   ACTIVE_PROJECT='';CUR='USD';DB=freshDB();
   await loadDB();await loadChartOfAccounts();await loadPeriods();
-  document.getElementById('companyScreen').style.display='none';document.getElementById('loginScreen').style.display='none';document.getElementById('mainApp').style.display='block';
-  document.getElementById('tbBiz').textContent=BIZ_NAME;document.getElementById('bizName').value=BIZ_NAME;document.getElementById('sspRate').value=SSP_RATE;
-  const rb=document.getElementById('roleBadge');rb.textContent=SESSION.role==='owner'?'👑 Owner':SESSION.role==='accountant'?'📊 Accountant':'👤 Staff';rb.className='role-badge '+SESSION.role;
-  const sb=document.getElementById('scopeBanner');if(sb&&SESSION.projectScope&&SESSION.role==='staff'){sb.innerHTML=`<div class="scope-banner">🔐 You can only see: <strong>${getScopedNames().join(', ')||'(no projects assigned)'}</strong></div>`;}else if(sb)sb.innerHTML='';
+  document.getElementById('companyScreen').style.display='none';
+  document.getElementById('loginScreen').style.display='none';
+  document.getElementById('mainApp').style.display='block';
+  document.getElementById('tbBiz').textContent=BIZ_NAME;
+  if(document.getElementById('bizName'))document.getElementById('bizName').value=BIZ_NAME;
+  if(document.getElementById('sspRate'))document.getElementById('sspRate').value=SSP_RATE;
+  const rb=document.getElementById('roleBadge');
+  if(rb){rb.textContent=SESSION.role==='owner'?'👑 Owner':SESSION.role==='accountant'?'📊 Accountant':'👤 Staff';rb.className='role-badge '+SESSION.role;}
+  const sb=document.getElementById('scopeBanner');
+  if(sb&&SESSION.projectScope&&SESSION.role==='staff'){sb.innerHTML=`<div class="scope-banner">🔐 You can only see: <strong>${getScopedNames().join(', ')||'(no projects assigned)'}</strong></div>`;}
+  else if(sb)sb.innerHTML='';
+  // Mode-aware sidebar and topbar badge
+  injectModeSwitcher();
+  renderSidebar(APP_MODE);
+  renderModeBadge();
+  if(APP_MODE==='retail')await loadRetailProducts().catch(()=>{});
   autoDepreciation();renderAll();runAudit();renderStaffPanel();loadPeriodList();
+  // Inject settings mode card after render
+  setTimeout(()=>{injectModeSettingsCard();refreshModeSettingsHighlight();injectRetailPages();if(APP_MODE==='retail'){injectPOForm();renderPOLines();renderPOSProductGrid();}},250);
 }
 function switchCompany(){document.getElementById('mainApp').style.display='none';showCompanyScreen();}
 function doLogout(){SESSION={userId:null,username:'',companyId:null,role:'owner',projectScope:null,companies:[]};DB=freshDB();BIZ_NAME='My Construction Co';SSP_RATE=1300;INV_COSTING_METHOD='WAC';ACTIVE_PROJECT='';CUR='USD';CHART_OF_ACCOUNTS=[];PERIODS=[];['mainApp','companyScreen'].forEach(id=>document.getElementById(id).style.display='none');document.getElementById('loginScreen').style.display='flex';document.getElementById('lu').value='';document.getElementById('lp').value='';document.getElementById('lerr').style.display='none';_isReg=false;document.getElementById('regFields').style.display='none';document.getElementById('loginTitle').textContent='ኣቱ — Login';document.getElementById('loginBtn').textContent='🔓 ኣቱ — Login';}
@@ -957,35 +1002,8 @@ async function renderPOList(){
 }
 
 // ── PATCH enterCompany to init retail mode ───
-const _origEnterCompany = typeof enterCompany !== 'undefined' ? enterCompany : null;
-async function enterCompany(c) {
-  APP_MODE = c.app_mode || 'construction';
-  SESSION.companyId = c.company_id; SESSION.role = c.role;
-  SESSION.projectScope = c.project_scope || null;
-  BIZ_NAME = c.biz_name; SSP_RATE = parseFloat(c.ssp_rate) || 1300;
-  INV_COSTING_METHOD = c.costing_method || 'WAC';
-  ACTIVE_PROJECT = ''; CUR = 'USD'; DB = freshDB();
-  await loadDB(); await loadChartOfAccounts(); await loadPeriods();
-  document.getElementById('companyScreen').style.display = 'none';
-  document.getElementById('loginScreen').style.display = 'none';
-  document.getElementById('mainApp').style.display = 'block';
-  document.getElementById('tbBiz').textContent = BIZ_NAME;
-  document.getElementById('bizName').value = BIZ_NAME;
-  document.getElementById('sspRate').value = SSP_RATE;
-  const rb = document.getElementById('roleBadge');
-  rb.textContent = SESSION.role === 'owner' ? '👑 Owner' : SESSION.role === 'accountant' ? '📊 Accountant' : '👤 Staff';
-  rb.className = 'role-badge ' + SESSION.role;
-  const sb = document.getElementById('scopeBanner');
-  if (sb && SESSION.projectScope && SESSION.role === 'staff') {
-    sb.innerHTML = `<div class="scope-banner">🔐 You can only see: <strong>${getScopedNames().join(', ') || '(no projects assigned)'}</strong></div>`;
-  } else if (sb) sb.innerHTML = '';
-  // Inject mode switcher into topbar
-  injectModeSwitcher();
-  renderSidebar(APP_MODE);
-  renderModeBadge();
-  if (APP_MODE === 'retail') await loadRetailProducts();
-  autoDepreciation(); renderAll(); runAudit(); renderStaffPanel(); loadPeriodList();
-}
+// enterCompany retail patch — delegates to _enterCompanyCore (defined above)
+// kept as a no-op override so later code that calls enterCompany still works
 
 // ── PATCH registration to include mode picker ─
 const _origDoLogin = doLogin;
@@ -1532,15 +1550,7 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 // Patch enterCompany to also inject settings card
-const _origEnterCompany2 = enterCompany;
-async function enterCompany(c) {
-  await _origEnterCompany2(c);
-  setTimeout(() => {
-    injectModeSettingsCard();
-    refreshModeSettingsHighlight();
-    if (APP_MODE === 'retail') renderPOSProductGrid();
-  }, 200);
-}
+// enterCompany second patch neutralised — logic consolidated in _enterCompanyCore
 </script>
 <script>
 // ══════════════════════════════════════════════════════════════
