@@ -184,24 +184,39 @@ module.exports = async function handler(req, res) {
       if (!ur.rows.length || ur.rows[0].password_b64 !== btoa(password))
         return res.status(401).json({ error: 'Wrong username or password' });
       const uid = ur.rows[0].id;
-      // Load all companies this user belongs to
+      await query("ALTER TABLE hh_companies ADD COLUMN IF NOT EXISTS app_mode TEXT DEFAULT 'construction'").catch(()=>{});
       const cr = await query(`
-        SELECT uc.company_id, uc.role, uc.project_scope, c.name as biz_name, c.ssp_rate, c.costing_method
-        FROM hh_user_companies uc JOIN hh_companies c ON c.id=uc.company_id
-        WHERE uc.user_id=$1 ORDER BY c.created_at
+        SELECT DISTINCT ON (uc.company_id)
+          uc.company_id, uc.role, uc.project_scope,
+          c.name as biz_name, c.ssp_rate, c.costing_method,
+          COALESCE(c.app_mode, 'construction') as app_mode
+        FROM hh_user_companies uc
+        JOIN hh_companies c ON c.id = uc.company_id
+        WHERE uc.user_id = $1
+        ORDER BY uc.company_id, c.created_at
       `, [uid]);
       return res.status(200).json({ ok: true, userId: uid, companies: cr.rows });
     }
 
     // ── CREATE COMPANY (existing user adds a new company) ────────────────────
     if (action === 'createCompany') {
-      const { userId, bizName } = body;
+      const { userId, bizName, appMode } = body;
       if (!userId || !bizName) return res.status(400).json({ error: 'Missing fields' });
-      const cr = await query('INSERT INTO hh_companies(name) VALUES($1) RETURNING id', [bizName]);
+      await query("ALTER TABLE hh_companies ADD COLUMN IF NOT EXISTS app_mode TEXT DEFAULT 'construction'").catch(()=>{});
+      // Prevent duplicate — return existing if same user+name
+      const existing = await query(
+        "SELECT c.id, c.name FROM hh_companies c JOIN hh_user_companies uc ON uc.company_id=c.id WHERE uc.user_id=$1 AND LOWER(c.name)=LOWER($2)",
+        [parseInt(userId), bizName]
+      );
+      if (existing.rows.length) {
+        return res.status(200).json({ ok: true, companyId: existing.rows[0].id, bizName: existing.rows[0].name });
+      }
+      const mode = appMode === 'retail' ? 'retail' : 'construction';
+      const cr = await query("INSERT INTO hh_companies(name, app_mode) VALUES($1,$2) RETURNING id", [bizName, mode]);
       const cid = cr.rows[0].id;
       await query('INSERT INTO hh_user_companies(user_id,company_id,role) VALUES($1,$2,$3)', [parseInt(userId), cid, 'owner']);
-      await seedChartOfAccounts(cid);
-      return res.status(200).json({ ok: true, companyId: cid, bizName });
+      if (mode === 'retail') await seedRetailAccounts(cid); else await seedChartOfAccounts(cid);
+      return res.status(200).json({ ok: true, companyId: cid, bizName, appMode: mode });
     }
 
     // ── REGISTER STAFF ────────────────────────────────────────────────────────
@@ -499,45 +514,11 @@ module.exports = async function handler(req, res) {
     const body = req.body || {};
     const { action } = body;
 
-    // ── REGISTER WITH MODE ────────────────────────────────────────────────────
-    if (action === 'register') {
-      const { username, password, bizName, appMode } = body;
-      if (!username || !password || !bizName) return res.status(400).json({ error: 'Missing fields' });
-      const ex = await query('SELECT id FROM hh_users WHERE username=$1', [username]);
-      if (ex.rows.length) return res.status(409).json({ error: 'Username taken' });
-      const ur = await query('INSERT INTO hh_users(username,password_b64) VALUES($1,$2) RETURNING id', [username, btoa(password)]);
-      const uid = ur.rows[0].id;
-      const mode = appMode === 'retail' ? 'retail' : 'construction';
-      const cr = await query('INSERT INTO hh_companies(name,costing_method) VALUES($1,$2) RETURNING id', [bizName, 'WAC']);
-      const cid = cr.rows[0].id;
-      // Store mode in company
-      await query('ALTER TABLE hh_companies ADD COLUMN IF NOT EXISTS app_mode TEXT DEFAULT \'construction\'');
-      await query('UPDATE hh_companies SET app_mode=$1 WHERE id=$2', [mode, cid]);
-      await query('INSERT INTO hh_user_companies(user_id,company_id,role) VALUES($1,$2,$3)', [uid, cid, 'owner']);
-      if (mode === 'retail') {
-        await seedRetailAccounts(cid);
-      } else {
-        await seedChartOfAccounts(cid);
-      }
-      return res.status(200).json({ ok: true, userId: uid, companyId: cid, role: 'owner', bizName, appMode: mode });
-    }
+    // register handled by original handler below
 
-    // ── LOGIN WITH MODE ───────────────────────────────────────────────────────
-    if (action === 'login') {
-      const { username, password } = body;
-      if (!username || !password) return res.status(400).json({ error: 'Missing fields' });
-      const ur = await query('SELECT * FROM hh_users WHERE username=$1', [username]);
-      if (!ur.rows.length || ur.rows[0].password_b64 !== btoa(password))
-        return res.status(401).json({ error: 'Wrong username or password' });
-      const uid = ur.rows[0].id;
-      await query('ALTER TABLE hh_companies ADD COLUMN IF NOT EXISTS app_mode TEXT DEFAULT \'construction\'').catch(()=>{});
-      const cr = await query(`
-        SELECT uc.company_id, uc.role, uc.project_scope, c.name as biz_name, c.ssp_rate, c.costing_method,
-               COALESCE(c.app_mode,'construction') as app_mode
-        FROM hh_user_companies uc JOIN hh_companies c ON c.id=uc.company_id
-        WHERE uc.user_id=$1 ORDER BY c.created_at
-      `, [uid]);
-      return res.status(200).json({ ok: true, userId: uid, companies: cr.rows });
+    // login + register handled by original handler below (with DISTINCT ON fix)
+    if (action === 'login' || action === 'register') {
+      return await _originalHandler(req, res);
     }
 
     // ── SWITCH MODE ───────────────────────────────────────────────────────────
