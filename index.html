@@ -540,3 +540,1304 @@ window.addEventListener('DOMContentLoaded',()=>{document.getElementById('loginSc
 </script>
 </body>
 </html>
+<script>
+// ══════════════════════════════════════════════
+// RETAIL MODE — STATE & HELPERS
+// ══════════════════════════════════════════════
+let APP_MODE = 'construction'; // 'construction' | 'retail'
+let RETAIL_PRODUCTS = [];
+let POS_CART = [];
+let POS_DISCOUNT = 0;
+
+// ── NAV CONFIG ───────────────────────────────
+const CONSTRUCTION_NAV = [
+  { section:'ዕለታዊ — Daily', items:[
+    {ico:'🎙️',ti:'ሓድሽ ምዝጋብ',en:'Record',page:'home'},
+    {ico:'💵',ti:'ንዋት ጥረ',en:'Petty Cash',page:'petty'},
+    {ico:'📱',ti:'ሞባይል ገንዘብ',en:'Mobile',page:'mobilemoney'},
+    {ico:'🧱',ti:'ሸቀጥ',en:'Materials',page:'materials'},
+    {ico:'🚚',ti:'ምብጻሕ',en:'Deliveries',page:'deliveries'},
+    {ico:'👷',ti:'ሰራሕተኛ',en:'Workers',page:'workers'},
+  ]},
+  { section:'ፕሮጀክት', items:[
+    {ico:'🏗️',ti:'ፕሮጀክታት',en:'Projects',page:'projects',badge:'projBadge'},
+    {ico:'🧾',ti:'ኢንቮይስ',en:'Invoice',page:'invoice'},
+    {ico:'🔒',ti:'ሪቴንሽን',en:'Retention',page:'retention'},
+  ]},
+  { section:'ሓላፍ ሒሳቢ', items:[
+    {ico:'📋',ti:'Chart of Accounts',en:'COA',page:'coa'},
+    {ico:'📒',ti:'ደፍተር',en:'Journal',page:'journal',badge:'jBadge'},
+    {ico:'📗',ti:'ሌጀር',en:'Ledger',page:'ledger'},
+    {ico:'⚖️',ti:'ፈተነ ሚዛን',en:'Trial',page:'trial'},
+    {ico:'💰',ti:'ትርፊ/ክሳራ',en:'Income',page:'income'},
+    {ico:'🏛️',ti:'ሚዛን ሓሳብ',en:'Balance',page:'balance'},
+    {ico:'📈',ti:'ትንበያ',en:'Forecast',page:'cashflow'},
+    {ico:'🔢',ti:'ዋጋ ፕሮጀክት',en:'Job Cost',page:'jobcost'},
+  ]},
+  { section:'ምቹ ምዝጋብ', items:[
+    {ico:'📅',ti:'Periods',en:'Close',page:'periods'},
+    {ico:'🤖',ti:'AI ሓጋዚ',en:'Advisor',page:'advisor'},
+    {ico:'🔍',ti:'ምርመራ',en:'Audit',page:'audit',badge:'auditBadge'},
+    {ico:'📉',ti:'ምምካን',en:'Depreciation',page:'depreciation'},
+    {ico:'⚙️',ti:'ቅጥዒ',en:'Settings',page:'settings'},
+  ]},
+];
+
+const RETAIL_NAV = [
+  { section:'🛒 Retail Daily', items:[
+    {ico:'🖥️',ti:'POS Register',en:'POS',page:'pos'},
+    {ico:'📦',ti:'Products',en:'Catalogue',page:'products'},
+    {ico:'📲',ti:'Receive Stock',en:'Stock In',page:'stockin'},
+    {ico:'🚚',ti:'Purchase Orders',en:'PO',page:'purchaseorders'},
+    {ico:'👷',ti:'ሰራሕተኛ',en:'Workers',page:'workers'},
+  ]},
+  { section:'📊 Reports', items:[
+    {ico:'💰',ti:'Sales Report',en:'Sales',page:'retailsales'},
+    {ico:'📦',ti:'Stock Valuation',en:'Inventory',page:'stockval'},
+    {ico:'📋',ti:'Chart of Accounts',en:'COA',page:'coa'},
+    {ico:'📒',ti:'ደፍተር',en:'Journal',page:'journal',badge:'jBadge'},
+    {ico:'📗',ti:'ሌጀር',en:'Ledger',page:'ledger'},
+    {ico:'⚖️',ti:'Trial Balance',en:'Trial',page:'trial'},
+    {ico:'💰',ti:'Income Statement',en:'Income',page:'income'},
+    {ico:'🏛️',ti:'Balance Sheet',en:'Balance',page:'balance'},
+  ]},
+  { section:'ምቹ ምዝጋብ', items:[
+    {ico:'📅',ti:'Periods',en:'Close',page:'periods'},
+    {ico:'🤖',ti:'AI ሓጋዚ',en:'Advisor',page:'advisor'},
+    {ico:'🔍',ti:'ምርመራ',en:'Audit',page:'audit',badge:'auditBadge'},
+    {ico:'📉',ti:'Depreciation',en:'Dep',page:'depreciation'},
+    {ico:'⚙️',ti:'ቅጥዒ',en:'Settings',page:'settings'},
+  ]},
+];
+
+// ── MODE SWITCHER ────────────────────────────
+function renderSidebar(mode){
+  const nav = mode === 'retail' ? RETAIL_NAV : CONSTRUCTION_NAV;
+  const sidebar = document.querySelector('.sidebar');
+  if(!sidebar) return;
+  sidebar.innerHTML = nav.map(section => `
+    <div class="sb-section">
+      <div class="sb-label">${section.section}</div>
+      ${section.items.map(item => `
+        <div class="sb-item" onclick="nav('${item.page}',this)" id="sb-${item.page}">
+          <span class="sb-ico">${item.ico}</span>${item.ti}<span class="en">${item.en}</span>
+          ${item.badge ? `<span class="sb-badge gold" id="${item.badge}">0</span>` : ''}
+        </div>`).join('')}
+    </div>`).join('');
+}
+
+async function switchAppMode(newMode){
+  if(newMode === APP_MODE) return;
+  try{
+    await dbApi({action:'switchMode', companyId:SESSION.companyId, appMode:newMode});
+    APP_MODE = newMode;
+    SESSION.companies = SESSION.companies.map(c =>
+      c.company_id === SESSION.companyId ? {...c, app_mode: newMode} : c);
+    renderSidebar(newMode);
+    renderModeBadge();
+    await loadChartOfAccounts();
+    if(newMode === 'retail') await loadRetailProducts();
+    // Navigate away from mode-specific pages
+    const constructionOnly = ['projects','invoice','retention','materials','deliveries','jobcost'];
+    const retailOnly = ['pos','products','stockin','purchaseorders','retailsales','stockval'];
+    const guard = newMode === 'retail' ? constructionOnly : retailOnly;
+    const activePage = document.querySelector('.page.on');
+    if(activePage && guard.some(p => activePage.id === 'pg-'+p)){
+      nav('home', document.querySelector('.sb-item'));
+    }
+    showToast(`✅ Switched to ${newMode === 'retail' ? '🛒 Retail' : '🏗️ Construction'} mode`);
+  }catch(e){showToast('❌ '+e.message);}
+}
+
+function renderModeBadge(){
+  const badge = document.getElementById('modeBadge');
+  if(!badge) return;
+  badge.textContent = APP_MODE === 'retail' ? '🛒 Retail' : '🏗️ Construction';
+  badge.style.background = APP_MODE === 'retail' ? 'rgba(192,48,42,.15)' : 'rgba(26,94,255,.15)';
+  badge.style.color = APP_MODE === 'retail' ? 'var(--red3)' : 'var(--blue3)';
+  badge.style.border = APP_MODE === 'retail' ? '1px solid rgba(192,48,42,.3)' : '1px solid rgba(64,128,255,.2)';
+}
+
+function injectModeSwitcher(){
+  // Insert mode badge + switcher into topbar
+  const tbCur = document.querySelector('.tb-cur');
+  if(!tbCur || document.getElementById('modeBadge')) return;
+  const sw = document.createElement('div');
+  sw.style.cssText='display:flex;align-items:center;gap:6px;';
+  sw.innerHTML = `
+    <span id="modeBadge" style="font-size:10px;padding:3px 9px;border-radius:4px;font-family:'JetBrains Mono',monospace;cursor:pointer;white-space:nowrap" onclick="toggleModeMenu()">🏗️ Construction</span>
+    <div id="modeMenu" style="display:none;position:absolute;top:52px;right:320px;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:6px;z-index:300;min-width:200px;box-shadow:var(--shadow)">
+      <div onclick="switchAppMode('construction');closeModeMenu()" style="padding:9px 12px;cursor:pointer;border-radius:5px;font-size:12px;font-family:'Noto Sans Ethiopic',sans-serif;display:flex;align-items:center;gap:8px;color:var(--text)" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='transparent'">🏗️ Construction Company</div>
+      <div onclick="switchAppMode('retail');closeModeMenu()" style="padding:9px 12px;cursor:pointer;border-radius:5px;font-size:12px;font-family:'Noto Sans Ethiopic',sans-serif;display:flex;align-items:center;gap:8px;color:var(--text)" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='transparent'">🛒 Retail / Supermarket</div>
+    </div>`;
+  tbCur.parentNode.insertBefore(sw, tbCur);
+}
+function toggleModeMenu(){const m=document.getElementById('modeMenu');if(m)m.style.display=m.style.display==='none'?'block':'none';}
+function closeModeMenu(){const m=document.getElementById('modeMenu');if(m)m.style.display='none';}
+document.addEventListener('click',e=>{const m=document.getElementById('modeMenu');if(m&&!e.target.closest('#modeBadge')&&!m.contains(e.target))m.style.display='none';});
+
+// ── RETAIL PRODUCTS ──────────────────────────
+async function loadRetailProducts(){
+  try{const r=await dbApi({action:'listProducts',companyId:SESSION.companyId});RETAIL_PRODUCTS=r.products||[];renderProductsPage();renderStockValPage();}catch(e){console.error('loadRetailProducts',e);}
+}
+
+function renderProductsPage(){
+  const el=document.getElementById('retailProductList');if(!el)return;
+  if(!RETAIL_PRODUCTS.length){el.innerHTML='<div style="text-align:center;padding:22px;color:var(--text3)">No products yet — add your first product above</div>';return;}
+  const q=(document.getElementById('productSearch')||{}).value||'';
+  const items=RETAIL_PRODUCTS.filter(p=>!q||p.name.toLowerCase().includes(q.toLowerCase())||p.sku?.includes(q)||p.barcode?.includes(q));
+  el.innerHTML=`<table><thead><tr><th>SKU</th><th>Barcode</th><th>Product</th><th>Category</th><th>Sale Price</th><th>Cost</th><th>Stock</th><th>Min</th><th></th></tr></thead><tbody>${
+    items.map(p=>{
+      const cls=p.qty<=0?'var(--red3)':p.qty<=p.min_qty?'var(--orange3)':'var(--green3)';
+      return`<tr><td style="font-family:'JetBrains Mono',monospace;font-size:10px">${p.sku||'—'}</td><td style="font-family:'JetBrains Mono',monospace;font-size:10px">${p.barcode||'—'}</td><td style="font-weight:500">${p.name}</td><td><span class="tag t-blue" style="font-size:9px">${p.category}</span></td><td style="font-family:'JetBrains Mono',monospace">${fc(p.sale_price)}</td><td style="font-family:'JetBrains Mono',monospace;color:var(--text3)">${fc(p.cost_price)}</td><td style="font-family:'JetBrains Mono',monospace;font-weight:700;color:${cls}">${p.qty} ${p.unit}</td><td style="font-family:'JetBrains Mono',monospace;color:var(--text3)">${p.min_qty}</td><td><button style="padding:2px 6px;background:transparent;border:1px solid rgba(192,48,42,.3);border-radius:3px;color:var(--red3);font-size:10px;cursor:pointer" onclick="deleteProduct(${p.id})">✕</button></td></tr>`;
+    }).join('')
+  }</tbody></table>`;
+}
+
+async function saveProduct(){
+  const name=document.getElementById('prd-name').value.trim();
+  const sku=document.getElementById('prd-sku').value.trim();
+  const barcode=document.getElementById('prd-barcode').value.trim();
+  const category=document.getElementById('prd-cat').value;
+  const sale_price=parseFloat(document.getElementById('prd-sale').value)||0;
+  const cost_price=parseFloat(document.getElementById('prd-cost').value)||0;
+  const qty=parseFloat(document.getElementById('prd-qty').value)||0;
+  const min_qty=parseFloat(document.getElementById('prd-min').value)||0;
+  const unit=document.getElementById('prd-unit').value||'unit';
+  const st=document.getElementById('prd-st');
+  if(!name){st.innerHTML='<span style="color:var(--red3)">Enter product name</span>';return;}
+  try{
+    const r=await dbApi({action:'saveProduct',companyId:SESSION.companyId,name,sku,barcode,category,sale_price,cost_price,qty,min_qty,unit});
+    // If opening stock qty > 0, add cost layer and post opening stock journal entry
+    if(qty>0&&cost_price>0){
+      const total=qty*cost_price;
+      DB.entries.push({id:DB.nextId++,date:today(),desc:`Opening stock: ${name}`,type:'Stock Receipt',amount:total,project:'',
+        debits:[{acct:'Inventory (Stock)',amt:total,atype:'asset'}],
+        credits:[{acct:'Accounts Payable',amt:total,atype:'liability'}]});
+      await saveData();
+    }
+    await loadRetailProducts();
+    st.innerHTML=`<span style="color:var(--green3)">✅ ${name} saved</span>`;
+    ['prd-name','prd-sku','prd-barcode','prd-sale','prd-cost','prd-qty','prd-min'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  }catch(e){st.innerHTML=`<span style="color:var(--red3)">❌ ${e.message}</span>`;}
+  setTimeout(()=>document.getElementById('prd-st').innerHTML='',4000);
+}
+
+async function deleteProduct(id){
+  if(!confirm('Delete product?'))return;
+  try{await dbApi({action:'deleteProduct',productId:id});await loadRetailProducts();}catch(e){showToast('❌ '+e.message);}
+}
+
+// ── STOCK RECEIVE ────────────────────────────
+async function receiveStock(){
+  const productId=document.getElementById('si-product').value;
+  const qty=parseFloat(document.getElementById('si-qty').value)||0;
+  const unitCost=parseFloat(document.getElementById('si-cost').value)||0;
+  const supplier=document.getElementById('si-supplier').value.trim();
+  const payMethod=document.getElementById('si-pay').value;
+  const st=document.getElementById('si-st');
+  if(!productId||!qty||!unitCost){st.innerHTML='<span style="color:var(--red3)">Fill all fields</span>';return;}
+  const product=RETAIL_PRODUCTS.find(p=>p.id===parseInt(productId));
+  if(!product){st.innerHTML='<span style="color:var(--red3)">Product not found</span>';return;}
+  const total=qty*unitCost;
+  try{
+    await dbApi({action:'receiveStock',companyId:SESSION.companyId,productId:parseInt(productId),qty,unitCost,supplier,paymentMethod:payMethod});
+    // Post journal entry: Dr Inventory (Stock), Cr Cash or AP
+    DB.entries.push({id:DB.nextId++,date:today(),desc:`Stock received: ${product.name} × ${qty} from ${supplier||'supplier'}`,
+      type:'Stock Receipt',amount:total,project:'',
+      debits:[{acct:'Inventory (Stock)',amt:total,atype:'asset'}],
+      credits:payMethod==='cash'?[{acct:'Cash',amt:total,atype:'asset'}]:[{acct:'Accounts Payable',amt:total,atype:'liability'}]});
+    await saveData();await loadRetailProducts();renderAll();
+    st.innerHTML=`<span style="color:var(--green3)">✅ Received ${qty} × ${product.name} — ${fc(total)}</span>`;
+    ['si-qty','si-cost','si-supplier'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  }catch(e){st.innerHTML=`<span style="color:var(--red3)">❌ ${e.message}</span>`;}
+  setTimeout(()=>document.getElementById('si-st').innerHTML='',5000);
+}
+
+// ── POS CART ENGINE ───────────────────────────
+function posLookup(barcodeOrSku){
+  const val=(barcodeOrSku||document.getElementById('pos-scan')?.value||'').trim();
+  if(!val)return;
+  const product=RETAIL_PRODUCTS.find(p=>p.barcode===val||p.sku===val||p.name.toLowerCase()===val.toLowerCase());
+  if(!product){showToast('⚠️ Product not found: '+val,3000);return;}
+  posAddToCart(product);
+  const scanEl=document.getElementById('pos-scan');if(scanEl)scanEl.value='';
+}
+
+function posAddToCart(product,qty=1){
+  const existing=POS_CART.find(i=>i.id===product.id);
+  if(existing){existing.qty+=qty;}
+  else{POS_CART.push({id:product.id,name:product.name,sku:product.sku,barcode:product.barcode,sale_price:parseFloat(product.sale_price)||0,cost_price:parseFloat(product.cost_price)||0,qty,unit:product.unit||'unit'});}
+  renderPOSCart();
+}
+
+function posRemoveFromCart(productId){
+  POS_CART=POS_CART.filter(i=>i.id!==productId);
+  renderPOSCart();
+}
+
+function posUpdateQty(productId,newQty){
+  const item=POS_CART.find(i=>i.id===productId);
+  if(!item)return;
+  item.qty=Math.max(0,parseFloat(newQty)||0);
+  if(item.qty===0)POS_CART=POS_CART.filter(i=>i.id!==productId);
+  renderPOSCart();
+}
+
+function getPOSTotals(){
+  const subtotal=POS_CART.reduce((s,i)=>s+i.sale_price*i.qty,0);
+  const discountAmt=POS_DISCOUNT>0?subtotal*POS_DISCOUNT/100:0;
+  const total=subtotal-discountAmt;
+  const cogs=POS_CART.reduce((s,i)=>s+i.cost_price*i.qty,0);
+  return{subtotal,discountAmt,total,cogs};
+}
+
+function renderPOSCart(){
+  const el=document.getElementById('pos-cart-items');
+  const {subtotal,discountAmt,total}=getPOSTotals();
+  if(!el)return;
+  if(!POS_CART.length){el.innerHTML='<div style="text-align:center;padding:22px;color:var(--text3);font-size:12px">🛒 Scan or search a product to begin</div>';
+    document.getElementById('pos-subtotal').textContent=fc(0);
+    document.getElementById('pos-discount-amt').textContent=fc(0);
+    document.getElementById('pos-total').textContent=fc(0);
+    return;}
+  el.innerHTML=POS_CART.map(item=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">
+      <div style="flex:1"><div style="font-size:13px;color:var(--text);font-family:'Noto Sans Ethiopic',sans-serif">${item.name}</div><div style="font-size:10px;color:var(--text3);font-family:'JetBrains Mono',monospace">${fc(item.sale_price)}/${item.unit}</div></div>
+      <input type="number" value="${item.qty}" min="0" step="1" onchange="posUpdateQty(${item.id},this.value)" style="width:60px;background:var(--bg3);border:1px solid var(--border2);border-radius:4px;padding:4px 7px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none;text-align:center"/>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--gold3);width:80px;text-align:right">${fc(item.sale_price*item.qty)}</div>
+      <button onclick="posRemoveFromCart(${item.id})" style="padding:2px 7px;background:transparent;border:1px solid rgba(192,48,42,.3);border-radius:3px;color:var(--red3);font-size:11px;cursor:pointer">✕</button>
+    </div>`).join('');
+  document.getElementById('pos-subtotal').textContent=fc(subtotal);
+  document.getElementById('pos-discount-amt').textContent=discountAmt>0?`-${fc(discountAmt)}`:fc(0);
+  document.getElementById('pos-total').textContent=fc(total);
+}
+
+async function completeSale(){
+  if(!POS_CART.length){showToast('⚠️ Cart is empty');return;}
+  const payMethod=document.getElementById('pos-payment').value;
+  const {subtotal,discountAmt,total,cogs}=getPOSTotals();
+  const payAcct=payMethod==='cash'?'Cash':payMethod==='mobile'?'Mobile Money':'Bank Account';
+
+  // 1. Sales journal entry: Dr Cash/MM/Bank, Cr Retail Sales Revenue
+  const saleEntry={id:DB.nextId++,date:today(),desc:`POS Sale — ${POS_CART.length} item(s)`,type:'POS Sale',amount:total,project:'',
+    debits:[{acct:payAcct,amt:total,atype:'asset'}],
+    credits:[{acct:'Retail Sales Revenue',amt:total,atype:'revenue'}]};
+  if(discountAmt>0)saleEntry.debits.push({acct:'Sales Discount',amt:discountAmt,atype:'expense'});
+  DB.entries.push(saleEntry);
+
+  // 2. COGS journal entry: Dr Cost of Goods Sold, Cr Inventory (Stock)
+  if(cogs>0){
+    DB.entries.push({id:DB.nextId++,date:today(),desc:`COGS — POS Sale (${POS_CART.length} item(s))`,
+      type:'COGS',amount:cogs,project:'',
+      debits:[{acct:'Cost of Goods Sold',amt:cogs,atype:'expense'}],
+      credits:[{acct:'Inventory (Stock)',amt:cogs,atype:'asset'}]});
+  }
+
+  // 3. Deduct stock from products
+  for(const item of POS_CART){
+    const product=RETAIL_PRODUCTS.find(p=>p.id===item.id);
+    if(product){
+      product.qty=Math.max(0,(parseFloat(product.qty)||0)-item.qty);
+      await dbApi({action:'saveProduct',companyId:SESSION.companyId,id:product.id,
+        name:product.name,sku:product.sku,barcode:product.barcode,category:product.category,
+        sale_price:product.sale_price,cost_price:product.cost_price,
+        qty:product.qty,min_qty:product.min_qty,unit:product.unit}).catch(()=>{});
+    }
+  }
+
+  // 4. Save POS sale record
+  await dbApi({action:'savePOSSale',companyId:SESSION.companyId,
+    items:POS_CART,subtotal,discount:discountAmt,total,paymentMethod:payMethod,
+    cashier:SESSION.username,journalEntryId:saleEntry.id}).catch(()=>{});
+
+  await saveData();
+  POS_CART=[];POS_DISCOUNT=0;
+  document.getElementById('pos-discount').value='';
+  renderPOSCart();renderAll();
+  showToast(`✅ Sale complete — ${fc(total)} via ${payMethod}`);
+  if(document.getElementById('pos-scan'))document.getElementById('pos-scan').focus();
+}
+
+// ── STOCK VALUATION PAGE ─────────────────────
+function renderStockValPage(){
+  const el=document.getElementById('stockValList');if(!el)return;
+  if(!RETAIL_PRODUCTS.length){el.innerHTML='<div style="text-align:center;padding:22px;color:var(--text3)">No products</div>';return;}
+  let totalVal=0,totalCost=0;
+  const rows=RETAIL_PRODUCTS.map(p=>{
+    const layers=Array.isArray(p.layers)?p.layers:(JSON.parse(p.layers||'[]'));
+    const tQ=layers.reduce((s,l)=>s+l.qty,0),tV=layers.reduce((s,l)=>s+l.qty*l.unitCost,0);
+    const avgCost=tQ>0?tV/tQ:(parseFloat(p.cost_price)||0);
+    const stockVal=parseFloat(p.qty)*avgCost;
+    const retailVal=parseFloat(p.qty)*parseFloat(p.sale_price);
+    totalVal+=stockVal;totalCost+=retailVal;
+    const cls=parseFloat(p.qty)<=0?'var(--red3)':parseFloat(p.qty)<=parseFloat(p.min_qty)?'var(--orange3)':'var(--green3)';
+    return`<tr><td style="font-weight:500">${p.name}</td><td style="font-family:'JetBrains Mono',monospace;font-size:10px">${p.sku||'—'}</td><td><span class="tag t-blue" style="font-size:9px">${p.category}</span></td><td style="font-family:'JetBrains Mono',monospace;font-weight:700;color:${cls}">${p.qty} ${p.unit}</td><td style="font-family:'JetBrains Mono',monospace">${fc(avgCost)}</td><td style="font-family:'JetBrains Mono',monospace">${fc(p.sale_price)}</td><td style="font-family:'JetBrains Mono',monospace;color:var(--gold3);font-weight:600">${fc(stockVal)}</td><td style="font-family:'JetBrains Mono',monospace;color:var(--green3)">${fc(retailVal)}</td></tr>`;
+  }).join('');
+  el.innerHTML=`<table><thead><tr><th>Product</th><th>SKU</th><th>Category</th><th>Stock</th><th>Avg Cost</th><th>Sale Price</th><th>Stock Value (Cost)</th><th>Retail Value</th></tr></thead><tbody>${rows}</tbody></table>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:12px">
+    <div class="kpi"><div class="kpi-lbl">Total Stock Value (Cost)</div><div class="kpi-val warn">${fc(totalVal)}</div></div>
+    <div class="kpi"><div class="kpi-lbl">Total Retail Value</div><div class="kpi-val pos">${fc(totalCost)}</div></div>
+    <div class="kpi"><div class="kpi-lbl">Gross Margin Potential</div><div class="kpi-val ${totalCost>totalVal?'pos':'neg'}">${fc(totalCost-totalVal)}</div></div>
+  </div>`;
+}
+
+// ── RETAIL SALES REPORT ───────────────────────
+async function renderRetailSalesPage(){
+  const el=document.getElementById('retailSalesList');if(!el)return;
+  try{
+    const r=await dbApi({action:'listPOSSales',companyId:SESSION.companyId,limit:200});
+    const sales=r.sales||[];
+    if(!sales.length){el.innerHTML='<div style="text-align:center;padding:22px;color:var(--text3)">No sales yet</div>';return;}
+    // Totals
+    const totalRevenue=sales.reduce((s,x)=>s+(parseFloat(x.total)||0),0);
+    const totalItems=sales.reduce((s,x)=>s+(Array.isArray(x.items)?x.items.length:(JSON.parse(x.items||'[]')).length),0);
+    el.innerHTML=`<div class="kgrid" style="grid-template-columns:repeat(3,1fr);margin-bottom:12px">
+      <div class="kpi"><div class="kpi-lbl">Total Sales</div><div class="kpi-val pos">${fc(totalRevenue)}</div></div>
+      <div class="kpi"><div class="kpi-lbl">Transactions</div><div class="kpi-val">${sales.length}</div></div>
+      <div class="kpi"><div class="kpi-lbl">Items Sold</div><div class="kpi-val">${totalItems}</div></div>
+    </div>
+    <table><thead><tr><th>Date</th><th>Items</th><th>Payment</th><th>Discount</th><th>Total</th><th>Cashier</th></tr></thead><tbody>${
+      sales.map(s=>{
+        const items=Array.isArray(s.items)?s.items:(JSON.parse(s.items||'[]'));
+        return`<tr><td style="font-family:'JetBrains Mono',monospace;font-size:11px">${String(s.sale_date).split('T')[0]}</td><td style="font-size:11px">${items.map(i=>i.name+' ×'+i.qty).join(', ').slice(0,50)}</td><td><span class="tag ${s.payment_method==='cash'?'t-green':'t-blue'}" style="font-size:9px">${s.payment_method}</span></td><td style="font-family:'JetBrains Mono',monospace">${s.discount>0?'-'+fc(s.discount):''}</td><td style="font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--gold3)">${fc(s.total)}</td><td style="font-size:11px;color:var(--text3)">${s.cashier||'—'}</td></tr>`;
+      }).join('')
+    }</tbody></table>`;
+  }catch(e){el.innerHTML=`<span style="color:var(--red3)">Could not load: ${e.message}</span>`;}
+}
+
+// ── OVERRIDE nav() to handle retail pages ────
+const _originalNav = typeof nav !== 'undefined' ? nav : null;
+function nav(page, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('on'));
+  document.querySelectorAll('.sb-item').forEach(i => i.classList.remove('on'));
+  const pg = document.getElementById('pg-' + page);
+  if (pg) pg.classList.add('on');
+  if (el) el.classList.add('on');
+
+  // Retail page triggers
+  if (page === 'pos') { renderPOSCart(); if(document.getElementById('pos-scan'))setTimeout(()=>document.getElementById('pos-scan').focus(),100); }
+  if (page === 'products') { renderProductsPage(); }
+  if (page === 'stockin') { renderStockInProductSelect(); }
+  if (page === 'stockval') { renderStockValPage(); }
+  if (page === 'retailsales') { renderRetailSalesPage(); }
+  if (page === 'purchaseorders') { renderPOList(); }
+
+  // Shared page triggers (keep original logic)
+  if (page === 'ledger') renderLedger();
+  if (page === 'trial') renderTrial();
+  if (page === 'income') renderIncome();
+  if (page === 'balance') renderBalance();
+  if (page === 'cashflow') renderCashflow();
+  if (page === 'jobcost') renderJobCost();
+  if (page === 'retention') renderRetention();
+  if (page === 'journal') renderJournal();
+  if (page === 'audit') { runAudit(); switchAuditTab('bot'); }
+  if (page === 'coa') renderCOA();
+  if (page === 'periods') loadPeriodList();
+  if (page === 'settings') {
+    document.getElementById('bizName').value = BIZ_NAME;
+    document.getElementById('sspRate').value = SSP_RATE;
+    renderCostingButtons(); renderProjectScopeCheckboxes();
+  }
+}
+
+function renderStockInProductSelect(){
+  const el=document.getElementById('si-product');if(!el)return;
+  el.innerHTML='<option value="">Select product...</option>'+RETAIL_PRODUCTS.map(p=>`<option value="${p.id}">${p.name} (stock: ${p.qty} ${p.unit})</option>`).join('');
+}
+
+async function renderPOList(){
+  const el=document.getElementById('poList');if(!el)return;
+  try{const r=await dbApi({action:'listPurchaseOrders',companyId:SESSION.companyId});
+    const orders=r.orders||[];
+    if(!orders.length){el.innerHTML='<div style="text-align:center;padding:22px;color:var(--text3)">No purchase orders yet</div>';return;}
+    el.innerHTML=`<table><thead><tr><th>Date</th><th>Supplier</th><th>Items</th><th>Total</th><th>Payment</th><th>Status</th></tr></thead><tbody>${orders.map(o=>{const items=Array.isArray(o.items)?o.items:(JSON.parse(o.items||'[]'));return`<tr><td style="font-family:'JetBrains Mono',monospace;font-size:11px">${String(o.po_date).split('T')[0]}</td><td>${o.supplier}</td><td style="font-size:11px">${items.map(i=>i.name+' ×'+i.qty).join(', ').slice(0,40)||'—'}</td><td style="font-family:'JetBrains Mono',monospace">${fc(o.total)}</td><td><span class="tag ${o.payment_method==='cash'?'t-green':'t-orange'}" style="font-size:9px">${o.payment_method}</span></td><td><span class="tag t-blue" style="font-size:9px">${o.status}</span></td></tr>`;}).join('')}</tbody></table>`;
+  }catch(e){el.innerHTML=`<span style="color:var(--red3)">${e.message}</span>`;}
+}
+
+// ── PATCH enterCompany to init retail mode ───
+const _origEnterCompany = typeof enterCompany !== 'undefined' ? enterCompany : null;
+async function enterCompany(c) {
+  APP_MODE = c.app_mode || 'construction';
+  SESSION.companyId = c.company_id; SESSION.role = c.role;
+  SESSION.projectScope = c.project_scope || null;
+  BIZ_NAME = c.biz_name; SSP_RATE = parseFloat(c.ssp_rate) || 1300;
+  INV_COSTING_METHOD = c.costing_method || 'WAC';
+  ACTIVE_PROJECT = ''; CUR = 'USD'; DB = freshDB();
+  await loadDB(); await loadChartOfAccounts(); await loadPeriods();
+  document.getElementById('companyScreen').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('mainApp').style.display = 'block';
+  document.getElementById('tbBiz').textContent = BIZ_NAME;
+  document.getElementById('bizName').value = BIZ_NAME;
+  document.getElementById('sspRate').value = SSP_RATE;
+  const rb = document.getElementById('roleBadge');
+  rb.textContent = SESSION.role === 'owner' ? '👑 Owner' : SESSION.role === 'accountant' ? '📊 Accountant' : '👤 Staff';
+  rb.className = 'role-badge ' + SESSION.role;
+  const sb = document.getElementById('scopeBanner');
+  if (sb && SESSION.projectScope && SESSION.role === 'staff') {
+    sb.innerHTML = `<div class="scope-banner">🔐 You can only see: <strong>${getScopedNames().join(', ') || '(no projects assigned)'}</strong></div>`;
+  } else if (sb) sb.innerHTML = '';
+  // Inject mode switcher into topbar
+  injectModeSwitcher();
+  renderSidebar(APP_MODE);
+  renderModeBadge();
+  if (APP_MODE === 'retail') await loadRetailProducts();
+  autoDepreciation(); renderAll(); runAudit(); renderStaffPanel(); loadPeriodList();
+}
+
+// ── PATCH registration to include mode picker ─
+const _origDoLogin = doLogin;
+// Mode selection state
+let REG_APP_MODE = 'construction';
+function selectRegMode(mode) {
+  REG_APP_MODE = mode;
+  document.getElementById('regModeConst').style.borderColor = mode === 'construction' ? 'var(--gold2)' : 'var(--border2)';
+  document.getElementById('regModeRetail').style.borderColor = mode === 'retail' ? 'var(--red3)' : 'var(--border2)';
+  document.getElementById('regModeConst').style.background = mode === 'construction' ? 'rgba(196,154,42,.08)' : 'var(--bg3)';
+  document.getElementById('regModeRetail').style.background = mode === 'retail' ? 'rgba(192,48,42,.08)' : 'var(--bg3)';
+}
+
+// Inject mode picker into registration form
+function injectModePicker() {
+  const regFields = document.getElementById('regFields');
+  if (!regFields || document.getElementById('regModePicker')) return;
+  const picker = document.createElement('div');
+  picker.id = 'regModePicker';
+  picker.style.cssText = 'margin-bottom:13px';
+  picker.innerHTML = `
+    <label style="display:block;font-family:'Noto Sans Ethiopic',sans-serif;font-size:11px;color:var(--text2);margin-bottom:7px">App Mode — ዓይነት ሒሳብ</label>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div id="regModeConst" onclick="selectRegMode('construction')" style="padding:12px;background:rgba(196,154,42,.08);border:1px solid var(--gold2);border-radius:7px;cursor:pointer;text-align:center;transition:all .15s">
+        <div style="font-size:22px;margin-bottom:4px">🏗️</div>
+        <div style="font-size:12px;font-weight:600;color:var(--text);font-family:'Noto Sans Ethiopic',sans-serif">Construction</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:2px">Job costing, WIP, Retention</div>
+      </div>
+      <div id="regModeRetail" onclick="selectRegMode('retail')" style="padding:12px;background:var(--bg3);border:1px solid var(--border2);border-radius:7px;cursor:pointer;text-align:center;transition:all .15s">
+        <div style="font-size:22px;margin-bottom:4px">🛒</div>
+        <div style="font-size:12px;font-weight:600;color:var(--text);font-family:'Noto Sans Ethiopic',sans-serif">Retail / Shop</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:2px">POS, Barcode, COGS</div>
+      </div>
+    </div>`;
+  regFields.insertBefore(picker, regFields.firstChild);
+}
+
+// Override toggleReg to inject mode picker
+const _origToggleReg = toggleReg;
+function toggleReg() {
+  _origToggleReg();
+  if (_isReg) { injectModePicker(); selectRegMode('construction'); }
+}
+
+// Override doLogin to pass appMode
+async function doLogin() {
+  const u = document.getElementById('lu').value.trim(), p = document.getElementById('lp').value;
+  const err = document.getElementById('lerr'), btn = document.getElementById('loginBtn');
+  if (!u || !p) { err.style.display = 'block'; err.textContent = 'Fill all fields'; return; }
+  btn.textContent = '...'; btn.disabled = true;
+  try {
+    if (_isReg) {
+      const biz = document.getElementById('lb').value.trim() || u + ' Construction';
+      const r = await dbApi({ action: 'register', username: u, password: p, bizName: biz, appMode: REG_APP_MODE });
+      SESSION = { userId: r.userId, username: u, companyId: r.companyId, role: 'owner', projectScope: null,
+        companies: [{ company_id: r.companyId, role: 'owner', project_scope: null, biz_name: r.bizName, ssp_rate: 1300, costing_method: 'WAC', app_mode: r.appMode }] };
+      await enterCompany(SESSION.companies[0]);
+    } else {
+      const r = await dbApi({ action: 'login', username: u, password: p });
+      SESSION.userId = r.userId; SESSION.username = u; SESSION.companies = r.companies || [];
+      if (!SESSION.companies.length) { err.style.display = 'block'; err.textContent = 'No company access — ask your owner'; return; }
+      if (SESSION.companies.length === 1) { await enterCompany(SESSION.companies[0]); }
+      else { showCompanyScreen(); }
+    }
+  } catch (e) { err.style.display = 'block'; err.textContent = e.message || 'Login failed'; }
+  finally { btn.textContent = _isReg ? '📝 Register' : '🔓 ኣቱ — Login'; btn.disabled = false; }
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('companyScreen').style.display = 'none';
+  document.getElementById('mainApp').style.display = 'none';
+});
+</script>
+
+<!-- ══ RETAIL PAGES (injected into main) ════════════════════════════════════ -->
+<style>
+/* POS layout */
+.pos-shell{display:grid;grid-template-columns:1fr 360px;gap:14px;height:calc(100vh - 120px);min-height:600px}
+.pos-left{display:flex;flex-direction:column;gap:10px;overflow:hidden}
+.pos-right{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.pos-scan-row{display:flex;gap:7px}
+.pos-scan-inp{flex:1;background:var(--bg);border:2px solid var(--gold2);border-radius:7px;padding:12px 14px;font-family:'JetBrains Mono',monospace;font-size:15px;color:var(--text);outline:none}
+.pos-scan-inp::placeholder{color:var(--text3);font-size:13px}
+.pos-scan-btn{padding:12px 16px;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#0a0e17;border:none;border-radius:7px;font-size:16px;cursor:pointer;font-weight:700}
+.pos-product-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;overflow-y:auto;flex:1;align-content:start}
+.pos-product-btn{background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:12px 8px;cursor:pointer;text-align:center;transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:5px}
+.pos-product-btn:hover{border-color:var(--gold2);background:var(--bg3)}
+.pos-product-btn .ppb-name{font-size:11px;font-weight:600;color:var(--text);font-family:'Noto Sans Ethiopic',sans-serif;line-height:1.3;word-break:break-word}
+.pos-product-btn .ppb-price{font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--gold3)}
+.pos-product-btn .ppb-stock{font-size:9px;font-family:'JetBrains Mono',monospace}
+.pos-cart-items{flex:1;overflow-y:auto;min-height:0}
+.pos-totals{border-top:1px solid var(--border);padding-top:10px}
+.pos-total-row{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;padding:3px 0}
+.pos-grand-total{font-size:22px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--gold3);margin:4px 0}
+.pos-pay-btn{width:100%;padding:14px;background:linear-gradient(135deg,var(--green),var(--green2));color:#fff;border:none;border-radius:8px;font-family:'Noto Sans Ethiopic',sans-serif;font-size:16px;font-weight:700;cursor:pointer}
+.pos-pay-btn:hover{opacity:.9}
+.pos-clear-btn{width:100%;padding:9px;background:transparent;border:1px solid rgba(192,48,42,.3);border-radius:6px;color:var(--red3);font-family:'Noto Sans Ethiopic',sans-serif;font-size:13px;cursor:pointer}
+@media(max-width:768px){.pos-shell{grid-template-columns:1fr;height:auto}.pos-product-grid{grid-template-columns:repeat(3,1fr)}}
+</style>
+
+<script>
+// Inject retail HTML pages into the main container at runtime
+function injectRetailPages() {
+  const main = document.querySelector('.main');
+  if (!main || document.getElementById('pg-pos')) return;
+
+  // POS PAGE
+  const posPage = document.createElement('div');
+  posPage.className = 'page';
+  posPage.id = 'pg-pos';
+  posPage.innerHTML = `
+    <div class="ph"><h1>🖥️ POS Register</h1><p>Scan barcode or click product to add to cart</p></div>
+    <div class="pos-shell">
+      <div class="pos-left">
+        <div class="pos-scan-row">
+          <input class="pos-scan-inp" id="pos-scan" placeholder="🔍 Scan barcode / type SKU / product name..." onkeydown="if(event.key==='Enter')posLookup(this.value)" autocomplete="off"/>
+          <button class="pos-scan-btn" onclick="posLookup()">Add</button>
+        </div>
+        <div class="pos-product-grid" id="pos-product-grid"></div>
+      </div>
+      <div class="pos-right">
+        <div style="font-family:'Noto Sans Ethiopic',sans-serif;font-size:13px;font-weight:600;color:var(--text);padding-bottom:8px;border-bottom:1px solid var(--border)">🛒 Current Sale</div>
+        <div class="pos-cart-items" id="pos-cart-items"><div style="text-align:center;padding:22px;color:var(--text3);font-size:12px">🛒 Scan or click a product to begin</div></div>
+        <div class="pos-totals">
+          <div class="pos-total-row"><span style="color:var(--text2)">Subtotal</span><span id="pos-subtotal" style="font-family:'JetBrains Mono',monospace">$0.00</span></div>
+          <div class="pos-total-row" style="align-items:center">
+            <div style="display:flex;align-items:center;gap:6px;color:var(--text2)">Discount <input id="pos-discount" type="number" min="0" max="100" placeholder="0" oninput="POS_DISCOUNT=parseFloat(this.value)||0;renderPOSCart()" style="width:50px;background:var(--bg3);border:1px solid var(--border2);border-radius:4px;padding:2px 6px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text);outline:none"/> %</div>
+            <span id="pos-discount-amt" style="font-family:'JetBrains Mono',monospace;color:var(--red3)">$0.00</span>
+          </div>
+          <div class="pos-total-row" style="margin-top:4px"><span style="font-size:14px;font-weight:600;color:var(--text)">TOTAL</span><span class="pos-grand-total" id="pos-total">$0.00</span></div>
+          <div class="pos-total-row" style="margin-top:8px">
+            <span style="color:var(--text2);font-size:11px">Payment</span>
+            <select id="pos-payment" style="background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:5px 9px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none">
+              <option value="cash">💵 Cash</option>
+              <option value="mobile">📱 Mobile Money</option>
+              <option value="card">💳 Card</option>
+            </select>
+          </div>
+          <button class="pos-pay-btn" onclick="completeSale()" style="margin-top:10px">✅ Complete Sale</button>
+          <button class="pos-clear-btn" onclick="POS_CART=[];POS_DISCOUNT=0;document.getElementById('pos-discount').value='';renderPOSCart()" style="margin-top:6px">🗑️ Clear Cart</button>
+        </div>
+      </div>
+    </div>`;
+  main.appendChild(posPage);
+
+  // PRODUCTS PAGE
+  const prodPage = document.createElement('div');
+  prodPage.className = 'page';
+  prodPage.id = 'pg-products';
+  prodPage.innerHTML = `
+    <div class="ph"><h1>📦 Products</h1><p>Your product catalogue with SKU, barcode, pricing and stock levels</p></div>
+    <div class="card"><div class="card-hdr">➕ Add Product</div>
+      <div class="fgrid">
+        <div class="fg"><label>Product Name</label><input id="prd-name" type="text" placeholder="Soda 500ml"/></div>
+        <div class="fg"><label>SKU</label><input id="prd-sku" type="text" placeholder="BEV-001"/></div>
+        <div class="fg"><label>Barcode</label><input id="prd-barcode" type="text" placeholder="6931234567890"/></div>
+        <div class="fg"><label>Category</label><select id="prd-cat"><option>Beverages</option><option>Food</option><option>Household</option><option>Electronics</option><option>Clothing</option><option>Stationery</option><option>General</option></select></div>
+        <div class="fg"><label>Sale Price</label><input id="prd-sale" type="number" step="0.01" placeholder="2.50"/></div>
+        <div class="fg"><label>Cost Price</label><input id="prd-cost" type="number" step="0.01" placeholder="1.80"/></div>
+        <div class="fg"><label>Opening Stock</label><input id="prd-qty" type="number" placeholder="0"/></div>
+        <div class="fg"><label>Min Stock Alert</label><input id="prd-min" type="number" placeholder="5"/></div>
+        <div class="fg"><label>Unit</label><select id="prd-unit"><option>unit</option><option>kg</option><option>liters</option><option>pack</option><option>dozen</option><option>box</option><option>carton</option></select></div>
+      </div>
+      <div class="btn-row"><button class="btn btn-gold" onclick="saveProduct()">➕ Add Product</button></div>
+      <div id="prd-st" style="font-size:11px;margin-top:7px"></div>
+    </div>
+    <div class="card">
+      <input style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:8px 11px;font-size:12px;color:var(--text);outline:none;margin-bottom:10px" placeholder="Search by name, SKU or barcode..." id="productSearch" oninput="renderProductsPage()"/>
+      <div id="retailProductList"></div>
+    </div>`;
+  main.appendChild(prodPage);
+
+  // STOCK IN PAGE
+  const stockInPage = document.createElement('div');
+  stockInPage.className = 'page';
+  stockInPage.id = 'pg-stockin';
+  stockInPage.innerHTML = `
+    <div class="ph"><h1>📲 Receive Stock</h1><p>Record stock received from supplier — auto-posts to Inventory and journal</p></div>
+    <div class="card"><div class="card-hdr">➕ Receive Delivery</div>
+      <div class="fgrid">
+        <div class="fg"><label>Product</label><select id="si-product" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:9px 11px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none"><option>Select product...</option></select></div>
+        <div class="fg"><label>Qty Received</label><input id="si-qty" type="number" placeholder="50"/></div>
+        <div class="fg"><label>Unit Cost</label><input id="si-cost" type="number" step="0.01" placeholder="1.80"/></div>
+        <div class="fg"><label>Supplier</label><input id="si-supplier" type="text" placeholder="Supplier name"/></div>
+        <div class="fg"><label>Payment</label><select id="si-pay"><option value="credit">Credit (Accounts Payable)</option><option value="cash">Cash</option></select></div>
+      </div>
+      <div class="btn-row"><button class="btn btn-gold" onclick="receiveStock()">📦 Receive Stock</button></div>
+      <div id="si-st" style="font-size:11px;margin-top:7px"></div>
+      <div class="alert al-info" style="margin-top:10px"><span class="alert-ico">💡</span><div class="alert-body"><div class="alert-title">What this posts</div>Dr Inventory (Stock) · Cr Accounts Payable (credit) or Cash. Each delivery creates a cost layer for FIFO/WAC valuation.</div></div>
+    </div>`;
+  main.appendChild(stockInPage);
+
+  // STOCK VALUATION PAGE
+  const stockValPage = document.createElement('div');
+  stockValPage.className = 'page';
+  stockValPage.id = 'pg-stockval';
+  stockValPage.innerHTML = `
+    <div class="ph"><h1>📊 Stock Valuation</h1><p>Current inventory value at cost (WAC) vs retail selling price</p></div>
+    <div class="card"><div id="stockValList"><div style="text-align:center;padding:22px;color:var(--text3)">Loading...</div></div></div>`;
+  main.appendChild(stockValPage);
+
+  // RETAIL SALES PAGE
+  const retailSalesPage = document.createElement('div');
+  retailSalesPage.className = 'page';
+  retailSalesPage.id = 'pg-retailsales';
+  retailSalesPage.innerHTML = `
+    <div class="ph"><h1>💰 Sales Report</h1><p>All POS transactions — revenue, items and payment methods</p></div>
+    <div class="card"><div id="retailSalesList"><div style="text-align:center;padding:22px;color:var(--text3)">Loading...</div></div></div>`;
+  main.appendChild(retailSalesPage);
+
+  // PURCHASE ORDERS PAGE
+  const poPage = document.createElement('div');
+  poPage.className = 'page';
+  poPage.id = 'pg-purchaseorders';
+  poPage.innerHTML = `
+    <div class="ph"><h1>🚚 Purchase Orders</h1><p>Orders placed with suppliers</p></div>
+    <div class="card"><div id="poList"><div style="text-align:center;padding:22px;color:var(--text3)">Loading...</div></div></div>`;
+  main.appendChild(poPage);
+}
+
+// Render quick-tap product grid in POS
+function renderPOSProductGrid() {
+  const el = document.getElementById('pos-product-grid');
+  if (!el) return;
+  if (!RETAIL_PRODUCTS.length) {
+    el.innerHTML = '<div style="color:var(--text3);font-size:12px;text-align:center;padding:14px;grid-column:1/-1">No products yet — add them in the Products page</div>';
+    return;
+  }
+  el.innerHTML = RETAIL_PRODUCTS.map(p => {
+    const cls = parseFloat(p.qty) <= 0 ? 'var(--red3)' : parseFloat(p.qty) <= parseFloat(p.min_qty) ? 'var(--orange3)' : 'var(--green3)';
+    return `<div class="pos-product-btn" onclick="posAddToCart(${JSON.stringify({id:p.id,name:p.name,sku:p.sku,barcode:p.barcode,sale_price:parseFloat(p.sale_price)||0,cost_price:parseFloat(p.cost_price)||0,qty:1,unit:p.unit||'unit'})})">
+      <div class="ppb-name">${p.name}</div>
+      <div class="ppb-price">${fc(p.sale_price)}</div>
+      <div class="ppb-stock" style="color:${cls}">${p.qty} ${p.unit}</div>
+    </div>`;
+  }).join('');
+}
+
+// Hook into DOMContentLoaded to inject retail pages
+window.addEventListener('DOMContentLoaded', () => {
+  injectRetailPages();
+});
+
+// Also patch renderAll to refresh retail pages when in retail mode
+const _origRenderAll = typeof renderAll !== 'undefined' ? renderAll : null;
+function renderAll() {
+  if (_origRenderAll) _origRenderAll();
+  if (APP_MODE === 'retail') {
+    renderPOSProductGrid();
+    renderProductsPage();
+    renderStockValPage();
+  }
+}
+</script>
+<script>
+// ══════════════════════════════════════════════════════════════
+// RETAIL AI — update AI prompt to know about retail mode
+// ══════════════════════════════════════════════════════════════
+const _origDoRecord = doRecord;
+async function doRecord(overrideText) {
+  const inp = document.getElementById('mainInp');
+  const q = (overrideText !== undefined ? overrideText : inp.value).trim();
+  if (!q) return;
+  const btn = document.querySelector('.hero-send');
+  btn.textContent = '⏳'; btn.disabled = true;
+  try {
+    const payload = {
+      prompt: q,
+      materials: APP_MODE === 'construction' ? DB.materials : [],
+      products: APP_MODE === 'retail' ? RETAIL_PRODUCTS : [],
+      projects: APP_MODE === 'construction' ? DB.projects : [],
+      appMode: APP_MODE
+    };
+    const res = await fetch('/api/ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    _pending = safeParseAIJson(data.result || '');
+    showResult(_pending);
+  } catch (err) { showToast('❌ ' + err.message, 5000); }
+  btn.textContent = '↗'; btn.disabled = false;
+}
+
+// ══════════════════════════════════════════════════════════════
+// RETAIL-AWARE AUDIT
+// ══════════════════════════════════════════════════════════════
+const _origRunAudit = runAudit;
+function runAudit() {
+  _origRunAudit();
+  if (APP_MODE !== 'retail') return;
+  // Additional retail checks
+  const findings = [];
+  // Low stock
+  const lowStock = RETAIL_PRODUCTS.filter(p => parseFloat(p.qty) <= parseFloat(p.min_qty) && parseFloat(p.min_qty) > 0);
+  if (lowStock.length) findings.push({ sev: 'med', title: '📦 Low Stock Alert', desc: lowStock.map(p => `${p.name}: ${p.qty} ${p.unit} (min: ${p.min_qty})`).join(', '), meta: 'Inventory' });
+  // Out of stock
+  const outStock = RETAIL_PRODUCTS.filter(p => parseFloat(p.qty) <= 0);
+  if (outStock.length) findings.push({ sev: 'high', title: '⛔ Out of Stock', desc: outStock.map(p => p.name).join(', '), meta: 'Inventory' });
+  // No products yet
+  if (!RETAIL_PRODUCTS.length) findings.push({ sev: 'med', title: '📦 No Products', desc: 'Add products to your catalogue before recording sales.', meta: 'Setup' });
+
+  if (!findings.length) return;
+  const el = document.getElementById('auditFindings');
+  if (!el) return;
+  const retailHtml = findings.map(f => `<div class="audit-item"><div class="audit-dot ${f.sev}"></div><div class="audit-info"><div class="audit-title">${f.title}</div><div class="audit-desc">${f.desc}</div><div class="audit-meta">${f.meta}</div></div><span class="tag ${f.sev === 'high' ? 't-red' : 't-orange'}" style="font-size:9px">${f.sev.toUpperCase()}</span></div>`).join('');
+  el.innerHTML = retailHtml + el.innerHTML;
+  const highCount = findings.filter(f => f.sev === 'high').length;
+  if (highCount) {
+    const ab = document.getElementById('auditBadge');
+    if (ab) { ab.textContent = parseInt(ab.textContent || '0') + highCount; ab.style.background = 'var(--red2)'; }
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// HOME PAGE — retail-aware KPIs and chips
+// ══════════════════════════════════════════════════════════════
+const _origRenderHomeKpis = renderHomeKpis;
+function renderHomeKpis() {
+  if (APP_MODE === 'construction') { _origRenderHomeKpis(); return; }
+  // Retail KPIs
+  const b = getBal();
+  const rev = sumByType(b, 'revenue');
+  const exp = sumByType(b, 'expense');
+  const net = rev - exp;
+  const cash = b['Cash'] ? b['Cash'].net : 0;
+  const inventory = b['Inventory (Stock)'] ? b['Inventory (Stock)'].net : 0;
+  const ap = b['Accounts Payable'] ? b['Accounts Payable'].net : 0;
+  const totalProducts = RETAIL_PRODUCTS.length;
+  const lowStockCount = RETAIL_PRODUCTS.filter(p => parseFloat(p.qty) <= parseFloat(p.min_qty) && parseFloat(p.min_qty) > 0).length;
+  const el = document.getElementById('homeKpis');
+  if (!el) return;
+  el.innerHTML = `
+    <div class="kpi"><div class="kpi-lbl">Sales Revenue</div><div class="kpi-val pos">${fc(rev)}</div></div>
+    <div class="kpi"><div class="kpi-lbl">COGS</div><div class="kpi-val neg">${fc(exp)}</div></div>
+    <div class="kpi"><div class="kpi-lbl">Gross Profit</div><div class="kpi-val ${net >= 0 ? 'pos' : 'neg'}">${fc(net)}</div></div>
+    <div class="kpi"><div class="kpi-lbl">Cash</div><div class="kpi-val ${cash >= 0 ? '' : 'neg'}">${fc(cash)}</div></div>
+    <div class="kpi"><div class="kpi-lbl">Inventory Value</div><div class="kpi-val warn">${fc(inventory)}</div></div>
+    <div class="kpi"><div class="kpi-lbl">Payables</div><div class="kpi-val neg">${fc(ap)}</div></div>
+    <div class="kpi"><div class="kpi-lbl">SKUs</div><div class="kpi-val">${totalProducts}</div></div>
+    ${lowStockCount > 0 ? `<div class="kpi" style="border-color:rgba(224,128,32,.4)"><div class="kpi-lbl" style="color:var(--orange3)">Low Stock Items</div><div class="kpi-val warn">${lowStockCount}</div></div>` : ''}`;
+}
+
+// Retail chips on home page
+const _origRenderAll2 = renderAll;
+function renderAll() {
+  _origRenderAll2();
+  // Swap chips for retail mode
+  const chips = document.querySelector('.chips');
+  if (!chips) return;
+  if (APP_MODE === 'retail') {
+    chips.innerHTML = `
+      <div class="chip" onclick="useChip(this)">Received 50 bags sugar from supplier</div>
+      <div class="chip" onclick="useChip(this)">Paid rent 500 USD</div>
+      <div class="chip" onclick="useChip(this)">Paid staff wages 300 USD</div>
+      <div class="chip" onclick="useChip(this)">Owner deposited 1000 USD capital</div>
+      <div class="chip" onclick="useChip(this)">Paid electricity bill 80 USD</div>`;
+  } else {
+    chips.innerHTML = `
+      <div class="chip" onclick="useChip(this)">ደሞዝ ከፈልና</div>
+      <div class="chip" onclick="useChip(this)">ሲሚንቶ ዓደግና</div>
+      <div class="chip" onclick="useChip(this)">ነዳዲ ሸቀጥ</div>
+      <div class="chip" onclick="useChip(this)">ዓሚል ቅድሚ ከፈለ</div>
+      <div class="chip" onclick="useChip(this)">Paid rent 6 months advance</div>`;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// SETTINGS PAGE — add mode switch toggle
+// ══════════════════════════════════════════════════════════════
+const _origSaveSettings = saveSettings;
+async function saveSettings() {
+  await _origSaveSettings();
+  // Also sync APP_MODE display
+  renderModeBadge();
+}
+
+function injectModeSettingsCard() {
+  const settingsPage = document.getElementById('pg-settings');
+  if (!settingsPage || document.getElementById('modeSwitchCard')) return;
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.id = 'modeSwitchCard';
+  card.innerHTML = `
+    <div class="card-hdr">🔄 App Mode</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div id="settingsModeConst" onclick="switchAppMode('construction')" style="padding:14px;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;cursor:pointer;text-align:center;transition:all .15s">
+        <div style="font-size:24px;margin-bottom:5px">🏗️</div>
+        <div style="font-size:13px;font-weight:600;color:var(--text);font-family:'Noto Sans Ethiopic',sans-serif">Construction</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:3px">Job costing · WIP · Retention</div>
+      </div>
+      <div id="settingsModeRetail" onclick="switchAppMode('retail')" style="padding:14px;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;cursor:pointer;text-align:center;transition:all .15s">
+        <div style="font-size:24px;margin-bottom:5px">🛒</div>
+        <div style="font-size:13px;font-weight:600;color:var(--text);font-family:'Noto Sans Ethiopic',sans-serif">Retail / Supermarket</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:3px">POS · Barcode · COGS</div>
+      </div>
+    </div>
+    <div class="alert al-info">
+      <span class="alert-ico">ℹ️</span>
+      <div class="alert-body"><div class="alert-title">Mode switch is safe</div>
+      All existing journal entries, balances and reports are preserved. Only the sidebar and data entry screens change. Both modes share the same General Journal and financial statements.
+      </div>
+    </div>`;
+  settingsPage.appendChild(card);
+  refreshModeSettingsHighlight();
+}
+
+function refreshModeSettingsHighlight() {
+  const c = document.getElementById('settingsModeConst');
+  const r = document.getElementById('settingsModeRetail');
+  if (!c || !r) return;
+  c.style.borderColor = APP_MODE === 'construction' ? 'var(--gold2)' : 'var(--border2)';
+  c.style.background = APP_MODE === 'construction' ? 'rgba(196,154,42,.08)' : 'var(--bg3)';
+  r.style.borderColor = APP_MODE === 'retail' ? 'var(--red3)' : 'var(--border2)';
+  r.style.background = APP_MODE === 'retail' ? 'rgba(192,48,42,.08)' : 'var(--bg3)';
+}
+
+// Patch switchAppMode to also update settings card highlight
+const _origSwitchAppMode = switchAppMode;
+async function switchAppMode(newMode) {
+  await _origSwitchAppMode(newMode);
+  refreshModeSettingsHighlight();
+  if (APP_MODE === 'retail') renderPOSProductGrid();
+}
+
+// ══════════════════════════════════════════════════════════════
+// INCOME STATEMENT — retail-aware labels
+// ══════════════════════════════════════════════════════════════
+const _origRenderIncome = renderIncome;
+function renderIncome() {
+  const el = document.getElementById('iFull');
+  if (!el) return;
+  const from = (document.getElementById('iFrom') || {}).value || '';
+  const to = (document.getElementById('iTo') || {}).value || '';
+  const b = {};
+  function add(acct, atype, dr, cr) {
+    if (!b[acct]) b[acct] = { atype, dr: 0, cr: 0, net: 0 };
+    b[acct].dr += dr; b[acct].cr += cr;
+    const t = (b[acct].atype || '').toLowerCase();
+    b[acct].net = t === 'asset' || t === 'expense' ? b[acct].dr - b[acct].cr : b[acct].cr - b[acct].dr;
+  }
+  scopedEntries(DB.entries)
+    .filter(e => (!from || e.date >= from) && (!to || e.date <= to))
+    .forEach(e => {
+      (e.debits || []).forEach(d => add(d.acct, d.atype, d.amt, 0));
+      (e.credits || []).forEach(c => add(c.acct, c.atype, 0, c.amt));
+    });
+  const rev = Object.entries(b).filter(([, v]) => v.atype === 'revenue');
+  const directExp = Object.entries(b).filter(([, v]) => v.atype === 'expense' && (v.acct === 'Cost of Goods Sold' || Object.keys(b).find(k => k === 'Cost of Goods Sold')));
+  const allExp = Object.entries(b).filter(([, v]) => v.atype === 'expense');
+  const cogsEntry = b['Cost of Goods Sold'];
+  const tR = rev.reduce((s, [, v]) => s + v.net, 0);
+  const tCogs = cogsEntry ? cogsEntry.net : 0;
+  const grossProfit = tR - tCogs;
+  const tX = allExp.reduce((s, [, v]) => s + v.net, 0);
+  const net = tR - tX;
+
+  if (APP_MODE === 'retail') {
+    // Retail format: Revenue → Gross Profit → Operating Expenses → Net
+    const opExp = allExp.filter(([a]) => a !== 'Cost of Goods Sold');
+    const tOp = opExp.reduce((s, [, v]) => s + v.net, 0);
+    el.innerHTML = `<div class="fs-card">
+      <div class="fs-title">Income Statement — Retail</div>
+      <div class="fs-sub">${from || 'All time'} → ${to || today()}</div>
+      <div class="fs-section">Revenue</div>
+      ${rev.map(([a, v]) => `<div class="fs-row indent"><span>${a}</span><span class="fs-val" style="color:var(--green3)">${fc(v.net)}</span></div>`).join('')}
+      <div class="fs-row sub"><span>Total Revenue</span><span class="fs-val" style="color:var(--green3)">${fc(tR)}</span></div>
+      <div class="fs-section">Cost of Goods Sold</div>
+      ${cogsEntry ? `<div class="fs-row indent"><span>Cost of Goods Sold</span><span class="fs-val" style="color:var(--red3)">${fc(tCogs)}</span></div>` : '<div style="color:var(--text3);font-size:11px;padding:5px 13px">No COGS posted yet</div>'}
+      <div class="fs-row sub"><span>Gross Profit</span><span class="fs-val" style="color:${grossProfit >= 0 ? 'var(--green3)' : 'var(--red3)'}">${fc(grossProfit)}</span></div>
+      <div class="fs-section">Operating Expenses</div>
+      ${opExp.map(([a, v]) => `<div class="fs-row indent"><span>${a}</span><span class="fs-val" style="color:var(--red3)">${fc(v.net)}</span></div>`).join('')}
+      <div class="fs-row sub"><span>Total Operating Expenses</span><span class="fs-val" style="color:var(--red3)">${fc(tOp)}</span></div>
+      <div class="fs-row total"><span>Net ${net >= 0 ? 'Profit' : 'Loss'}</span><span class="fs-val" style="color:${net >= 0 ? 'var(--green3)' : 'var(--red3)'}">${fc(net)}</span></div>
+      <div style="margin-top:12px;padding:10px;background:var(--bg3);border-radius:6px;border:1px solid var(--border)">
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text2)"><span>Gross Margin %</span><span style="font-family:'JetBrains Mono',monospace;color:var(--gold3);font-weight:600">${tR > 0 ? (grossProfit / tR * 100).toFixed(1) : '0.0'}%</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text2);margin-top:5px"><span>Net Margin %</span><span style="font-family:'JetBrains Mono',monospace;color:${net >= 0 ? 'var(--green3)' : 'var(--red3)'};font-weight:600">${tR > 0 ? (net / tR * 100).toFixed(1) : '0.0'}%</span></div>
+      </div>
+    </div>`;
+  } else {
+    _origRenderIncome();
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// HOME ALERTS — retail-aware
+// ══════════════════════════════════════════════════════════════
+const _origRenderHomeAlerts = renderHomeAlerts;
+function renderHomeAlerts() {
+  if (APP_MODE === 'construction') { _origRenderHomeAlerts(); return; }
+  const alerts = [];
+  const b = getBal();
+  const cash = b['Cash'] ? b['Cash'].net : 0;
+  if (cash < 0) alerts.push({ cls: 'al-danger', ico: '🔴', title: 'Negative Cash!', msg: 'Cash balance: ' + fc(cash) });
+  const lowStock = RETAIL_PRODUCTS.filter(p => parseFloat(p.qty) <= parseFloat(p.min_qty) && parseFloat(p.min_qty) > 0);
+  if (lowStock.length) alerts.push({ cls: 'al-warn', ico: '📦', title: `${lowStock.length} item(s) low on stock`, msg: lowStock.map(p => `${p.name}: ${p.qty} ${p.unit}`).join(', ') });
+  const outStock = RETAIL_PRODUCTS.filter(p => parseFloat(p.qty) <= 0 && RETAIL_PRODUCTS.length > 0);
+  if (outStock.length) alerts.push({ cls: 'al-danger', ico: '⛔', title: `${outStock.length} item(s) out of stock`, msg: outStock.map(p => p.name).join(', ') });
+  const el = document.getElementById('homeAlerts');
+  if (!el) return;
+  el.innerHTML = alerts.map(a => `<div class="alert ${a.cls}"><span class="alert-ico">${a.ico}</span><div class="alert-body"><div class="alert-title">${a.title}</div>${a.msg}</div></div>`).join('');
+}
+
+// ══════════════════════════════════════════════════════════════
+// RETAIL HOME — today's entries show sale summaries
+// ══════════════════════════════════════════════════════════════
+const _origRenderTodayEntries = renderTodayEntries;
+function renderTodayEntries() {
+  if (APP_MODE === 'construction') { _origRenderTodayEntries(); return; }
+  const el = document.getElementById('todayEntries');
+  if (!el) return;
+  const todayEntries = DB.entries.filter(e => e.date === today() && e.type === 'POS Sale');
+  const todayRevenue = todayEntries.reduce((s, e) => s + e.amount, 0);
+  const todayCogs = DB.entries.filter(e => e.date === today() && e.type === 'COGS').reduce((s, e) => s + e.amount, 0);
+  const allToday = DB.entries.filter(e => e.date === today()).slice(-10).reverse();
+  if (!allToday.length) {
+    el.innerHTML = '<div style="text-align:center;padding:14px;color:var(--text3);font-size:12px">No transactions today</div>';
+    return;
+  }
+  el.innerHTML = `
+    <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border2);margin-bottom:7px">
+      <div><div style="font-size:10px;color:var(--text3)">Today's Sales</div><div style="font-size:16px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--green3)">${fc(todayRevenue)}</div></div>
+      <div style="text-align:right"><div style="font-size:10px;color:var(--text3)">Today's COGS</div><div style="font-size:16px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--red3)">${fc(todayCogs)}</div></div>
+    </div>
+    ${allToday.map(e => `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px"><div><div style="color:var(--text)">${e.desc}</div><div style="font-size:10px;color:var(--text3)">${e.type}</div></div><div style="font-family:'JetBrains Mono',monospace;color:var(--gold3)">${fc(e.amount)}</div></div>`).join('')}`;
+}
+
+// ══════════════════════════════════════════════════════════════
+// RETAIL AI SYSTEM PROMPT PATCH in ai.js frontend call
+// ══════════════════════════════════════════════════════════════
+// (ai.js already receives appMode & products — handled server-side)
+
+// ══════════════════════════════════════════════════════════════
+// FINAL INIT — patch DOMContentLoaded
+// ══════════════════════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', () => {
+  // Inject settings mode card after a short delay to ensure settings page exists
+  setTimeout(() => {
+    injectModeSettingsCard();
+    injectRetailPages();
+  }, 100);
+});
+
+// Patch enterCompany to also inject settings card
+const _origEnterCompany2 = enterCompany;
+async function enterCompany(c) {
+  await _origEnterCompany2(c);
+  setTimeout(() => {
+    injectModeSettingsCard();
+    refreshModeSettingsHighlight();
+    if (APP_MODE === 'retail') renderPOSProductGrid();
+  }, 200);
+}
+</script>
+<script>
+// ══════════════════════════════════════════════════════════════
+// PURCHASE ORDER FORM — submit a PO and post journal entry
+// ══════════════════════════════════════════════════════════════
+async function submitPurchaseOrder() {
+  const supplier = document.getElementById('po-supplier').value.trim();
+  const payMethod = document.getElementById('po-pay').value;
+  const notes = document.getElementById('po-notes').value.trim();
+  const st = document.getElementById('po-st');
+  if (!supplier) { st.innerHTML = '<span style="color:var(--red3)">Enter supplier name</span>'; return; }
+
+  // Collect PO line items
+  const rows = document.querySelectorAll('.po-line-row');
+  const items = [];
+  let total = 0;
+  rows.forEach(row => {
+    const productId = row.querySelector('.po-line-product').value;
+    const qty = parseFloat(row.querySelector('.po-line-qty').value) || 0;
+    const unitCost = parseFloat(row.querySelector('.po-line-cost').value) || 0;
+    if (!productId || !qty || !unitCost) return;
+    const product = RETAIL_PRODUCTS.find(p => p.id === parseInt(productId));
+    if (!product) return;
+    const lineTotal = qty * unitCost;
+    total += lineTotal;
+    items.push({ productId: parseInt(productId), name: product.name, qty, unitCost, lineTotal });
+  });
+
+  if (!items.length) { st.innerHTML = '<span style="color:var(--red3)">Add at least one item</span>'; return; }
+
+  try {
+    // Save PO record
+    await dbApi({ action: 'savePurchaseOrder', companyId: SESSION.companyId, supplier, po_date: today(), items, total, paymentMethod: payMethod, notes });
+
+    // Post journal entry: Dr Inventory (Stock), Cr AP or Cash
+    DB.entries.push({
+      id: DB.nextId++, date: today(),
+      desc: `Purchase Order: ${supplier} — ${items.length} item(s)`,
+      type: 'Stock Purchase', amount: total, project: '',
+      debits: [{ acct: 'Inventory (Stock)', amt: total, atype: 'asset' }],
+      credits: payMethod === 'cash'
+        ? [{ acct: 'Cash', amt: total, atype: 'asset' }]
+        : [{ acct: 'Accounts Payable', amt: total, atype: 'liability' }]
+    });
+
+    // Also receive stock into product layers
+    for (const item of items) {
+      await dbApi({ action: 'receiveStock', companyId: SESSION.companyId, productId: item.productId, qty: item.qty, unitCost: item.unitCost, supplier, paymentMethod: payMethod }).catch(() => {});
+    }
+
+    await saveData(); await loadRetailProducts(); renderAll();
+    st.innerHTML = `<span style="color:var(--green3)">✅ PO saved — ${fc(total)} from ${supplier}</span>`;
+    document.getElementById('po-supplier').value = '';
+    document.getElementById('po-notes').value = '';
+    // Reset line items to one empty row
+    renderPOLines();
+    await renderPOList();
+  } catch (e) { st.innerHTML = `<span style="color:var(--red3)">❌ ${e.message}</span>`; }
+  setTimeout(() => { const s = document.getElementById('po-st'); if (s) s.innerHTML = ''; }, 5000);
+}
+
+function renderPOLines() {
+  const el = document.getElementById('po-lines');
+  if (!el) return;
+  el.innerHTML = `
+    <div class="po-line-row" style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:7px;margin-bottom:7px;align-items:end">
+      <div class="fg" style="margin:0"><label>Product</label><select class="po-line-product" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:9px 11px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none">${'<option value="">Select...</option>' + RETAIL_PRODUCTS.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}</select></div>
+      <div class="fg" style="margin:0"><label>Qty</label><input class="po-line-qty" type="number" placeholder="10" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:9px 11px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none"/></div>
+      <div class="fg" style="margin:0"><label>Unit Cost</label><input class="po-line-cost" type="number" step="0.01" placeholder="1.80" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:9px 11px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none"/></div>
+      <button onclick="addPOLine()" style="padding:9px 11px;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;color:var(--gold2);cursor:pointer;font-size:14px;margin-top:14px">+</button>
+    </div>`;
+}
+
+function addPOLine() {
+  const el = document.getElementById('po-lines');
+  if (!el) return;
+  const row = document.createElement('div');
+  row.className = 'po-line-row';
+  row.style.cssText = 'display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:7px;margin-bottom:7px;align-items:end';
+  row.innerHTML = `
+    <div class="fg" style="margin:0"><select class="po-line-product" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:9px 11px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none">${'<option value="">Select...</option>' + RETAIL_PRODUCTS.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}</select></div>
+    <div class="fg" style="margin:0"><input class="po-line-qty" type="number" placeholder="10" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:9px 11px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none"/></div>
+    <div class="fg" style="margin:0"><input class="po-line-cost" type="number" step="0.01" placeholder="1.80" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:9px 11px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none"/></div>
+    <button onclick="this.closest('.po-line-row').remove()" style="padding:9px 11px;background:transparent;border:1px solid rgba(192,48,42,.3);border-radius:5px;color:var(--red3);cursor:pointer;font-size:14px">✕</button>`;
+  el.appendChild(row);
+}
+
+// Inject PO form into the purchase orders page after it's created
+function injectPOForm() {
+  const page = document.getElementById('pg-purchaseorders');
+  if (!page || document.getElementById('poFormCard')) return;
+  const formCard = document.createElement('div');
+  formCard.className = 'card';
+  formCard.id = 'poFormCard';
+  formCard.innerHTML = `
+    <div class="card-hdr">➕ Create Purchase Order</div>
+    <div class="fgrid">
+      <div class="fg"><label>Supplier</label><input id="po-supplier" type="text" placeholder="Supplier name"/></div>
+      <div class="fg"><label>Payment</label><select id="po-pay"><option value="credit">Credit (Accounts Payable)</option><option value="cash">Cash</option></select></div>
+    </div>
+    <div class="fg"><label>Notes</label><input id="po-notes" type="text" placeholder="Optional notes"/></div>
+    <div style="font-size:10px;color:var(--text2);margin-bottom:7px;font-family:'Noto Sans Ethiopic',sans-serif">Line Items</div>
+    <div id="po-lines"></div>
+    <div class="btn-row">
+      <button class="btn btn-gold" onclick="submitPurchaseOrder()">✅ Submit Purchase Order</button>
+      <button class="btn btn-outline" onclick="addPOLine()">+ Add Line</button>
+    </div>
+    <div id="po-st" style="font-size:11px;margin-top:7px"></div>`;
+  page.insertBefore(formCard, page.querySelector('.card') || page.firstChild.nextSibling);
+  renderPOLines();
+}
+
+// ══════════════════════════════════════════════════════════════
+// RETAIL MONTH-END CHECKLIST ADDITIONS
+// ══════════════════════════════════════════════════════════════
+const _origRunMonthEnd = typeof runMonthEnd !== 'undefined' ? runMonthEnd : null;
+function runMonthEnd() {
+  if (APP_MODE === 'construction') { if (_origRunMonthEnd) _origRunMonthEnd(); return; }
+  const el = document.getElementById('monthEndChecklist');
+  if (!el) return;
+  const b = getBal();
+  const now = new Date();
+  const thisM = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  const outStock = RETAIL_PRODUCTS.filter(p => parseFloat(p.qty) <= 0 && RETAIL_PRODUCTS.length > 0);
+  const lowStock = RETAIL_PRODUCTS.filter(p => parseFloat(p.qty) <= parseFloat(p.min_qty) && parseFloat(p.min_qty) > 0);
+  const apBal = b['Accounts Payable'] ? b['Accounts Payable'].net : 0;
+  const invBal = b['Inventory (Stock)'] ? b['Inventory (Stock)'].net : 0;
+  const checks = [
+    {
+      label: 'No items out of stock',
+      status: () => outStock.length === 0 ? 'pass' : 'fail',
+      detail: () => outStock.length === 0 ? 'All products have stock' : outStock.map(p => p.name).join(', ')
+    },
+    {
+      label: 'Low stock reviewed',
+      status: () => lowStock.length === 0 ? 'pass' : 'warn',
+      detail: () => lowStock.length === 0 ? 'All above minimum' : lowStock.map(p => `${p.name}: ${p.qty}`).join(', ')
+    },
+    {
+      label: 'Inventory balance positive',
+      status: () => invBal >= 0 ? 'pass' : 'fail',
+      detail: () => `Inventory (Stock): ${fc(invBal)}`
+    },
+    {
+      label: 'Supplier payables reviewed',
+      status: () => apBal > 0 ? 'warn' : 'pass',
+      detail: () => `Accounts Payable: ${fc(apBal)}`
+    },
+    {
+      label: 'Cash reconciliation',
+      status: () => {
+        const cash = b['Cash'] ? b['Cash'].net : 0;
+        return cash >= 0 ? 'warn' : 'fail';
+      },
+      detail: () => `Cash: ${fc(b['Cash'] ? b['Cash'].net : 0)}`
+    },
+    {
+      label: 'No unbalanced entries',
+      status: () => {
+        const bad = DB.entries.filter(e => {
+          const dr = (e.debits || []).reduce((s, d) => s + d.amt, 0);
+          const cr = (e.credits || []).reduce((s, c) => s + c.amt, 0);
+          return Math.abs(dr - cr) > 0.05;
+        });
+        return bad.length === 0 ? 'pass' : 'fail';
+      },
+      detail: () => {
+        const bad = DB.entries.filter(e => {
+          const dr = (e.debits || []).reduce((s, d) => s + d.amt, 0);
+          const cr = (e.credits || []).reduce((s, c) => s + c.amt, 0);
+          return Math.abs(dr - cr) > 0.05;
+        });
+        return bad.length === 0 ? 'All balanced' : `${bad.length} unbalanced`;
+      }
+    },
+    {
+      label: 'Open accounting period',
+      status: () => PERIODS.some(p => !p.is_closed) ? 'pass' : 'warn',
+      detail: () => PERIODS.some(p => !p.is_closed) ? 'Active period open' : 'No open period'
+    }
+  ];
+  const si = { pass: '✅', warn: '⚠️', fail: '❌' };
+  const sc = { pass: 'al-ok', warn: 'al-warn', fail: 'al-danger' };
+  const pc = checks.filter(c => c.status() === 'pass').length;
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;padding:10px;background:var(--bg3);border-radius:6px;border:1px solid var(--border)">
+      <div style="font-size:26px;font-weight:700;font-family:'JetBrains Mono',monospace;color:${pc === checks.length ? 'var(--green3)' : pc >= checks.length * 0.7 ? 'var(--orange3)' : 'var(--red3)'}">${pc}/${checks.length}</div>
+      <div><div style="font-size:13px;font-weight:600;color:var(--text)">Retail Month-End Checks</div><div style="font-size:11px;color:var(--text3)">${thisM} · ${pc === checks.length ? '✅ Ready to close' : '⚠️ Issues remain'}</div></div>
+    </div>` +
+    checks.map(c => { const s = c.status(); return `<div class="alert ${sc[s]}" style="margin-bottom:7px"><span class="alert-ico">${si[s]}</span><div class="alert-body"><div class="alert-title">${c.label}</div>${c.detail()}</div></div>`; }).join('');
+}
+
+// ══════════════════════════════════════════════════════════════
+// RETAIL ADVISOR — context-aware chat
+// ══════════════════════════════════════════════════════════════
+const _origSendChat = sendChat;
+async function sendChat() {
+  if (APP_MODE === 'construction') { _origSendChat(); return; }
+  const inp = document.getElementById('chatInp'), q = inp.value.trim();
+  if (!q) return;
+  inp.value = '';
+  const msgs = document.getElementById('chatMsgs');
+  msgs.innerHTML += `<div class="msg user">${q}</div>`;
+  msgs.innerHTML += `<div class="msg ai loading" id="aiLoad">🤖 ይሓስብ ኣሎ...</div>`;
+  msgs.scrollTop = msgs.scrollHeight;
+  const b = getBal();
+  const context = `RETAIL SHOP: ${BIZ_NAME} · ${CUR}
+SALES REVENUE: ${fc(sumByType(b, 'revenue'))}
+COGS: ${fc(b['Cost of Goods Sold'] ? b['Cost of Goods Sold'].net : 0)}
+GROSS PROFIT: ${fc(sumByType(b, 'revenue') - (b['Cost of Goods Sold'] ? b['Cost of Goods Sold'].net : 0))}
+CASH: ${fc(b['Cash'] ? b['Cash'].net : 0)}
+INVENTORY VALUE: ${fc(b['Inventory (Stock)'] ? b['Inventory (Stock)'].net : 0)}
+ACCOUNTS PAYABLE: ${fc(b['Accounts Payable'] ? b['Accounts Payable'].net : 0)}
+TOTAL PRODUCTS: ${RETAIL_PRODUCTS.length}
+LOW STOCK: ${RETAIL_PRODUCTS.filter(p => parseFloat(p.qty) <= parseFloat(p.min_qty) && parseFloat(p.min_qty) > 0).length} item(s)
+OUT OF STOCK: ${RETAIL_PRODUCTS.filter(p => parseFloat(p.qty) <= 0).length} item(s)`;
+  try {
+    const res = await fetch('/api/ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: q, mode: 'advisor', context, appMode: 'retail' })
+    });
+    const data = await res.json();
+    const text = data.result || 'ምላሽ ኣይመጸን';
+    document.getElementById('aiLoad').remove();
+    msgs.innerHTML += `<div class="msg ai">${text.replace(/\n/g, '<br>')}</div>`;
+    msgs.scrollTop = msgs.scrollHeight;
+  } catch (err) {
+    document.getElementById('aiLoad').remove();
+    msgs.innerHTML += `<div class="msg ai" style="color:var(--red3)">Error: ${err.message}</div>`;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// PATCH nav() — inject PO form when navigating to purchaseorders
+// ══════════════════════════════════════════════════════════════
+const _nav_before_po = nav;
+function nav(page, el) {
+  _nav_before_po(page, el);
+  if (page === 'purchaseorders') {
+    injectPOForm();
+    renderPOLines();
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// RETAIL VARIANCE ALERTS
+// ══════════════════════════════════════════════════════════════
+const _origRenderVarianceAlerts = typeof renderVarianceAlerts !== 'undefined' ? renderVarianceAlerts : null;
+function renderVarianceAlerts() {
+  if (APP_MODE === 'construction') { if (_origRenderVarianceAlerts) _origRenderVarianceAlerts(); return; }
+  const el = document.getElementById('varianceAlerts');
+  if (!el) return;
+  const now = new Date();
+  const thisM = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  const lastM = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const prevM = lastM.getFullYear() + '-' + String(lastM.getMonth() + 1).padStart(2, '0');
+
+  function monthAcct(ym, acct) {
+    return scopedEntries(DB.entries)
+      .filter(e => e.date.slice(0, 7) === ym)
+      .reduce((s, e) => s + (e.credits || []).filter(c => c.acct === acct).reduce((ss, c) => ss + c.amt, 0), 0);
+  }
+  function monthType(ym, type) {
+    return scopedEntries(DB.entries)
+      .filter(e => e.date.slice(0, 7) === ym && e.type === type)
+      .reduce((s, e) => s + e.amount, 0);
+  }
+  const checks = [
+    { label: 'Retail Sales', cur: monthAcct(thisM, 'Retail Sales Revenue'), prev: monthAcct(prevM, 'Retail Sales Revenue'), threshold: 0.3 },
+    { label: 'COGS', cur: monthType(thisM, 'COGS'), prev: monthType(prevM, 'COGS'), threshold: 0.4 },
+    { label: 'Wages & Salaries', cur: monthType(thisM, 'Payroll'), prev: monthType(prevM, 'Payroll'), threshold: 0.2 },
+  ];
+  const alerts = checks.filter(c => c.prev > 0 && Math.abs(c.cur - c.prev) / c.prev > c.threshold);
+  if (!alerts.length) {
+    el.innerHTML = '<div class="alert al-ok"><span class="alert-ico">✅</span><div class="alert-body">No unusual variances vs prior month</div></div>';
+    return;
+  }
+  el.innerHTML = alerts.map(a => {
+    const pct = Math.round((a.cur - a.prev) / a.prev * 100);
+    const up = pct > 0;
+    return `<div class="alert ${up ? 'al-danger' : 'al-warn'}"><span class="alert-ico">${up ? '📈' : '📉'}</span><div class="alert-body"><div class="alert-title">${a.label} ${up ? 'spike' : 'drop'}: ${up ? '+' : ''}${pct}%</div>This month: ${fc(a.cur)} · Last month: ${fc(a.prev)}</div></div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════════════════
+// FINAL INIT — ensure everything is wired after DOM ready
+// ══════════════════════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', () => {
+  setTimeout(() => {
+    injectModeSettingsCard();
+    injectRetailPages();
+    if (APP_MODE === 'retail') {
+      injectPOForm();
+      renderPOLines();
+      renderPOSProductGrid();
+    }
+  }, 300);
+});
+</script>
