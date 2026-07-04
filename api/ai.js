@@ -231,4 +231,3 @@ function validateAndFixEntry(rawText) {
     return JSON.stringify(parsed);
   } catch { return rawText; }
 }
-
