@@ -149,6 +149,8 @@ function isAllowed(role, action) {
 }
 
 // ── Main handler ─────────────────────────────────────────────────────────────
+
+// ── UNIFIED HANDLER ───────────────────────────────────────────────────────────
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -158,22 +160,25 @@ module.exports = async function handler(req, res) {
 
   try {
     await ensureTables();
+    await ensureRetailTables();
     const body = req.body || {};
     const { action } = body;
 
     // ── REGISTER ─────────────────────────────────────────────────────────────
     if (action === 'register') {
-      const { username, password, bizName } = body;
+      const { username, password, bizName, appMode } = body;
       if (!username || !password || !bizName) return res.status(400).json({ error: 'Missing fields' });
       const ex = await query('SELECT id FROM hh_users WHERE username=$1', [username]);
       if (ex.rows.length) return res.status(409).json({ error: 'Username taken' });
       const ur = await query('INSERT INTO hh_users(username,password_b64) VALUES($1,$2) RETURNING id', [username, btoa(password)]);
       const uid = ur.rows[0].id;
-      const cr = await query('INSERT INTO hh_companies(name) VALUES($1) RETURNING id', [bizName]);
+      const mode = appMode === 'retail' ? 'retail' : 'construction';
+      await query("ALTER TABLE hh_companies ADD COLUMN IF NOT EXISTS app_mode TEXT DEFAULT 'construction'").catch(()=>{});
+      const cr = await query("INSERT INTO hh_companies(name, app_mode) VALUES($1,$2) RETURNING id", [bizName, mode]);
       const cid = cr.rows[0].id;
       await query('INSERT INTO hh_user_companies(user_id,company_id,role) VALUES($1,$2,$3)', [uid, cid, 'owner']);
-      await seedChartOfAccounts(cid);
-      return res.status(200).json({ ok: true, userId: uid, companyId: cid, role: 'owner', bizName });
+      if (mode === 'retail') await seedRetailAccounts(cid); else await seedChartOfAccounts(cid);
+      return res.status(200).json({ ok: true, userId: uid, companyId: cid, role: 'owner', bizName, appMode: mode });
     }
 
     // ── LOGIN ─────────────────────────────────────────────────────────────────
@@ -396,132 +401,8 @@ module.exports = async function handler(req, res) {
     }
 
     return res.status(400).json({ error: 'Unknown action' });
-  } catch (err) {
-    console.error('DB handler error:', err);
-    return res.status(500).json({ error: 'Database error', detail: err.message });
-  }
-};
 
-// ── RETAIL MODE ADDITIONS ────────────────────────────────────────────────────
-
-const RETAIL_ACCOUNTS = [
-  // Current Assets
-  { code:'1000', name:'Cash',                     parent_group:'Current Assets',    account_type:'asset',    is_system:true },
-  { code:'1010', name:'Bank Account',             parent_group:'Current Assets',    account_type:'asset',    is_system:true },
-  { code:'1020', name:'Mobile Money',             parent_group:'Current Assets',    account_type:'asset',    is_system:true },
-  { code:'1030', name:'Accounts Receivable',      parent_group:'Current Assets',    account_type:'asset',    is_system:true },
-  { code:'1050', name:'Inventory (Stock)',         parent_group:'Current Assets',    account_type:'asset',    is_system:true },
-  { code:'1060', name:'Prepaid Expenses',         parent_group:'Current Assets',    account_type:'asset',    is_system:true },
-  // Non-current Assets
-  { code:'1500', name:'Shop Equipment',           parent_group:'Non-current Assets',account_type:'asset',    is_system:true },
-  { code:'1510', name:'Furniture & Fixtures',     parent_group:'Non-current Assets',account_type:'asset',    is_system:true },
-  { code:'1530', name:'Accumulated Depreciation - Equipment', parent_group:'Non-current Assets',account_type:'contra-asset',is_system:true },
-  // Liabilities
-  { code:'2000', name:'Accounts Payable',         parent_group:'Liabilities',       account_type:'liability',is_system:true },
-  { code:'2010', name:'Salaries Payable',         parent_group:'Liabilities',       account_type:'liability',is_system:true },
-  { code:'2020', name:'PAYE Payable',             parent_group:'Liabilities',       account_type:'liability',is_system:true },
-  { code:'2030', name:'NSSF Payable',             parent_group:'Liabilities',       account_type:'liability',is_system:true },
-  { code:'2040', name:'VAT Payable',              parent_group:'Liabilities',       account_type:'liability',is_system:true },
-  // Equity
-  { code:'3000', name:'Owner Capital',            parent_group:'Equity',            account_type:'equity',   is_system:true },
-  { code:'3010', name:'Retained Earnings',        parent_group:'Equity',            account_type:'equity',   is_system:true },
-  // Revenue
-  { code:'4000', name:'Retail Sales Revenue',     parent_group:'Revenue',           account_type:'revenue',  is_system:true },
-  { code:'4010', name:'Other Income',             parent_group:'Revenue',           account_type:'revenue',  is_system:true },
-  // Direct Expenses
-  { code:'5000', name:'Cost of Goods Sold',       parent_group:'Expense (Direct)',  account_type:'expense',  is_system:true },
-  { code:'5010', name:'Stock Write-off',          parent_group:'Expense (Direct)',  account_type:'expense',  is_system:true },
-  { code:'5020', name:'Freight & Delivery In',    parent_group:'Expense (Direct)',  account_type:'expense',  is_system:true },
-  // Indirect Expenses
-  { code:'6000', name:'Wages & Salaries Expense', parent_group:'Expense (Indirect)',account_type:'expense',  is_system:true },
-  { code:'6010', name:'Rent Expense',             parent_group:'Expense (Indirect)',account_type:'expense',  is_system:true },
-  { code:'6020', name:'Utilities Expense',        parent_group:'Expense (Indirect)',account_type:'expense',  is_system:true },
-  { code:'6030', name:'Repairs & Maintenance',    parent_group:'Expense (Indirect)',account_type:'expense',  is_system:true },
-  { code:'6040', name:'Advertising Expense',      parent_group:'Expense (Indirect)',account_type:'expense',  is_system:true },
-  { code:'6050', name:'Depreciation Expense',     parent_group:'Expense (Indirect)',account_type:'expense',  is_system:true },
-  { code:'6060', name:'Miscellaneous Expense',    parent_group:'Expense (Indirect)',account_type:'expense',  is_system:true },
-  { code:'6070', name:'NSSF Employer Contribution',parent_group:'Expense (Indirect)',account_type:'expense', is_system:true },
-];
-
-async function seedRetailAccounts(companyId) {
-  for (const a of RETAIL_ACCOUNTS) {
-    await query(`
-      INSERT INTO hh_chart_of_accounts(company_id,code,name,parent_group,account_type,is_system)
-      VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(company_id,name) DO NOTHING
-    `, [companyId, a.code, a.name, a.parent_group, a.account_type, a.is_system]);
-  }
-}
-
-async function ensureRetailTables() {
-  await query(`
-    CREATE TABLE IF NOT EXISTS hh_products (
-      id SERIAL PRIMARY KEY,
-      company_id INTEGER NOT NULL REFERENCES hh_companies(id),
-      sku TEXT,
-      barcode TEXT,
-      name TEXT NOT NULL,
-      category TEXT DEFAULT 'General',
-      sale_price NUMERIC DEFAULT 0,
-      cost_price NUMERIC DEFAULT 0,
-      qty NUMERIC DEFAULT 0,
-      min_qty NUMERIC DEFAULT 0,
-      unit TEXT DEFAULT 'unit',
-      costing_method TEXT DEFAULT 'WAC',
-      layers JSONB DEFAULT '[]',
-      created_at TIMESTAMPTZ DEFAULT NOW(),
-      UNIQUE(company_id, name)
-    );
-    CREATE TABLE IF NOT EXISTS hh_pos_sales (
-      id SERIAL PRIMARY KEY,
-      company_id INTEGER NOT NULL REFERENCES hh_companies(id),
-      sale_date DATE DEFAULT CURRENT_DATE,
-      items JSONB NOT NULL DEFAULT '[]',
-      subtotal NUMERIC DEFAULT 0,
-      discount NUMERIC DEFAULT 0,
-      total NUMERIC DEFAULT 0,
-      payment_method TEXT DEFAULT 'cash',
-      cashier TEXT,
-      journal_entry_id INTEGER,
-      created_at TIMESTAMPTZ DEFAULT NOW()
-    );
-    CREATE TABLE IF NOT EXISTS hh_purchase_orders (
-      id SERIAL PRIMARY KEY,
-      company_id INTEGER NOT NULL REFERENCES hh_companies(id),
-      supplier TEXT NOT NULL,
-      po_date DATE DEFAULT CURRENT_DATE,
-      items JSONB NOT NULL DEFAULT '[]',
-      total NUMERIC DEFAULT 0,
-      status TEXT DEFAULT 'pending',
-      payment_method TEXT DEFAULT 'credit',
-      notes TEXT,
-      created_at TIMESTAMPTZ DEFAULT NOW()
-    );
-  `);
-}
-
-// Patch the main handler to handle retail actions and mode-aware registration
-const _originalHandler = module.exports;
-module.exports = async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-
-  try {
-    await ensureTables();
-    await ensureRetailTables();
-    const body = req.body || {};
-    const { action } = body;
-
-    // register handled by original handler below
-
-    // login + register handled by original handler below (with DISTINCT ON fix)
-    if (action === 'login' || action === 'register') {
-      return await _originalHandler(req, res);
-    }
-
-    // ── SWITCH MODE ───────────────────────────────────────────────────────────
+    // ── RETAIL ACTIONS ────────────────────────────────────────────────────────
     if (action === 'switchMode') {
       const { companyId, appMode } = body;
       if (!companyId || !appMode) return res.status(400).json({ error: 'Missing fields' });
@@ -619,11 +500,10 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true, orders: r.rows });
     }
 
-    // ── PASS THROUGH to original handler for all other actions ────────────────
-    return await _originalHandler(req, res);
+    return res.status(400).json({ error: 'Unknown action' });
 
   } catch (err) {
-    console.error('Retail handler error:', err);
+    console.error('DB handler error:', err);
     return res.status(500).json({ error: 'Database error', detail: err.message });
   }
 };
