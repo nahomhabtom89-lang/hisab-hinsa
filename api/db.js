@@ -150,6 +150,81 @@ function isAllowed(role, action) {
 
 // ── Main handler ─────────────────────────────────────────────────────────────
 
+
+// ── RETAIL ACCOUNTS SEED ─────────────────────────────────────────────────────
+const RETAIL_ACCOUNTS = [
+  { code:'1000', name:'Cash',                      parent_group:'Current Assets',     account_type:'asset',    is_system:true },
+  { code:'1010', name:'Bank Account',              parent_group:'Current Assets',     account_type:'asset',    is_system:true },
+  { code:'1020', name:'Mobile Money',              parent_group:'Current Assets',     account_type:'asset',    is_system:true },
+  { code:'1030', name:'Accounts Receivable',       parent_group:'Current Assets',     account_type:'asset',    is_system:true },
+  { code:'1050', name:'Inventory (Stock)',          parent_group:'Current Assets',     account_type:'asset',    is_system:true },
+  { code:'1060', name:'Prepaid Expenses',          parent_group:'Current Assets',     account_type:'asset',    is_system:true },
+  { code:'1500', name:'Shop Equipment',            parent_group:'Non-current Assets', account_type:'asset',    is_system:true },
+  { code:'1530', name:'Accumulated Depreciation - Equipment', parent_group:'Non-current Assets', account_type:'contra-asset', is_system:true },
+  { code:'2000', name:'Accounts Payable',          parent_group:'Liabilities',        account_type:'liability',is_system:true },
+  { code:'2010', name:'Salaries Payable',          parent_group:'Liabilities',        account_type:'liability',is_system:true },
+  { code:'2020', name:'PAYE Payable',              parent_group:'Liabilities',        account_type:'liability',is_system:true },
+  { code:'2030', name:'NSSF Payable',              parent_group:'Liabilities',        account_type:'liability',is_system:true },
+  { code:'3000', name:'Owner Capital',             parent_group:'Equity',             account_type:'equity',   is_system:true },
+  { code:'3010', name:'Retained Earnings',         parent_group:'Equity',             account_type:'equity',   is_system:true },
+  { code:'4000', name:'Retail Sales Revenue',      parent_group:'Revenue',            account_type:'revenue',  is_system:true },
+  { code:'4010', name:'Other Income',              parent_group:'Revenue',            account_type:'revenue',  is_system:true },
+  { code:'5000', name:'Cost of Goods Sold',        parent_group:'Expense (Direct)',   account_type:'expense',  is_system:true },
+  { code:'5010', name:'Stock Write-off',           parent_group:'Expense (Direct)',   account_type:'expense',  is_system:true },
+  { code:'6000', name:'Wages & Salaries Expense',  parent_group:'Expense (Indirect)', account_type:'expense',  is_system:true },
+  { code:'6010', name:'Rent Expense',              parent_group:'Expense (Indirect)', account_type:'expense',  is_system:true },
+  { code:'6020', name:'Utilities Expense',         parent_group:'Expense (Indirect)', account_type:'expense',  is_system:true },
+  { code:'6030', name:'Repairs & Maintenance',     parent_group:'Expense (Indirect)', account_type:'expense',  is_system:true },
+  { code:'6040', name:'Advertising Expense',       parent_group:'Expense (Indirect)', account_type:'expense',  is_system:true },
+  { code:'6050', name:'Depreciation Expense',      parent_group:'Expense (Indirect)', account_type:'expense',  is_system:true },
+  { code:'6060', name:'Miscellaneous Expense',     parent_group:'Expense (Indirect)', account_type:'expense',  is_system:true },
+  { code:'6070', name:'NSSF Employer Contribution',parent_group:'Expense (Indirect)', account_type:'expense',  is_system:true },
+];
+
+async function seedRetailAccounts(companyId) {
+  for (const a of RETAIL_ACCOUNTS) {
+    await query(
+      `INSERT INTO hh_chart_of_accounts(company_id,code,name,parent_group,account_type,is_system)
+       VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(company_id,name) DO NOTHING`,
+      [companyId, a.code, a.name, a.parent_group, a.account_type, a.is_system]
+    );
+  }
+}
+
+async function ensureRetailTables() {
+  await query(`
+    CREATE TABLE IF NOT EXISTS hh_products (
+      id SERIAL PRIMARY KEY,
+      company_id INTEGER NOT NULL REFERENCES hh_companies(id),
+      sku TEXT, barcode TEXT, name TEXT NOT NULL,
+      category TEXT DEFAULT 'General',
+      sale_price NUMERIC DEFAULT 0, cost_price NUMERIC DEFAULT 0,
+      qty NUMERIC DEFAULT 0, min_qty NUMERIC DEFAULT 0,
+      unit TEXT DEFAULT 'unit', costing_method TEXT DEFAULT 'WAC',
+      layers JSONB DEFAULT '[]', created_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(company_id, name)
+    );
+    CREATE TABLE IF NOT EXISTS hh_pos_sales (
+      id SERIAL PRIMARY KEY,
+      company_id INTEGER NOT NULL REFERENCES hh_companies(id),
+      sale_date DATE DEFAULT CURRENT_DATE,
+      items JSONB NOT NULL DEFAULT '[]',
+      subtotal NUMERIC DEFAULT 0, discount NUMERIC DEFAULT 0,
+      total NUMERIC DEFAULT 0, payment_method TEXT DEFAULT 'cash',
+      cashier TEXT, journal_entry_id INTEGER,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS hh_purchase_orders (
+      id SERIAL PRIMARY KEY,
+      company_id INTEGER NOT NULL REFERENCES hh_companies(id),
+      supplier TEXT NOT NULL, po_date DATE DEFAULT CURRENT_DATE,
+      items JSONB NOT NULL DEFAULT '[]', total NUMERIC DEFAULT 0,
+      status TEXT DEFAULT 'pending', payment_method TEXT DEFAULT 'credit',
+      notes TEXT, created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  `);
+}
+
 // ── UNIFIED HANDLER ───────────────────────────────────────────────────────────
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
