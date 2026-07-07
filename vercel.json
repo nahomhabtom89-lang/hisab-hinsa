@@ -1,6 +1,13 @@
 {
-  "functions": {
-    "api/ai.js": { "memory": 1024, "maxDuration": 30 },
-    "api/db.js": { "memory": 1024, "maxDuration": 30 }
-  }
+  "version": 2,
+  "builds": [
+    { "src": "api/db.js", "use": "@vercel/node" },
+    { "src": "api/ai.js", "use": "@vercel/node" },
+    { "src": "index.html", "use": "@vercel/static" }
+  ],
+  "routes": [
+    { "src": "/api/db", "dest": "/api/db.js" },
+    { "src": "/api/ai", "dest": "/api/ai.js" },
+    { "src": "/(.*)", "dest": "/index.html" }
+  ]
 }
