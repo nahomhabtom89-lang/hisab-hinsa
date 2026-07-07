@@ -1,3 +1,4 @@
+// Hisabi Hensi db.js v4.0 - 2026-07-06 - retail actions included
 // api/db.js — Hisabi Hensi · Multi-tenant backend
 // Multi-company · Project-scoped staff · Chart of Accounts · Period closing
 const { Pool } = require('pg');
