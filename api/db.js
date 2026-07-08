@@ -235,9 +235,21 @@ module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
+    // Parse body - handle both Vercel auto-parse and raw stream
+    let body = req.body;
+    if (!body || typeof body !== 'object') {
+      try {
+        const raw = await new Promise((resolve, reject) => {
+          let d = '';
+          req.on('data', c => d += c);
+          req.on('end', () => resolve(d));
+          req.on('error', reject);
+        });
+        body = raw ? JSON.parse(raw) : {};
+      } catch(e) { body = {}; }
+    }
     await ensureTables();
     await ensureRetailTables();
-    const body = req.body || {};
     const { action } = body;
 
     // ── REGISTER ─────────────────────────────────────────────────────────────
