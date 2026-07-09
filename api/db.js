@@ -1,4 +1,4 @@
-// Hisabi Hensi db.js v4.0 - 2026-07-06 - retail actions included
+// Hisabi Hensi db.js v4.1 - 2026-07-09 - FIXED: removed premature "Unknown action" return that was blocking all retail actions
 // api/db.js — Hisabi Hensi · Multi-tenant backend
 // Multi-company · Project-scoped staff · Chart of Accounts · Period closing
 const { Pool } = require('pg');
@@ -148,9 +148,6 @@ function isAllowed(role, action) {
   const blocked = ROLE_BLOCKED[role] || ROLE_BLOCKED['staff'];
   return !blocked.some(b => action.toLowerCase().includes(b.toLowerCase()));
 }
-
-// ── Main handler ─────────────────────────────────────────────────────────────
-
 
 // ── RETAIL ACCOUNTS SEED ─────────────────────────────────────────────────────
 const RETAIL_ACCOUNTS = [
@@ -426,18 +423,13 @@ module.exports = async function handler(req, res) {
     }
 
     // ── CLOSE PERIOD ──────────────────────────────────────────────────────────
-    // Executes the full closing routine in memory (app-level), then saves the result.
-    // The journal entries array is passed in from the frontend so we can compute
-    // the net P&L without a separate hh_journal_entries SQL table.
     if (action === 'closePeriod') {
       const { companyId, periodId, username, periodStart, periodEnd, entries } = body;
       if (!companyId || !periodId) return res.status(400).json({ error: 'Missing fields' });
-      // Check period not already closed
       const pr = await query('SELECT * FROM hh_accounting_periods WHERE id=$1 AND company_id=$2', [parseInt(periodId), parseInt(companyId)]);
       if (!pr.rows.length) return res.status(404).json({ error: 'Period not found' });
       if (pr.rows[0].is_closed) return res.status(409).json({ error: 'Period already closed' });
 
-      // Compute revenue + expense totals for entries within the period date range
       const ps = periodStart || pr.rows[0].period_start?.toISOString().split('T')[0];
       const pe = periodEnd || pr.rows[0].period_end?.toISOString().split('T')[0];
       const periodEntries = (entries || []).filter(e => e.date >= ps && e.date <= pe);
@@ -449,17 +441,14 @@ module.exports = async function handler(req, res) {
       });
       const netPnl = revenueTotal - expenseTotal;
 
-      // Save closing entry summary
       await query(`
         INSERT INTO hh_closing_entries(company_id,period_id,period_name,revenue_total,expense_total,net_pnl,retained_earnings_delta,posted_by)
         VALUES($1,$2,$3,$4,$5,$6,$7,$8)
       `, [parseInt(companyId), parseInt(periodId), pr.rows[0].period_name, revenueTotal, expenseTotal, netPnl, netPnl, username || 'system']);
 
-      // Lock the period
       await query('UPDATE hh_accounting_periods SET is_closed=TRUE,closed_by=$1,closed_at=NOW() WHERE id=$2',
         [username || 'system', parseInt(periodId)]);
 
-      // Audit
       await query('INSERT INTO hh_audit_log(company_id,username,action,detail) VALUES($1,$2,$3,$4)',
         [parseInt(companyId), username || 'system', 'closePeriod',
          `Period ${pr.rows[0].period_name}: Rev=${revenueTotal.toFixed(2)} Exp=${expenseTotal.toFixed(2)} Net=${netPnl.toFixed(2)}`]);
@@ -488,16 +477,16 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true, allowed: isAllowed(userRole || 'staff', actionName || '') });
     }
 
-    return res.status(400).json({ error: 'Unknown action' });
-
     // ── RETAIL ACTIONS ────────────────────────────────────────────────────────
+    // (NOTE: previously there was a premature `return res.status(400).json({error:'Unknown action'})`
+    //  right here, before this block. That made every retail action below unreachable — THIS was
+    //  the actual bug. It has been removed; the real "unknown action" catch-all is at the very end.)
     if (action === 'switchMode') {
       const { companyId, appMode } = body;
       if (!companyId || !appMode) return res.status(400).json({ error: 'Missing fields' });
       const mode = appMode === 'retail' ? 'retail' : 'construction';
       await query('ALTER TABLE hh_companies ADD COLUMN IF NOT EXISTS app_mode TEXT DEFAULT \'construction\'').catch(()=>{});
       await query('UPDATE hh_companies SET app_mode=$1 WHERE id=$2', [mode, parseInt(companyId)]);
-      // Seed the new mode's accounts (ON CONFLICT DO NOTHING so no duplicates)
       if (mode === 'retail') await seedRetailAccounts(parseInt(companyId));
       else await seedChartOfAccounts(parseInt(companyId));
       return res.status(200).json({ ok: true, appMode: mode });
@@ -540,7 +529,6 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true, product: r.rows[0] });
     }
     if (action === 'receiveStock') {
-      // Receive supplier delivery — add cost layer to product
       const { companyId, productId, qty, unitCost, supplier, paymentMethod } = body;
       if (!companyId || !productId || !qty || !unitCost) return res.status(400).json({ error: 'Missing fields' });
       const r = await query('SELECT * FROM hh_products WHERE id=$1 AND company_id=$2', [parseInt(productId), parseInt(companyId)]);
