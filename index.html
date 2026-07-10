@@ -361,9 +361,28 @@
 </div>
 
 </div></div></div><!-- /main /shell /mainApp -->
+<div id="quickAddModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:5000;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:20px;width:100%;max-width:380px;box-shadow:var(--shadow)">
+    <div style="font-family:'Noto Sans Ethiopic',sans-serif;font-size:15px;font-weight:700;color:var(--text);margin-bottom:14px">➕ Quick Add Product</div>
+    <div class="fg"><label>Product Name</label><input id="qa-name" type="text" placeholder="Bread"/></div>
+    <div class="fg"><label>SKU</label><input id="qa-sku" type="text" placeholder="BRD-001"/></div>
+    <div class="fg"><label>Category</label>
+      <select id="qa-cat"><option>Beverages</option><option>Food</option><option>Household</option><option>Electronics</option><option>Clothing</option><option selected>General</option></select>
+    </div>
+    <div class="fgrid">
+      <div class="fg"><label>Cost Price</label><input id="qa-cost" type="number" step="0.01" placeholder="0.80"/></div>
+      <div class="fg"><label>Sale Price</label><input id="qa-sale" type="number" step="0.01" placeholder="1.20"/></div>
+    </div>
+    <div id="qa-st" style="font-size:11px;margin:4px 0 8px"></div>
+    <div class="btn-row" style="margin-top:0">
+      <button class="btn btn-gold" onclick="saveQuickAddProduct()">✅ Save &amp; Select</button>
+      <button class="btn btn-outline" onclick="closeQuickAddModal()">Cancel</button>
+    </div>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 <script>
-'use strict'; // v3.0 2026-07-05
+'use strict'; // v3.1 2026-07-09
 // ═══════════════════════════════════════════════════════════
 // HISABI HENSI — Unified script, no duplicate definitions
 // ═══════════════════════════════════════════════════════════
@@ -494,13 +513,19 @@ document.addEventListener('click',e=>{const m=document.getElementById('modeMenu'
 async function switchAppMode(newMode){if(newMode===APP_MODE){const m=document.getElementById('modeMenu');if(m)m.style.display='none';return;}try{await dbApi({action:'switchMode',companyId:SESSION.companyId,appMode:newMode});APP_MODE=newMode;renderSidebar(newMode);renderModeBadge();const m=document.getElementById('modeMenu');if(m)m.style.display='none';await loadChartOfAccounts();if(newMode==='retail'){await loadRetailProducts();injectRetailPages();setTimeout(()=>{renderPOSProductGrid();renderPOLines();},200);}const constructionOnly=['projects','invoice','retention','materials','deliveries','jobcost'];const retailOnly=['pos','products','stockin','purchaseorders','retailsales','stockval'];const guard=newMode==='retail'?constructionOnly:retailOnly;const active=document.querySelector('.page.on');if(active&&guard.some(p=>active.id==='pg-'+p))nav('home');renderAll();injectModeSettingsCard();showToast(`✅ Switched to ${newMode==='retail'?'🛒 Retail':'🏗️ Construction'} mode`);}catch(e){showToast('❌ '+e.message);}}
 
 // ── NAVIGATION ────────────────────────────────────────────────────
-function nav(page,el){
+async function nav(page,el){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
   document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('on'));
   const pg=document.getElementById('pg-'+page);if(pg)pg.classList.add('on');if(el)el.classList.add('on');
   if(page==='ledger')renderLedger();if(page==='trial')renderTrial();if(page==='income')renderIncome();if(page==='balance')renderBalance();if(page==='cashflow')renderCashflow();if(page==='jobcost')renderJobCost();if(page==='retention')renderRetention();if(page==='journal')renderJournal();if(page==='audit'){runAudit();switchAuditTab('bot');}if(page==='coa')renderCOA();if(page==='periods')loadPeriodList();if(page==='settings'){const bn=document.getElementById('bizName');if(bn)bn.value=BIZ_NAME;const sr=document.getElementById('sspRate');if(sr)sr.value=SSP_RATE;renderCostingButtons();renderProjectScopeCheckboxes();injectModeSettingsCard();}
-  if(page==='pos'){renderPOSCart();setTimeout(()=>{const s=document.getElementById('pos-scan');if(s)s.focus();},100);}
-  if(page==='products'){renderProductsPage();}if(page==='stockin'){renderStockInProductSelect();}if(page==='stockval'){renderStockValPage();}if(page==='retailsales'){renderRetailSalesPage();}if(page==='purchaseorders'){renderPOList();}
+  // Retail pages that depend on the product catalogue always refetch fresh from the DB on entry,
+  // so newly added products (e.g. from the Products page or the Quick Add modal) show up immediately.
+  if(page==='pos'){await loadRetailProducts();renderPOSCart();setTimeout(()=>{const s=document.getElementById('pos-scan');if(s)s.focus();},100);}
+  if(page==='products'){await loadRetailProducts();}
+  if(page==='stockin'){await loadRetailProducts();renderStockInProductSelect();}
+  if(page==='stockval'){await loadRetailProducts();}
+  if(page==='retailsales'){renderRetailSalesPage();}
+  if(page==='purchaseorders'){await loadRetailProducts();renderPOList();}
 }
 function setCur(c){CUR=c;document.getElementById('cur-usd').classList.toggle('on',c==='USD');document.getElementById('cur-ssp').classList.toggle('on',c==='SSP');renderAll();}
 
@@ -714,11 +739,26 @@ async function removeStaff(membershipId){if(!confirm('Remove?'))return;try{await
 function injectModeSettingsCard(){const page=document.getElementById('pg-settings');if(!page||document.getElementById('modeSwitchCard'))return;const card=document.createElement('div');card.className='card';card.id='modeSwitchCard';card.innerHTML=`<div class="card-hdr">🔄 App Mode</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px"><div id="settingsModeConst" onclick="switchAppMode('construction')" style="padding:14px;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;cursor:pointer;text-align:center;transition:all .15s"><div style="font-size:24px;margin-bottom:5px">🏗️</div><div style="font-size:13px;font-weight:600">Construction</div><div style="font-size:10px;color:var(--text3);margin-top:3px">Job costing · WIP · Retention</div></div><div id="settingsModeRetail" onclick="switchAppMode('retail')" style="padding:14px;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;cursor:pointer;text-align:center;transition:all .15s"><div style="font-size:24px;margin-bottom:5px">🛒</div><div style="font-size:13px;font-weight:600">Retail / Supermarket</div><div style="font-size:10px;color:var(--text3);margin-top:3px">POS · Barcode · COGS</div></div></div><div class="alert al-info"><span class="alert-ico">ℹ️</span><div class="alert-body">All journal entries preserved when switching. Only sidebar and screens change.</div></div>`;page.appendChild(card);const c=document.getElementById('settingsModeConst'),r=document.getElementById('settingsModeRetail');if(c)c.style.borderColor=APP_MODE==='construction'?'var(--gold2)':'var(--border2)';if(r)r.style.borderColor=APP_MODE==='retail'?'var(--red3)':'var(--border2)';}
 
 // ── RETAIL PRODUCTS ───────────────────────────────────────────────
-async function loadRetailProducts(){try{const r=await dbApi({action:'listProducts',companyId:SESSION.companyId});RETAIL_PRODUCTS=r.products||[];renderProductsPage();renderStockValPage();renderPOSProductGrid();}catch(e){console.error('loadRetailProducts',e);}}
+async function loadRetailProducts(){
+  try{
+    const r=await dbApi({action:'listProducts',companyId:SESSION.companyId});
+    RETAIL_PRODUCTS=r.products||[];
+    renderProductsPage();
+    renderStockValPage();
+    renderPOSProductGrid();
+    refreshPOProductDropdowns();   // keep any open PO line-item selects in sync
+    renderStockInProductSelect();  // keep Receive Stock select in sync
+  }catch(e){console.error('loadRetailProducts',e);}
+}
 function renderProductsPage(){const el=document.getElementById('retailProductList');if(!el)return;if(!RETAIL_PRODUCTS.length){el.innerHTML='<div style="text-align:center;padding:22px;color:var(--text3)">No products yet</div>';return;}const q=(document.getElementById('productSearch')||{}).value||'';const items=RETAIL_PRODUCTS.filter(p=>!q||p.name.toLowerCase().includes(q.toLowerCase())||(p.sku||'').includes(q)||(p.barcode||'').includes(q));el.innerHTML=`<table><thead><tr><th>SKU</th><th>Barcode</th><th>Product</th><th>Category</th><th>Sale Price</th><th>Cost</th><th>Stock</th><th>Min</th><th></th></tr></thead><tbody>${items.map(p=>{const cls=parseFloat(p.qty)<=0?'var(--red3)':parseFloat(p.qty)<=parseFloat(p.min_qty)?'var(--orange3)':'var(--green3)';return`<tr><td style="font-family:'JetBrains Mono',monospace;font-size:10px">${p.sku||'—'}</td><td style="font-family:'JetBrains Mono',monospace;font-size:10px">${p.barcode||'—'}</td><td style="font-weight:500">${p.name}</td><td><span class="tag t-blue" style="font-size:9px">${p.category}</span></td><td style="font-family:'JetBrains Mono',monospace">${fc(p.sale_price)}</td><td style="font-family:'JetBrains Mono',monospace;color:var(--text3)">${fc(p.cost_price)}</td><td style="font-family:'JetBrains Mono',monospace;font-weight:700;color:${cls}">${p.qty} ${p.unit}</td><td style="font-family:'JetBrains Mono',monospace;color:var(--text3)">${p.min_qty}</td><td><button style="padding:2px 6px;background:transparent;border:1px solid rgba(192,48,42,.3);border-radius:3px;color:var(--red3);font-size:10px;cursor:pointer" onclick="deleteProduct(${p.id})">✕</button></td></tr>`;}).join('')}</tbody></table>`;}
 async function saveProduct(){const name=document.getElementById('prd-name').value.trim();const st=document.getElementById('prd-st');if(!name){st.innerHTML='<span style="color:var(--red3)">Enter product name</span>';return;}const sku=document.getElementById('prd-sku').value.trim(),barcode=document.getElementById('prd-barcode').value.trim(),category=document.getElementById('prd-cat').value,sale_price=parseFloat(document.getElementById('prd-sale').value)||0,cost_price=parseFloat(document.getElementById('prd-cost').value)||0,qty=parseFloat(document.getElementById('prd-qty').value)||0,min_qty=parseFloat(document.getElementById('prd-min').value)||0,unit=document.getElementById('prd-unit').value||'unit';try{await dbApi({action:'saveProduct',companyId:SESSION.companyId,name,sku,barcode,category,sale_price,cost_price,qty,min_qty,unit});if(qty>0&&cost_price>0){const total=qty*cost_price;DB.entries.push({id:DB.nextId++,date:today(),desc:`Opening stock: ${name}`,type:'Stock Receipt',amount:total,project:'',debits:[{acct:'Inventory (Stock)',amt:total,atype:'asset'}],credits:[{acct:'Accounts Payable',amt:total,atype:'liability'}]});await saveData();}await loadRetailProducts();renderAll();st.innerHTML=`<span style="color:var(--green3)">✅ ${name} saved</span>`;['prd-name','prd-sku','prd-barcode','prd-sale','prd-cost','prd-qty','prd-min'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});}catch(e){st.innerHTML=`<span style="color:var(--red3)">❌ ${e.message}</span>`;}setTimeout(()=>{const s=document.getElementById('prd-st');if(s)s.innerHTML='';},4000);}
 async function deleteProduct(id){if(!confirm('Delete?'))return;try{await dbApi({action:'deleteProduct',productId:id});await loadRetailProducts();}catch(e){showToast('❌ '+e.message);}}
-function renderStockInProductSelect(){const el=document.getElementById('si-product');if(!el)return;el.innerHTML='<option value="">Select product...</option>'+RETAIL_PRODUCTS.map(p=>`<option value="${p.id}">${p.name} (stock: ${p.qty} ${p.unit})</option>`).join('');}
+function renderStockInProductSelect(){
+  const el=document.getElementById('si-product');if(!el)return;
+  const prevValue=el.value;
+  el.innerHTML='<option value="">Select product...</option>'+RETAIL_PRODUCTS.map(p=>`<option value="${p.id}">${p.name} (stock: ${p.qty} ${p.unit})</option>`).join('');
+  if(prevValue&&RETAIL_PRODUCTS.some(p=>String(p.id)===String(prevValue)))el.value=prevValue;
+}
 async function receiveStock(){const productId=document.getElementById('si-product').value,qty=parseFloat(document.getElementById('si-qty').value)||0,unitCost=parseFloat(document.getElementById('si-cost').value)||0,supplier=document.getElementById('si-supplier').value.trim(),payMethod=document.getElementById('si-pay').value,st=document.getElementById('si-st');if(!productId||!qty||!unitCost){st.innerHTML='<span style="color:var(--red3)">Fill all fields</span>';return;}const product=RETAIL_PRODUCTS.find(p=>p.id===parseInt(productId));if(!product)return;const total=qty*unitCost;try{await dbApi({action:'receiveStock',companyId:SESSION.companyId,productId:parseInt(productId),qty,unitCost,supplier,paymentMethod:payMethod});DB.entries.push({id:DB.nextId++,date:today(),desc:`Stock received: ${product.name} × ${qty} from ${supplier||'supplier'}`,type:'Stock Receipt',amount:total,project:'',debits:[{acct:'Inventory (Stock)',amt:total,atype:'asset'}],credits:payMethod==='cash'?[{acct:'Cash',amt:total,atype:'asset'}]:[{acct:'Accounts Payable',amt:total,atype:'liability'}]});await saveData();await loadRetailProducts();renderAll();st.innerHTML=`<span style="color:var(--green3)">✅ Received ${qty} × ${product.name} — ${fc(total)}</span>`;['si-qty','si-cost','si-supplier'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});}catch(e){st.innerHTML=`<span style="color:var(--red3)">❌ ${e.message}</span>`;}setTimeout(()=>{const s=document.getElementById('si-st');if(s)s.innerHTML='';},5000);}
 function renderStockValPage(){const el=document.getElementById('stockValList');if(!el)return;if(!RETAIL_PRODUCTS.length){el.innerHTML='<div style="text-align:center;padding:22px;color:var(--text3)">No products</div>';return;}let totalCostVal=0,totalRetailVal=0;const rows=RETAIL_PRODUCTS.map(p=>{const layers=Array.isArray(p.layers)?p.layers:(JSON.parse(p.layers||'[]'));const tQ=layers.reduce((s,l)=>s+(l.qty||0),0),tV=layers.reduce((s,l)=>s+(l.qty||0)*(l.unitCost||0),0);const avgCost=tQ>0?tV/tQ:(parseFloat(p.cost_price)||0);const stockVal=parseFloat(p.qty)*avgCost,retailVal=parseFloat(p.qty)*parseFloat(p.sale_price);totalCostVal+=stockVal;totalRetailVal+=retailVal;const cls=parseFloat(p.qty)<=0?'var(--red3)':parseFloat(p.qty)<=parseFloat(p.min_qty)?'var(--orange3)':'var(--green3)';return`<tr><td style="font-weight:500">${p.name}</td><td><span class="tag t-blue" style="font-size:9px">${p.category}</span></td><td style="font-family:'JetBrains Mono',monospace;color:${cls};font-weight:700">${p.qty} ${p.unit}</td><td style="font-family:'JetBrains Mono',monospace">${fc(avgCost)}</td><td style="font-family:'JetBrains Mono',monospace">${fc(p.sale_price)}</td><td style="font-family:'JetBrains Mono',monospace;color:var(--gold3);font-weight:600">${fc(stockVal)}</td><td style="font-family:'JetBrains Mono',monospace;color:var(--green3)">${fc(retailVal)}</td></tr>`;}).join('');el.innerHTML=`<table><thead><tr><th>Product</th><th>Category</th><th>Stock</th><th>Avg Cost</th><th>Sale Price</th><th>Stock Value</th><th>Retail Value</th></tr></thead><tbody>${rows}</tbody></table><div class="kgrid" style="grid-template-columns:repeat(3,1fr);margin-top:12px"><div class="kpi"><div class="kpi-lbl">Stock Value (Cost)</div><div class="kpi-val warn">${fc(totalCostVal)}</div></div><div class="kpi"><div class="kpi-lbl">Retail Value</div><div class="kpi-val pos">${fc(totalRetailVal)}</div></div><div class="kpi"><div class="kpi-lbl">Margin Potential</div><div class="kpi-val ${totalRetailVal>totalCostVal?'pos':'neg'}">${fc(totalRetailVal-totalCostVal)}</div></div></div>`;}
 async function renderRetailSalesPage(){const el=document.getElementById('retailSalesList');if(!el)return;try{const r=await dbApi({action:'listPOSSales',companyId:SESSION.companyId,limit:200});const sales=r.sales||[];if(!sales.length){el.innerHTML='<div style="text-align:center;padding:22px;color:var(--text3)">No sales yet</div>';return;}const totalRevenue=sales.reduce((s,x)=>s+(parseFloat(x.total)||0),0);el.innerHTML=`<div class="kgrid" style="grid-template-columns:repeat(3,1fr);margin-bottom:12px"><div class="kpi"><div class="kpi-lbl">Total Sales</div><div class="kpi-val pos">${fc(totalRevenue)}</div></div><div class="kpi"><div class="kpi-lbl">Transactions</div><div class="kpi-val">${sales.length}</div></div></div><table><thead><tr><th>Date</th><th>Items</th><th>Payment</th><th>Discount</th><th>Total</th><th>Cashier</th></tr></thead><tbody>${sales.map(s=>{const items=Array.isArray(s.items)?s.items:(JSON.parse(s.items||'[]'));return`<tr><td style="font-family:'JetBrains Mono',monospace;font-size:11px">${String(s.sale_date).split('T')[0]}</td><td style="font-size:11px">${items.map(i=>i.name+' ×'+i.qty).join(', ').slice(0,50)}</td><td><span class="tag ${s.payment_method==='cash'?'t-green':'t-blue'}" style="font-size:9px">${s.payment_method}</span></td><td>${s.discount>0?'-'+fc(s.discount):''}</td><td style="font-family:'JetBrains Mono',monospace;color:var(--gold3);font-weight:700">${fc(s.total)}</td><td style="font-size:11px;color:var(--text3)">${s.cashier||'—'}</td></tr>`;}).join('')}</tbody></table>`;}catch(e){el.innerHTML=`<span style="color:var(--red3)">${e.message}</span>`;}}
@@ -734,10 +774,87 @@ async function completeSale(){if(!POS_CART.length){showToast('⚠️ Cart is emp
 function renderPOSProductGrid(){const el=document.getElementById('pos-product-grid');if(!el)return;if(!RETAIL_PRODUCTS.length){el.innerHTML='<div style="color:var(--text3);font-size:12px;text-align:center;padding:14px;grid-column:1/-1">No products — add them in Products page</div>';return;}el.innerHTML=RETAIL_PRODUCTS.map(p=>{const cls=parseFloat(p.qty)<=0?'var(--red3)':parseFloat(p.qty)<=parseFloat(p.min_qty)?'var(--orange3)':'var(--green3)';const obj=JSON.stringify({id:p.id,name:p.name,sku:p.sku||'',sale_price:parseFloat(p.sale_price)||0,cost_price:parseFloat(p.cost_price)||0,qty:1,unit:p.unit||'unit'}).replace(/'/g,'&apos;');return`<div class="pos-product-btn" onclick='posAddToCart(${obj})'><div style="font-size:11px;font-weight:600;color:var(--text);line-height:1.3;word-break:break-word">${p.name}</div><div style="font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--gold3)">${fc(p.sale_price)}</div><div style="font-size:9px;font-family:'JetBrains Mono',monospace;color:${cls}">${p.qty} ${p.unit}</div></div>`;}).join('');}
 
 // ── PURCHASE ORDERS ───────────────────────────────────────────────
+// Rebuilds every currently-rendered PO line-item <select> from the latest RETAIL_PRODUCTS,
+// preserving whatever was already selected in each row. Called whenever the product
+// catalogue refreshes (tab switch, quick-add, product page edits, etc).
+function refreshPOProductDropdowns(){
+  document.querySelectorAll('.po-line-product').forEach(sel=>{
+    const prevValue=sel.value;
+    sel.innerHTML='<option value="">Select...</option>'+
+      RETAIL_PRODUCTS.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+    if(prevValue&&RETAIL_PRODUCTS.some(p=>String(p.id)===String(prevValue)))sel.value=prevValue;
+  });
+}
 function renderPOLines(){const el=document.getElementById('po-lines');if(!el)return;el.innerHTML='';addPOLine();}
-function addPOLine(){const el=document.getElementById('po-lines');if(!el)return;const row=document.createElement('div');row.className='po-line-row';row.style.cssText='display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:7px;margin-bottom:7px;align-items:end';row.innerHTML=`<div class="fg" style="margin:0"><select class="po-line-product" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:9px 11px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none"><option value="">Select...</option>${RETAIL_PRODUCTS.map(p=>`<option value="${p.id}">${p.name}</option>`).join('')}</select></div><div class="fg" style="margin:0"><input class="po-line-qty" type="number" placeholder="10" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:9px 11px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none"/></div><div class="fg" style="margin:0"><input class="po-line-cost" type="number" step="0.01" placeholder="1.80" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:9px 11px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none"/></div><button onclick="this.closest('.po-line-row').remove()" style="padding:9px 11px;background:transparent;border:1px solid rgba(192,48,42,.3);border-radius:5px;color:var(--red3);cursor:pointer;font-size:14px">✕</button>`;el.appendChild(row);}
+let _poLineSeq=0;
+function addPOLine(){
+  const el=document.getElementById('po-lines');if(!el)return;
+  const lineId='po-line-'+(_poLineSeq++);
+  const row=document.createElement('div');
+  row.className='po-line-row';
+  row.dataset.lineId=lineId;
+  row.style.cssText='display:grid;grid-template-columns:2fr auto 1fr 1fr auto;gap:7px;margin-bottom:7px;align-items:end';
+  row.innerHTML=`
+    <div class="fg" style="margin:0">
+      <select class="po-line-product" id="sel-${lineId}" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:9px 11px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none">
+        <option value="">Select...</option>
+        ${RETAIL_PRODUCTS.map(p=>`<option value="${p.id}">${p.name}</option>`).join('')}
+      </select>
+    </div>
+    <button type="button" onclick="openQuickAddProduct('sel-${lineId}')" title="Add a new product without leaving this page" style="padding:9px 10px;background:transparent;border:1px dashed var(--gold2);border-radius:5px;color:var(--gold2);cursor:pointer;font-size:11px;white-space:nowrap">+ New</button>
+    <div class="fg" style="margin:0"><input class="po-line-qty" type="number" placeholder="10" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:9px 11px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none"/></div>
+    <div class="fg" style="margin:0"><input class="po-line-cost" type="number" step="0.01" placeholder="1.80" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:9px 11px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none"/></div>
+    <button type="button" onclick="this.closest('.po-line-row').remove()" style="padding:9px 11px;background:transparent;border:1px solid rgba(192,48,42,.3);border-radius:5px;color:var(--red3);cursor:pointer;font-size:14px">✕</button>
+  `;
+  el.appendChild(row);
+}
 async function submitPurchaseOrder(){const supplier=document.getElementById('po-supplier').value.trim(),payMethod=document.getElementById('po-pay').value,notes=document.getElementById('po-notes').value.trim(),st=document.getElementById('po-st');if(!supplier){st.innerHTML='<span style="color:var(--red3)">Enter supplier</span>';return;}const rows=document.querySelectorAll('.po-line-row');const items=[];let total=0;rows.forEach(row=>{const productId=row.querySelector('.po-line-product').value,qty=parseFloat(row.querySelector('.po-line-qty').value)||0,unitCost=parseFloat(row.querySelector('.po-line-cost').value)||0;if(!productId||!qty||!unitCost)return;const product=RETAIL_PRODUCTS.find(p=>p.id===parseInt(productId));if(!product)return;const lineTotal=qty*unitCost;total+=lineTotal;items.push({productId:parseInt(productId),name:product.name,qty,unitCost,lineTotal});});if(!items.length){st.innerHTML='<span style="color:var(--red3)">Add at least one item</span>';return;}try{await dbApi({action:'savePurchaseOrder',companyId:SESSION.companyId,supplier,po_date:today(),items,total,paymentMethod:payMethod,notes});DB.entries.push({id:DB.nextId++,date:today(),desc:`PO: ${supplier} — ${items.length} item(s)`,type:'Stock Purchase',amount:total,project:'',debits:[{acct:'Inventory (Stock)',amt:total,atype:'asset'}],credits:payMethod==='cash'?[{acct:'Cash',amt:total,atype:'asset'}]:[{acct:'Accounts Payable',amt:total,atype:'liability'}]});for(const item of items){await dbApi({action:'receiveStock',companyId:SESSION.companyId,productId:item.productId,qty:item.qty,unitCost:item.unitCost,supplier,paymentMethod:payMethod}).catch(()=>{});}await saveData();await loadRetailProducts();renderAll();st.innerHTML=`<span style="color:var(--green3)">✅ PO saved — ${fc(total)} from ${supplier}</span>`;document.getElementById('po-supplier').value='';if(document.getElementById('po-notes'))document.getElementById('po-notes').value='';renderPOLines();await renderPOList();}catch(e){st.innerHTML=`<span style="color:var(--red3)">❌ ${e.message}</span>`;}setTimeout(()=>{const s=document.getElementById('po-st');if(s)s.innerHTML='';},5000);}
 async function renderPOList(){const el=document.getElementById('poList');if(!el)return;try{const r=await dbApi({action:'listPurchaseOrders',companyId:SESSION.companyId});const orders=r.orders||[];if(!orders.length){el.innerHTML='<div style="text-align:center;padding:22px;color:var(--text3)">No purchase orders yet</div>';return;}el.innerHTML=`<table><thead><tr><th>Date</th><th>Supplier</th><th>Items</th><th>Total</th><th>Payment</th><th>Status</th></tr></thead><tbody>${orders.map(o=>{const items=Array.isArray(o.items)?o.items:(JSON.parse(o.items||'[]'));return`<tr><td style="font-family:'JetBrains Mono',monospace;font-size:11px">${String(o.po_date).split('T')[0]}</td><td>${o.supplier}</td><td style="font-size:11px">${items.map(i=>i.name+' ×'+i.qty).join(', ').slice(0,40)||'—'}</td><td style="font-family:'JetBrains Mono',monospace">${fc(o.total)}</td><td><span class="tag ${o.payment_method==='cash'?'t-green':'t-orange'}" style="font-size:9px">${o.payment_method}</span></td><td><span class="tag t-blue" style="font-size:9px">${o.status}</span></td></tr>`;}).join('')}</tbody></table>`;}catch(e){el.innerHTML=`<span style="color:var(--red3)">${e.message}</span>`;}}
+
+// ── QUICK ADD PRODUCT MODAL ───────────────────────────────────────
+// Lets the user create a new product without leaving the Purchase Orders / Receive Stock screen.
+// Opened via a "+ New" button next to a product <select>; on save it writes the product to the DB
+// with opening stock of 0, refreshes the catalogue everywhere (which also refreshes every open
+// dropdown), then auto-selects the new product on the exact select element that triggered it.
+let _quickAddTargetSelectId=null;
+
+function openQuickAddProduct(selectId){
+  _quickAddTargetSelectId=selectId;
+  ['qa-name','qa-sku','qa-cost','qa-sale'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  const cat=document.getElementById('qa-cat');if(cat)cat.value='General';
+  const st=document.getElementById('qa-st');if(st)st.innerHTML='';
+  document.getElementById('quickAddModal').style.display='flex';
+  setTimeout(()=>{const n=document.getElementById('qa-name');if(n)n.focus();},50);
+}
+
+function closeQuickAddModal(){
+  document.getElementById('quickAddModal').style.display='none';
+  _quickAddTargetSelectId=null;
+}
+
+async function saveQuickAddProduct(){
+  const name=document.getElementById('qa-name').value.trim();
+  const st=document.getElementById('qa-st');
+  if(!name){st.innerHTML='<span style="color:var(--red3)">Enter a product name</span>';return;}
+  const sku=document.getElementById('qa-sku').value.trim();
+  const category=document.getElementById('qa-cat').value;
+  const cost_price=parseFloat(document.getElementById('qa-cost').value)||0;
+  const sale_price=parseFloat(document.getElementById('qa-sale').value)||0;
+  st.innerHTML='<span style="color:var(--text3)">Saving...</span>';
+  try{
+    await dbApi({action:'saveProduct',companyId:SESSION.companyId,name,sku,category,sale_price,cost_price,qty:0,min_qty:0,unit:'unit'});
+    await loadRetailProducts();  // refetch from DB — also refreshes every open PO/Receive-Stock dropdown
+
+    const newProduct=RETAIL_PRODUCTS.find(p=>p.name.toLowerCase()===name.toLowerCase());
+    const targetSel=_quickAddTargetSelectId?document.getElementById(_quickAddTargetSelectId):null;
+    if(targetSel&&newProduct)targetSel.value=newProduct.id;
+
+    closeQuickAddModal();
+    showToast(`✅ "${name}" added and selected`);
+  }catch(e){
+    st.innerHTML=`<span style="color:var(--red3)">❌ ${e.message}</span>`;
+  }
+}
 
 // ── RETAIL PAGES INJECTOR ─────────────────────────────────────────
 function injectRetailPages(){
@@ -772,7 +889,15 @@ function injectRetailPages(){
 <div class="card"><input style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:8px 11px;font-size:12px;color:var(--text);outline:none;margin-bottom:10px" placeholder="Search by name, SKU or barcode..." id="productSearch" oninput="renderProductsPage()"/><div id="retailProductList"></div></div>`],
     ['pg-stockin',`<div class="ph"><h1>📲 Receive Stock</h1></div>
 <div class="card"><div class="card-hdr">➕ Receive Delivery</div>
-  <div class="fgrid"><div class="fg"><label>Product</label><select id="si-product" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:9px 11px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none"></select></div><div class="fg"><label>Qty</label><input id="si-qty" type="number" placeholder="50"/></div><div class="fg"><label>Unit Cost</label><input id="si-cost" type="number" step="0.01" placeholder="1.80"/></div><div class="fg"><label>Supplier</label><input id="si-supplier" type="text" placeholder="Supplier name"/></div><div class="fg"><label>Payment</label><select id="si-pay"><option value="credit">Credit (AP)</option><option value="cash">Cash</option></select></div></div>
+  <div class="fgrid">
+    <div class="fg">
+      <label>Product</label>
+      <div style="display:flex;gap:6px">
+        <select id="si-product" style="flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:9px 11px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none"></select>
+        <button type="button" onclick="openQuickAddProduct('si-product')" title="Add a new product without leaving this page" style="padding:9px 10px;background:transparent;border:1px dashed var(--gold2);border-radius:5px;color:var(--gold2);cursor:pointer;font-size:11px;white-space:nowrap">+ New</button>
+      </div>
+    </div>
+    <div class="fg"><label>Qty</label><input id="si-qty" type="number" placeholder="50"/></div><div class="fg"><label>Unit Cost</label><input id="si-cost" type="number" step="0.01" placeholder="1.80"/></div><div class="fg"><label>Supplier</label><input id="si-supplier" type="text" placeholder="Supplier name"/></div><div class="fg"><label>Payment</label><select id="si-pay"><option value="credit">Credit (AP)</option><option value="cash">Cash</option></select></div></div>
   <div class="btn-row"><button class="btn btn-gold" onclick="receiveStock()">📦 Receive Stock</button></div>
   <div id="si-st" style="font-size:11px;margin-top:7px"></div>
 </div>`],
