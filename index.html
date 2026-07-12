@@ -783,6 +783,18 @@ function renderStockInProductSelect(){
 // result is a review state, never posted straight to the books — the user must click
 // Confirm before anything touches inventory or the journal.
 let RS_PARSED_RECEIPT=null;
+let RS_LAST_SINGLE_ITEM_NAME=null; // parsed name for the single-item auto-fill path, used as a fallback if the user never picks/creates a product manually
+// Shared by both the single-item auto-fill flow and the multi-item review table: creates a
+// brand-new catalog product from a receipt line so an unmatched item never blocks intake.
+// Opening stock is 0 here — receiveStock() adds the real received qty right after — and the
+// sale price defaults to cost×1.2 (or $0.00 if cost is unknown) so it's easy to spot and
+// adjust in the Catalogue tab later.
+async function autoCreateProductFromReceiptLine(name,costPrice){
+  const cost=parseFloat(costPrice)||0;
+  const salePrice=cost>0?Math.round(cost*1.2*100)/100:0;
+  const r=await dbApi({action:'saveProduct',companyId:SESSION.companyId,name:(name||'Unnamed Item').trim(),category:'General',sale_price:salePrice,cost_price:cost,qty:0,min_qty:0,unit:'unit'});
+  return r.productId;
+}
 function setRSReceiptStatus(msg,isError){const el=document.getElementById('rsReceiptStatus');if(!el)return;el.textContent=msg;el.style.color=isError?'var(--red3)':'var(--text3)';}
 function handleReceiptDrop(event){event.preventDefault();event.currentTarget.style.borderColor='var(--border2)';const file=event.dataTransfer.files[0];if(file)handleStockReceiptUpload(file);}
 async function handleStockReceiptUpload(file){
@@ -855,9 +867,10 @@ function populateSingleIntakeForm(supplier,item){
   const qtyEl=document.getElementById('si-qty');if(qtyEl)qtyEl.value=item.qty||'';
   const costEl=document.getElementById('si-cost');if(costEl)costEl.value=item.unitCost||'';
   const productSel=document.getElementById('si-product');
+  RS_LAST_SINGLE_ITEM_NAME=item.name||null;
   if(productSel){
     const match=posFindProduct(item.name,true); // reuse the same fuzzy matcher built for POS voice
-    productSel.value=match?match.id:'';
+    productSel.value=match?match.id:''; // if unmatched, receiveStock() will auto-create it from RS_LAST_SINGLE_ITEM_NAME on confirm
   }
   const wrap=document.getElementById('rsReceiptReview');if(wrap){wrap.style.display='none';wrap.innerHTML='';}
 }
@@ -867,8 +880,8 @@ function renderReceiptReviewTable(parsed){
   const rows=parsed.items.map(it=>{
     const rowId='rsrow-'+(_rsReviewRowSeq++);
     const match=posFindProduct(it.name,true);
-    const options='<option value="">— no match, use + New —</option>'+RETAIL_PRODUCTS.map(p=>`<option value="${p.id}" ${match&&match.id===p.id?'selected':''}>${p.name}</option>`).join('');
-    return `<div class="rs-review-row" data-row-id="${rowId}" style="display:grid;grid-template-columns:1.4fr auto 1fr 1fr;gap:7px;align-items:end;padding:8px 0;border-bottom:1px solid var(--border)">
+    const options='<option value="">— no match, will auto-create on confirm —</option>'+RETAIL_PRODUCTS.map(p=>`<option value="${p.id}" ${match&&match.id===p.id?'selected':''}>${p.name}</option>`).join('');
+    return `<div class="rs-review-row" data-row-id="${rowId}" data-parsed-name="${(it.name||'').replace(/"/g,'&quot;')}" style="display:grid;grid-template-columns:1.4fr auto 1fr 1fr;gap:7px;align-items:end;padding:8px 0;border-bottom:1px solid var(--border)">
       <div>
         <div style="font-size:10px;color:var(--text3);margin-bottom:3px">Receipt said: "${it.name}"</div>
         <select class="rs-review-product" id="sel-${rowId}" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:7px 9px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none">${options}</select>
@@ -888,23 +901,37 @@ function renderReceiptReviewTable(parsed){
 function cancelReceiptReview(){const wrap=document.getElementById('rsReceiptReview');if(wrap){wrap.style.display='none';wrap.innerHTML='';}RS_PARSED_RECEIPT=null;setRSReceiptStatus('');}
 // This is the only place the multi-item receipt review actually posts anything — mirrors
 // the same receiveStock + journal-entry pattern as the manual single-item flow below.
+// Rows with no matched product are no longer skipped: they auto-create a brand-new
+// catalog entry from the receipt's own name right here, then proceed exactly as if that
+// product had always existed.
 async function confirmReceiptIntake(){
   const wrap=document.getElementById('rsReceiptReview');if(!wrap)return;
   const supplier=(document.getElementById('rs-review-supplier')||{}).value||'';
   const payMethod=(document.getElementById('rs-review-pay')||{}).value||'credit';
-  const rowEls=wrap.querySelectorAll('.rs-review-row');
-  const lines=[];let skipped=0;
+  const rowEls=Array.from(wrap.querySelectorAll('.rs-review-row'));
+  const candidates=[];let skipped=0;
   rowEls.forEach(row=>{
     const sel=row.querySelector('.rs-review-product');
     const productId=sel?sel.value:'';
+    const parsedName=row.dataset.parsedName||'';
     const qty=parseFloat(row.querySelector('.rs-review-qty').value)||0;
     const unitCost=parseFloat(row.querySelector('.rs-review-cost').value)||0;
-    if(!productId||qty<=0||unitCost<=0){skipped++;return;}
-    lines.push({productId:parseInt(productId),qty,unitCost});
+    if(qty<=0||unitCost<=0){skipped++;return;} // still skip rows with no usable qty/cost — that's a data problem, not a matching one
+    candidates.push({productId,parsedName,qty,unitCost});
   });
-  if(!lines.length){setRSReceiptStatus('⚠️ Match a product (or use +New) for at least one row before confirming.',true);return;}
+  if(!candidates.length){setRSReceiptStatus('⚠️ No rows have both a quantity and a unit cost — nothing to receive.',true);return;}
   setRSReceiptStatus('⏳ Recording receipt...');
   try{
+    const lines=[];const autoCreated=[];
+    for(const c of candidates){
+      let productId=c.productId?parseInt(c.productId):null;
+      if(!productId){
+        productId=await autoCreateProductFromReceiptLine(c.parsedName,c.unitCost);
+        autoCreated.push(c.parsedName||'Unnamed Item');
+      }
+      lines.push({productId,qty:c.qty,unitCost:c.unitCost});
+    }
+    if(autoCreated.length)await loadRetailProducts(); // refresh catalogue/dropdowns before we reference names below
     let total=0;
     for(const line of lines){
       await dbApi({action:'receiveStock',companyId:SESSION.companyId,productId:line.productId,qty:line.qty,unitCost:line.unitCost,supplier,paymentMethod:payMethod});
@@ -916,8 +943,9 @@ async function confirmReceiptIntake(){
     await loadRetailProducts();
     renderAll();
     cancelReceiptReview();
-    setRSReceiptStatus(`✅ Received ${lines.length} item(s) — ${fc(total)} recorded${skipped?` (${skipped} row(s) skipped — no product matched)`:''}`);
-    showToast(`✅ Stock receipt recorded — ${fc(total)}`);
+    const createdMsg=autoCreated.length?` — created new product(s): ${autoCreated.join(', ')} (set your sale price in Catalogue)`:'';
+    setRSReceiptStatus(`✅ Received ${lines.length} item(s) — ${fc(total)} recorded${createdMsg}${skipped?` (${skipped} row(s) skipped — no qty/cost)`:''}`);
+    showToast(`✅ Stock receipt recorded — ${fc(total)}${autoCreated.length?` (${autoCreated.length} new product${autoCreated.length>1?'s':''})`:''}`);
   }catch(e){
     setRSReceiptStatus('❌ '+e.message,true);
   }
@@ -925,8 +953,42 @@ async function confirmReceiptIntake(){
 
 // Manual stock intake with NO purchase order behind it (e.g. a walk-in supplier drop-off,
 // or the fields auto-filled above from a single-item receipt upload). Since there's no PO
-// to await, the journal entry is posted immediately here.
-async function receiveStock(){const productId=document.getElementById('si-product').value,qty=parseFloat(document.getElementById('si-qty').value)||0,unitCost=parseFloat(document.getElementById('si-cost').value)||0,supplier=document.getElementById('si-supplier').value.trim(),payMethod=document.getElementById('si-pay').value,st=document.getElementById('si-st');if(!productId||!qty||!unitCost){st.innerHTML='<span style="color:var(--red3)">Fill all fields</span>';return;}const product=RETAIL_PRODUCTS.find(p=>p.id===parseInt(productId));if(!product)return;const total=qty*unitCost;try{await dbApi({action:'receiveStock',companyId:SESSION.companyId,productId:parseInt(productId),qty,unitCost,supplier,paymentMethod:payMethod});DB.entries.push({id:DB.nextId++,date:today(),desc:`Stock received: ${product.name} × ${qty} from ${supplier||'supplier'}`,type:'Stock Receipt',amount:total,project:'',debits:[{acct:'Inventory (Stock)',amt:total,atype:'asset'}],credits:payMethod==='cash'?[{acct:'Cash',amt:total,atype:'asset'}]:[{acct:'Accounts Payable',amt:total,atype:'liability'}]});await saveData();await loadRetailProducts();renderAll();st.innerHTML=`<span style="color:var(--green3)">✅ Received ${qty} × ${product.name} — ${fc(total)}</span>`;['si-qty','si-cost','si-supplier'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});}catch(e){st.innerHTML=`<span style="color:var(--red3)">❌ ${e.message}</span>`;}setTimeout(()=>{const s=document.getElementById('si-st');if(s)s.innerHTML='';},5000);}
+// to await, the journal entry is posted immediately here. If the product field was left
+// unmatched after a receipt auto-fill, this auto-creates the product from the receipt's
+// own name rather than blocking the intake — true manual entry (no receipt involved)
+// still requires picking a product, since there's no parsed name to create one from.
+async function receiveStock(){
+  const productIdRaw=document.getElementById('si-product').value;
+  const qty=parseFloat(document.getElementById('si-qty').value)||0;
+  const unitCost=parseFloat(document.getElementById('si-cost').value)||0;
+  const supplier=document.getElementById('si-supplier').value.trim();
+  const payMethod=document.getElementById('si-pay').value;
+  const st=document.getElementById('si-st');
+  if(!qty||!unitCost){st.innerHTML='<span style="color:var(--red3)">Fill all fields</span>';return;}
+  try{
+    let productId=productIdRaw?parseInt(productIdRaw):null;
+    let product=productId?RETAIL_PRODUCTS.find(p=>p.id===productId):null;
+    if(!productId){
+      if(!RS_LAST_SINGLE_ITEM_NAME){st.innerHTML='<span style="color:var(--red3)">Select a product</span>';return;}
+      st.innerHTML=`<span style="color:var(--text3)">Auto-creating product "${RS_LAST_SINGLE_ITEM_NAME}"...</span>`;
+      productId=await autoCreateProductFromReceiptLine(RS_LAST_SINGLE_ITEM_NAME,unitCost);
+      await loadRetailProducts();
+      product=RETAIL_PRODUCTS.find(p=>p.id===productId);
+    }
+    if(!product){st.innerHTML='<span style="color:var(--red3)">Product not found</span>';return;}
+    const total=qty*unitCost;
+    await dbApi({action:'receiveStock',companyId:SESSION.companyId,productId,qty,unitCost,supplier,paymentMethod:payMethod});
+    DB.entries.push({id:DB.nextId++,date:today(),desc:`Stock received: ${product.name} × ${qty} from ${supplier||'supplier'}`,type:'Stock Receipt',amount:total,project:'',debits:[{acct:'Inventory (Stock)',amt:total,atype:'asset'}],credits:payMethod==='cash'?[{acct:'Cash',amt:total,atype:'asset'}]:[{acct:'Accounts Payable',amt:total,atype:'liability'}]});
+    await saveData();await loadRetailProducts();renderAll();
+    const createdMsg=RS_LAST_SINGLE_ITEM_NAME&&!productIdRaw?' — new product created (set your sale price in Catalogue)':'';
+    st.innerHTML=`<span style="color:var(--green3)">✅ Received ${qty} × ${product.name} — ${fc(total)}${createdMsg}</span>`;
+    ['si-qty','si-cost','si-supplier'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+    RS_LAST_SINGLE_ITEM_NAME=null;
+  }catch(e){
+    st.innerHTML=`<span style="color:var(--red3)">❌ ${e.message}</span>`;
+  }
+  setTimeout(()=>{const s=document.getElementById('si-st');if(s)s.innerHTML='';},5000);
+}
 
 // ── RECEIVE STOCK AGAINST A PURCHASE ORDER ────────────────────────
 // This is the correct trigger point for the journal entry (Dr Inventory / Cr AP),
