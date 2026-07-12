@@ -766,7 +766,40 @@ async function loadRetailProducts(){
     renderStockInProductSelect();  // keep Receive Stock select in sync
   }catch(e){console.error('loadRetailProducts',e);}
 }
-function renderProductsPage(){const el=document.getElementById('retailProductList');if(!el)return;if(!RETAIL_PRODUCTS.length){el.innerHTML='<div style="text-align:center;padding:22px;color:var(--text3)">No products yet</div>';return;}const q=(document.getElementById('productSearch')||{}).value||'';const items=RETAIL_PRODUCTS.filter(p=>!q||p.name.toLowerCase().includes(q.toLowerCase())||(p.sku||'').includes(q)||(p.barcode||'').includes(q));el.innerHTML=`<table><thead><tr><th>SKU</th><th>Barcode</th><th>Product</th><th>Category</th><th>Sale Price</th><th>Cost</th><th>Stock</th><th>Min</th><th></th></tr></thead><tbody>${items.map(p=>{const cls=parseFloat(p.qty)<=0?'var(--red3)':parseFloat(p.qty)<=parseFloat(p.min_qty)?'var(--orange3)':'var(--green3)';return`<tr><td style="font-family:'JetBrains Mono',monospace;font-size:10px">${p.sku||'—'}</td><td style="font-family:'JetBrains Mono',monospace;font-size:10px">${p.barcode||'—'}</td><td style="font-weight:500">${p.name}</td><td><span class="tag t-blue" style="font-size:9px">${p.category}</span></td><td style="font-family:'JetBrains Mono',monospace">${fc(p.sale_price)}</td><td style="font-family:'JetBrains Mono',monospace;color:var(--text3)">${fc(p.cost_price)}</td><td style="font-family:'JetBrains Mono',monospace;font-weight:700;color:${cls}">${p.qty} ${p.unit}</td><td style="font-family:'JetBrains Mono',monospace;color:var(--text3)">${p.min_qty}</td><td><button style="padding:2px 6px;background:transparent;border:1px solid rgba(192,48,42,.3);border-radius:3px;color:var(--red3);font-size:10px;cursor:pointer" onclick="deleteProduct(${p.id})">✕</button></td></tr>`;}).join('')}</tbody></table>`;}
+function renderProductsPage(){const el=document.getElementById('retailProductList');if(!el)return;if(!RETAIL_PRODUCTS.length){el.innerHTML='<div style="text-align:center;padding:22px;color:var(--text3)">No products yet</div>';return;}const q=(document.getElementById('productSearch')||{}).value||'';const items=RETAIL_PRODUCTS.filter(p=>!q||p.name.toLowerCase().includes(q.toLowerCase())||(p.sku||'').includes(q)||(p.barcode||'').includes(q));const canEditPrice=SESSION.role==='owner';el.innerHTML=`<table><thead><tr><th>SKU</th><th>Barcode</th><th>Product</th><th>Category</th><th>Sale Price</th><th>Cost</th><th>Stock</th><th>Min</th><th></th></tr></thead><tbody>${items.map(p=>{const cls=parseFloat(p.qty)<=0?'var(--red3)':parseFloat(p.qty)<=parseFloat(p.min_qty)?'var(--orange3)':'var(--green3)';const priceCell=canEditPrice?`<td data-price-cell="${p.id}" style="font-family:'JetBrains Mono',monospace;cursor:pointer;border-bottom:1px dashed var(--gold2)" title="Click to edit price" onclick="startInlineEditPrice(this,${p.id},${parseFloat(p.sale_price)||0})">${fc(p.sale_price)}</td>`:`<td style="font-family:'JetBrains Mono',monospace">${fc(p.sale_price)}</td>`;return`<tr><td style="font-family:'JetBrains Mono',monospace;font-size:10px">${p.sku||'—'}</td><td style="font-family:'JetBrains Mono',monospace;font-size:10px">${p.barcode||'—'}</td><td style="font-weight:500">${p.name}</td><td><span class="tag t-blue" style="font-size:9px">${p.category}</span></td>${priceCell}<td style="font-family:'JetBrains Mono',monospace;color:var(--text3)">${fc(p.cost_price)}</td><td style="font-family:'JetBrains Mono',monospace;font-weight:700;color:${cls}">${p.qty} ${p.unit}</td><td style="font-family:'JetBrains Mono',monospace;color:var(--text3)">${p.min_qty}</td><td><button style="padding:2px 6px;background:transparent;border:1px solid rgba(192,48,42,.3);border-radius:3px;color:var(--red3);font-size:10px;cursor:pointer" onclick="deleteProduct(${p.id})">✕</button></td></tr>`;}).join('')}</tbody></table>`;}
+// ── INLINE SALE PRICE EDITING (Owner only) ─────────────────────────
+// Role check happens both here (defense in depth — the cell isn't even clickable/rendered
+// with a handler for non-owners in renderProductsPage above) and again before saving.
+function startInlineEditPrice(cellEl,productId,currentPrice){
+  if(SESSION.role!=='owner')return;
+  if(cellEl.querySelector('input'))return; // already editing this cell
+  cellEl.innerHTML=`<input type="number" step="0.01" min="0" value="${currentPrice}" style="width:78px;background:var(--bg3);border:1px solid var(--gold2);border-radius:4px;padding:4px 6px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none" onkeydown="if(event.key==='Enter'){this.blur();}else if(event.key==='Escape'){this.dataset.cancelled='1';this.blur();}" onblur="finishInlineEditPrice(this,${productId})"/>`;
+  const inp=cellEl.querySelector('input');
+  inp.focus();inp.select();
+}
+function finishInlineEditPrice(inputEl,productId){
+  if(inputEl.dataset.cancelled==='1'){renderProductsPage();return;} // Escape — discard edit
+  updateProductSalePrice(productId,inputEl.value);
+}
+async function updateProductSalePrice(productId,newPrice){
+  const product=RETAIL_PRODUCTS.find(p=>p.id===productId);
+  if(!product)return;
+  const price=parseFloat(newPrice);
+  if(isNaN(price)||price<0){showToast('⚠️ Enter a valid price');renderProductsPage();return;}
+  const prevPrice=product.sale_price;
+  product.sale_price=price; // optimistic — feels instant, rolled back below if the save fails
+  renderProductsPage();
+  renderPOSProductGrid(); // POS checkout grid must reflect the new price immediately
+  renderStockValPage();
+  try{
+    await dbApi({action:'saveProduct',companyId:SESSION.companyId,id:product.id,sku:product.sku,barcode:product.barcode,name:product.name,category:product.category,sale_price:price,cost_price:product.cost_price,qty:product.qty,min_qty:product.min_qty,unit:product.unit});
+    showToast(`✅ ${product.name} price updated to ${fc(price)}`);
+  }catch(e){
+    product.sale_price=prevPrice;
+    renderProductsPage();renderPOSProductGrid();renderStockValPage();
+    showToast('❌ Failed to save price: '+e.message,4000);
+  }
+}
 async function saveProduct(){const name=document.getElementById('prd-name').value.trim();const st=document.getElementById('prd-st');if(!name){st.innerHTML='<span style="color:var(--red3)">Enter product name</span>';return;}const sku=document.getElementById('prd-sku').value.trim(),barcode=document.getElementById('prd-barcode').value.trim(),category=document.getElementById('prd-cat').value,sale_price=parseFloat(document.getElementById('prd-sale').value)||0,cost_price=parseFloat(document.getElementById('prd-cost').value)||0,qty=parseFloat(document.getElementById('prd-qty').value)||0,min_qty=parseFloat(document.getElementById('prd-min').value)||0,unit=document.getElementById('prd-unit').value||'unit';try{await dbApi({action:'saveProduct',companyId:SESSION.companyId,name,sku,barcode,category,sale_price,cost_price,qty,min_qty,unit});if(qty>0&&cost_price>0){const total=qty*cost_price;DB.entries.push({id:DB.nextId++,date:today(),desc:`Opening stock: ${name}`,type:'Stock Receipt',amount:total,project:'',debits:[{acct:'Inventory (Stock)',amt:total,atype:'asset'}],credits:[{acct:'Accounts Payable',amt:total,atype:'liability'}]});await saveData();}await loadRetailProducts();renderAll();st.innerHTML=`<span style="color:var(--green3)">✅ ${name} saved</span>`;['prd-name','prd-sku','prd-barcode','prd-sale','prd-cost','prd-qty','prd-min'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});}catch(e){st.innerHTML=`<span style="color:var(--red3)">❌ ${e.message}</span>`;}setTimeout(()=>{const s=document.getElementById('prd-st');if(s)s.innerHTML='';},4000);}
 async function deleteProduct(id){if(!confirm('Delete?'))return;try{await dbApi({action:'deleteProduct',productId:id});await loadRetailProducts();}catch(e){showToast('❌ '+e.message);}}
 function renderStockInProductSelect(){
