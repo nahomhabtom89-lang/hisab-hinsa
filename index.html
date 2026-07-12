@@ -9,6 +9,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.0.4/tesseract.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 <style>
 :root{--bg:#0a0e17;--bg2:#111827;--bg3:#1a2236;--bg4:#243048;--border:#1e2d47;--border2:#2a3f5e;--text:#e8edf5;--text2:#8fa3c0;--text3:#4d6280;--gold:#c49a2a;--gold2:#e0b84a;--gold3:#f5d070;--blue:#1a5eff;--blue2:#4080ff;--blue3:#80b0ff;--green:#0a7a3e;--green2:#12a855;--green3:#30d878;--red:#8b1a1a;--red2:#c0302a;--red3:#f07070;--orange:#b06010;--orange2:#e08020;--orange3:#ffb040;--purple:#5b2d8e;--purple2:#7c3fd4;--purple3:#b98bff;--shadow:0 8px 40px rgba(0,0,0,.6);--radius:8px}
 *{box-sizing:border-box;margin:0;padding:0}body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
@@ -380,6 +381,16 @@
     </div>
   </div>
 </div>
+<div id="cameraScanModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:6000;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:16px;width:100%;max-width:420px;box-shadow:var(--shadow)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div style="font-family:'Noto Sans Ethiopic',sans-serif;font-size:14px;font-weight:700;color:var(--text)">📷 Scan Barcode</div>
+      <button onclick="closeCameraScanner()" style="background:transparent;border:none;color:var(--text3);font-size:18px;cursor:pointer;line-height:1">✕</button>
+    </div>
+    <div id="qr-reader" style="width:100%;border-radius:8px;overflow:hidden"></div>
+    <div id="qr-reader-status" style="font-size:11px;color:var(--text3);margin-top:8px;text-align:center">Point camera at a barcode</div>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 <script>
 'use strict'; // v3.1 2026-07-09
@@ -514,6 +525,11 @@ async function switchAppMode(newMode){if(newMode===APP_MODE){const m=document.ge
 
 // ── NAVIGATION ────────────────────────────────────────────────────
 async function nav(page,el){
+  // Leaving POS: release the camera/mic so they don't keep running in the background.
+  if(page!=='pos'){
+    if(_html5QrScanner)closeCameraScanner();
+    if(_posVoiceRecognizer)posToggleVoice();
+  }
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
   document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('on'));
   const pg=document.getElementById('pg-'+page);if(pg)pg.classList.add('on');if(el)el.classList.add('on');
@@ -837,8 +853,94 @@ function renderStockValPage(){const el=document.getElementById('stockValList');i
 async function renderRetailSalesPage(){const el=document.getElementById('retailSalesList');if(!el)return;try{const r=await dbApi({action:'listPOSSales',companyId:SESSION.companyId,limit:200});const sales=r.sales||[];if(!sales.length){el.innerHTML='<div style="text-align:center;padding:22px;color:var(--text3)">No sales yet</div>';return;}const totalRevenue=sales.reduce((s,x)=>s+(parseFloat(x.total)||0),0);el.innerHTML=`<div class="kgrid" style="grid-template-columns:repeat(3,1fr);margin-bottom:12px"><div class="kpi"><div class="kpi-lbl">Total Sales</div><div class="kpi-val pos">${fc(totalRevenue)}</div></div><div class="kpi"><div class="kpi-lbl">Transactions</div><div class="kpi-val">${sales.length}</div></div></div><table><thead><tr><th>Date</th><th>Items</th><th>Payment</th><th>Discount</th><th>Total</th><th>Cashier</th></tr></thead><tbody>${sales.map(s=>{const items=Array.isArray(s.items)?s.items:(JSON.parse(s.items||'[]'));return`<tr><td style="font-family:'JetBrains Mono',monospace;font-size:11px">${String(s.sale_date).split('T')[0]}</td><td style="font-size:11px">${items.map(i=>i.name+' ×'+i.qty).join(', ').slice(0,50)}</td><td><span class="tag ${s.payment_method==='cash'?'t-green':'t-blue'}" style="font-size:9px">${s.payment_method}</span></td><td>${s.discount>0?'-'+fc(s.discount):''}</td><td style="font-family:'JetBrains Mono',monospace;color:var(--gold3);font-weight:700">${fc(s.total)}</td><td style="font-size:11px;color:var(--text3)">${s.cashier||'—'}</td></tr>`;}).join('')}</tbody></table>`;}catch(e){el.innerHTML=`<span style="color:var(--red3)">${e.message}</span>`;}}
 
 // ── POS CART ──────────────────────────────────────────────────────
-function posLookup(val){val=(val||(document.getElementById('pos-scan')||{}).value||'').trim();if(!val)return;const product=RETAIL_PRODUCTS.find(p=>p.barcode===val||p.sku===val||p.name.toLowerCase()===val.toLowerCase());if(!product){showToast('⚠️ Not found: '+val,3000);return;}posAddToCart(product);const s=document.getElementById('pos-scan');if(s)s.value='';}
+// Single shared matcher used by every input method (typed, camera-scanned, spoken) so
+// they all funnel into the exact same "add to cart" behavior — no separate code paths.
+// allowFuzzy is used by voice only, since spoken product names rarely match exactly.
+function posFindProduct(raw,allowFuzzy){
+  const val=(raw||'').trim();if(!val)return null;
+  const exact=RETAIL_PRODUCTS.find(p=>p.barcode===val||p.sku===val||p.name.toLowerCase()===val.toLowerCase());
+  if(exact||!allowFuzzy)return exact||null;
+  const s=val.toLowerCase();
+  return RETAIL_PRODUCTS.find(p=>p.name.toLowerCase().includes(s)||s.includes(p.name.toLowerCase()))||null;
+}
+function posLookup(val){val=(val||(document.getElementById('pos-scan')||{}).value||'').trim();if(!val)return;const product=posFindProduct(val,false);if(!product){showToast('⚠️ Not found: '+val,3000);return;}posAddToCart(product);const s=document.getElementById('pos-scan');if(s)s.value='';}
 function posAddToCart(product,qty=1){const existing=POS_CART.find(i=>i.id===product.id);if(existing){existing.qty+=qty;}else{POS_CART.push({id:product.id,name:product.name,sku:product.sku||'',sale_price:parseFloat(product.sale_price)||0,cost_price:parseFloat(product.cost_price)||0,qty,unit:product.unit||'unit'});}renderPOSCart();}
+
+// ── POS VOICE-ACTIVATED ADD ────────────────────────────────────────
+// Say a product name → matched (exact, then fuzzy) → posAddToCart → input cleared →
+// keeps listening for the next item, fire-and-forget for the cashier.
+let _posVoiceRecognizer=null;
+function posToggleVoice(){
+  const btn=document.getElementById('pos-voice-btn');
+  if(_posVoiceRecognizer){
+    const r=_posVoiceRecognizer;_posVoiceRecognizer=null; // clear first so onend doesn't auto-restart
+    try{r.stop();}catch(e){}
+    if(btn){btn.classList.remove('on');btn.textContent='🎙️';}
+    return;
+  }
+  if(!window.SpeechRecognition&&!window.webkitSpeechRecognition){showToast('Voice not supported on this browser/device');return;}
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  _posVoiceRecognizer=new SR();
+  _posVoiceRecognizer.lang='en-US';
+  _posVoiceRecognizer.continuous=true;
+  _posVoiceRecognizer.interimResults=false;
+  _posVoiceRecognizer.onresult=e=>{
+    const said=e.results[e.results.length-1][0].transcript.trim();
+    const scanInp=document.getElementById('pos-scan');
+    const product=posFindProduct(said,true);
+    if(product){posAddToCart(product);}
+    else{showToast(`⚠️ Product not recognized: "${said}"`,2500);}
+    if(scanInp)scanInp.value=''; // clear and keep listening either way
+  };
+  _posVoiceRecognizer.onerror=e=>{
+    if(e.error==='no-speech'||e.error==='aborted')return;
+    if(e.error==='not-allowed'||e.error==='service-not-allowed'){
+      showToast('🎙️ Microphone permission denied');
+      _posVoiceRecognizer=null;
+      if(btn){btn.classList.remove('on');btn.textContent='🎙️';}
+      return;
+    }
+    showToast('Voice error: '+e.error,3000);
+  };
+  _posVoiceRecognizer.onend=()=>{if(_posVoiceRecognizer)_posVoiceRecognizer.start();}; // auto-restart while toggled on
+  _posVoiceRecognizer.start();
+  if(btn){btn.classList.add('on');btn.textContent='🔴';}
+  showToast('🎙️ Listening — say a product name');
+}
+
+// ── POS CAMERA BARCODE SCANNING ────────────────────────────────────
+// Opens a modal with a live rear-camera preview; a decoded barcode is dropped into the
+// search box and run through the exact same posLookup() path as manual typing, then the
+// modal closes itself — no extra click needed.
+let _html5QrScanner=null;
+async function openCameraScanner(){
+  const modal=document.getElementById('cameraScanModal');if(!modal)return;
+  modal.style.display='flex';
+  const statusEl=document.getElementById('qr-reader-status');
+  if(statusEl)statusEl.textContent='Starting camera...';
+  if(typeof Html5Qrcode==='undefined'){if(statusEl)statusEl.textContent='❌ Scanner library failed to load — check your connection.';return;}
+  try{
+    _html5QrScanner=new Html5Qrcode('qr-reader');
+    await _html5QrScanner.start(
+      { facingMode: 'environment' },
+      { fps: 10, qrbox: { width: 250, height: 150 } },
+      (decodedText)=>{
+        const scanInp=document.getElementById('pos-scan');
+        if(scanInp)scanInp.value=decodedText;
+        posLookup(decodedText);
+        closeCameraScanner();
+      },
+      ()=>{ /* per-frame no-match — ignore and keep scanning */ }
+    );
+    if(statusEl)statusEl.textContent='Point camera at a barcode';
+  }catch(e){
+    if(statusEl)statusEl.textContent='❌ Camera error: '+(e.message||e);
+  }
+}
+async function closeCameraScanner(){
+  const modal=document.getElementById('cameraScanModal');if(modal)modal.style.display='none';
+  if(_html5QrScanner){try{await _html5QrScanner.stop();await _html5QrScanner.clear();}catch(e){}_html5QrScanner=null;}
+}
 function posRemoveFromCart(productId){POS_CART=POS_CART.filter(i=>i.id!==productId);renderPOSCart();}
 function posUpdateQty(productId,newQty){const item=POS_CART.find(i=>i.id===productId);if(!item)return;item.qty=Math.max(0,parseFloat(newQty)||0);if(item.qty===0)POS_CART=POS_CART.filter(i=>i.id!==productId);renderPOSCart();}
 function getPOSTotals(){const subtotal=POS_CART.reduce((s,i)=>s+i.sale_price*i.qty,0),discountAmt=POS_DISCOUNT>0?subtotal*POS_DISCOUNT/100:0;return{subtotal,discountAmt,total:subtotal-discountAmt,cogs:POS_CART.reduce((s,i)=>s+i.cost_price*i.qty,0)};}
@@ -945,7 +1047,12 @@ function injectRetailPages(){
 <div class="ph"><h1>🖥️ POS Register</h1></div>
 <div class="pos-shell">
   <div class="pos-left">
-    <div style="display:flex;gap:7px"><input id="pos-scan" style="flex:1;background:var(--bg);border:2px solid var(--gold2);border-radius:7px;padding:12px 14px;font-family:'JetBrains Mono',monospace;font-size:15px;color:var(--text);outline:none" placeholder="🔍 Scan barcode / SKU / product name..." onkeydown="if(event.key==='Enter')posLookup(this.value)" autocomplete="off"/><button style="padding:12px 18px;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#0a0e17;border:none;border-radius:7px;font-size:16px;cursor:pointer;font-weight:700" onclick="posLookup()">Add</button></div>
+    <div style="display:flex;gap:7px">
+      <input id="pos-scan" style="flex:1;background:var(--bg);border:2px solid var(--gold2);border-radius:7px;padding:12px 14px;font-family:'JetBrains Mono',monospace;font-size:15px;color:var(--text);outline:none" placeholder="🔍 Scan barcode / SKU / product name..." onkeydown="if(event.key==='Enter')posLookup(this.value)" autocomplete="off"/>
+      <button id="pos-voice-btn" class="mic-btn" onclick="posToggleVoice()" title="Say a product name to add it">🎙️</button>
+      <button id="pos-camera-btn" class="mic-btn" onclick="openCameraScanner()" title="Scan a barcode with your camera">📷</button>
+      <button style="padding:12px 18px;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#0a0e17;border:none;border-radius:7px;font-size:16px;cursor:pointer;font-weight:700" onclick="posLookup()">Add</button>
+    </div>
     <div class="pos-product-grid" id="pos-product-grid"></div>
   </div>
   <div class="pos-right">
@@ -1016,4 +1123,3 @@ window.addEventListener('DOMContentLoaded',()=>{
 </script>
 </body>
 </html>
-
