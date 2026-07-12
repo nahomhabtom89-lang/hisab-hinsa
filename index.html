@@ -601,8 +601,8 @@ function useChip(el){document.getElementById('mainInp').value=el.textContent;doc
 // ── AI RECORD ─────────────────────────────────────────────────────
 function setReceiptStatus(msg,isError){const el=document.getElementById('receiptStatus');if(el){el.textContent=msg;el.style.color=isError?'var(--red3)':'var(--text3)';}}
 async function handleReceiptUpload(file){if(!file)return;try{let text='';if(file.type==='application/pdf'||file.name.toLowerCase().endsWith('.pdf'))text=await extractTextFromPDF(file);else if(file.type.startsWith('image/'))text=await extractTextFromImage(file);else{setReceiptStatus('⚠️ Unsupported',true);return;}text=(text||'').trim();if(!text){setReceiptStatus('⚠️ No text found',true);return;}setReceiptStatus('✅ Extracted');document.getElementById('mainInp').value=text.slice(0,500);await doRecord(text);}catch(err){setReceiptStatus('❌ '+err.message,true);}finally{document.getElementById('receiptFile').value='';}}
-async function extractTextFromPDF(file){setReceiptStatus('📄 Reading PDF...');if(typeof pdfjsLib==='undefined')throw new Error('PDF reader failed');pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';const buf=await file.arrayBuffer(),pdf=await pdfjsLib.getDocument({data:buf}).promise;let txt='';for(let i=1;i<=Math.min(pdf.numPages,5);i++){const page=await pdf.getPage(i);const c=await page.getTextContent();txt+=c.items.map(it=>it.str).join(' ')+'\n';}if(txt.trim().length>15)return txt;const canvas=document.createElement('canvas');const p1=await pdf.getPage(1);const vp=p1.getViewport({scale:2});canvas.width=vp.width;canvas.height=vp.height;await p1.render({canvasContext:canvas.getContext('2d'),viewport:vp}).promise;return extractTextFromImage(await new Promise(resolve=>canvas.toBlob(resolve,'image/png')));}
-async function extractTextFromImage(blob){setReceiptStatus('🔍 OCR...');if(typeof Tesseract==='undefined')throw new Error('OCR failed');const result=await Tesseract.recognize(blob,'eng',{logger:m=>{if(m.status==='recognizing text')setReceiptStatus(`🔍 ${Math.round((m.progress||0)*100)}%`);}});return result.data.text;}
+async function extractTextFromPDF(file,onStatus){const report=onStatus||setReceiptStatus;report('📄 Reading PDF...');if(typeof pdfjsLib==='undefined')throw new Error('PDF reader failed');pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';const buf=await file.arrayBuffer(),pdf=await pdfjsLib.getDocument({data:buf}).promise;let txt='';for(let i=1;i<=Math.min(pdf.numPages,5);i++){const page=await pdf.getPage(i);const c=await page.getTextContent();txt+=c.items.map(it=>it.str).join(' ')+'\n';}if(txt.trim().length>15)return txt;const canvas=document.createElement('canvas');const p1=await pdf.getPage(1);const vp=p1.getViewport({scale:2});canvas.width=vp.width;canvas.height=vp.height;await p1.render({canvasContext:canvas.getContext('2d'),viewport:vp}).promise;return extractTextFromImage(await new Promise(resolve=>canvas.toBlob(resolve,'image/png')),onStatus);}
+async function extractTextFromImage(blob,onStatus){const report=onStatus||setReceiptStatus;report('🔍 OCR...');if(typeof Tesseract==='undefined')throw new Error('OCR failed');const result=await Tesseract.recognize(blob,'eng',{logger:m=>{if(m.status==='recognizing text')report(`🔍 ${Math.round((m.progress||0)*100)}%`);}});return result.data.text;}
 function safeParseAIJson(raw){
   if(!raw)throw new Error('Empty AI response');
   raw=raw.trim().replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
@@ -775,9 +775,157 @@ function renderStockInProductSelect(){
   el.innerHTML='<option value="">Select product...</option>'+RETAIL_PRODUCTS.map(p=>`<option value="${p.id}">${p.name} (stock: ${p.qty} ${p.unit})</option>`).join('');
   if(prevValue&&RETAIL_PRODUCTS.some(p=>String(p.id)===String(prevValue)))el.value=prevValue;
 }
-// Manual stock intake with NO purchase order behind it (e.g. a walk-in supplier drop-off).
-// Since there's no PO to await, the journal entry is posted immediately here — this path
-// is unaffected by the PO workflow change below.
+
+// ── AI RECEIPT/INVOICE UPLOAD FOR STOCK INTAKE (retail only) ──────────────
+// Reuses the same OCR/PDF text extraction already built for the Home "Record" page,
+// then sends the raw text to /api/ai with a receipt-specific systemPrompt (no backend
+// changes needed — ai.js already supports a custom systemPrompt override). The parsed
+// result is a review state, never posted straight to the books — the user must click
+// Confirm before anything touches inventory or the journal.
+let RS_PARSED_RECEIPT=null;
+function setRSReceiptStatus(msg,isError){const el=document.getElementById('rsReceiptStatus');if(!el)return;el.textContent=msg;el.style.color=isError?'var(--red3)':'var(--text3)';}
+function handleReceiptDrop(event){event.preventDefault();event.currentTarget.style.borderColor='var(--border2)';const file=event.dataTransfer.files[0];if(file)handleStockReceiptUpload(file);}
+async function handleStockReceiptUpload(file){
+  if(!file)return;
+  const dz=document.getElementById('rsReceiptDropzone');
+  try{
+    if(dz)dz.style.opacity='0.6';
+    setRSReceiptStatus('⏳ Reading document...');
+    let text='';
+    if(file.type==='application/pdf'||file.name.toLowerCase().endsWith('.pdf'))text=await extractTextFromPDF(file,setRSReceiptStatus);
+    else if(file.type.startsWith('image/'))text=await extractTextFromImage(file,setRSReceiptStatus);
+    else{setRSReceiptStatus('⚠️ Unsupported file type — use an image or PDF',true);return;}
+    text=(text||'').trim();
+    if(!text){setRSReceiptStatus('⚠️ No text found in that document',true);return;}
+    setRSReceiptStatus('🤖 Extracting supplier, items, quantities...');
+    await parseReceiptWithAI(text);
+  }catch(err){
+    setRSReceiptStatus('❌ '+err.message,true);
+  }finally{
+    if(dz)dz.style.opacity='1';
+    const f=document.getElementById('rsReceiptFile');if(f)f.value='';
+  }
+}
+const RECEIPT_PARSE_PROMPT=`You are a data-extraction engine for supplier delivery receipts and invoices.
+Return ONLY valid JSON. No markdown, no commentary, no trailing commas, no text outside the JSON.
+Structure exactly:
+{"supplier":"Supplier name, or empty string if not found","items":[{"name":"Product name exactly as written on the receipt","qty":10,"unitCost":1.5}]}
+Rules:
+1. qty and unitCost must be plain numbers, never strings or currency symbols.
+2. If unit cost isn't stated directly but a line total and quantity are, compute unitCost = lineTotal / qty.
+3. List every distinct line item separately — never merge different products into one line.
+4. If a field truly cannot be found, use 0 for numbers and "" for the supplier — never fabricate values.`;
+function safeParseReceiptJson(raw){
+  if(!raw)return null;
+  raw=raw.trim().replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
+  const m=raw.match(/\{[\s\S]*\}/);
+  if(!m)return null;
+  try{return JSON.parse(m[0]);}
+  catch(e1){try{return JSON.parse(m[0].replace(/[\u201C\u201D]/g,'"').replace(/[\u2018\u2019]/g,"'").replace(/,\s*([}\]])/g,'$1'));}catch(e2){return null;}}
+}
+async function parseReceiptWithAI(rawText){
+  try{
+    const res=await fetch('/api/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:rawText,systemPrompt:RECEIPT_PARSE_PROMPT})});
+    const data=await res.json();
+    const parsed=safeParseReceiptJson(data.result||'');
+    if(!parsed||!Array.isArray(parsed.items)||!parsed.items.length){
+      setRSReceiptStatus('⚠️ Could not find line items in that document — try manual entry instead.',true);
+      return;
+    }
+    showReceiptReview(parsed);
+  }catch(e){
+    setRSReceiptStatus('❌ AI parsing failed: '+e.message,true);
+  }
+}
+// Single item → auto-fill the existing Manual Stock Intake fields directly.
+// Multiple items → show an editable review table (still nothing is posted until Confirm).
+function showReceiptReview(parsed){
+  RS_PARSED_RECEIPT=parsed;
+  if(parsed.items.length===1){
+    populateSingleIntakeForm(parsed.supplier,parsed.items[0]);
+    const wrap=document.getElementById('rsReceiptReview');if(wrap){wrap.style.display='none';wrap.innerHTML='';}
+    setRSReceiptStatus('✅ Fields auto-filled below from the receipt — please verify, then click "Receive Stock".');
+    return;
+  }
+  renderReceiptReviewTable(parsed);
+  setRSReceiptStatus(`✅ Found ${parsed.items.length} item(s) — review and edit below, then confirm.`);
+}
+function populateSingleIntakeForm(supplier,item){
+  const supplierEl=document.getElementById('si-supplier');if(supplierEl)supplierEl.value=supplier||'';
+  const qtyEl=document.getElementById('si-qty');if(qtyEl)qtyEl.value=item.qty||'';
+  const costEl=document.getElementById('si-cost');if(costEl)costEl.value=item.unitCost||'';
+  const productSel=document.getElementById('si-product');
+  if(productSel){
+    const match=posFindProduct(item.name,true); // reuse the same fuzzy matcher built for POS voice
+    productSel.value=match?match.id:'';
+  }
+  const wrap=document.getElementById('rsReceiptReview');if(wrap){wrap.style.display='none';wrap.innerHTML='';}
+}
+let _rsReviewRowSeq=0;
+function renderReceiptReviewTable(parsed){
+  const wrap=document.getElementById('rsReceiptReview');if(!wrap)return;
+  const rows=parsed.items.map(it=>{
+    const rowId='rsrow-'+(_rsReviewRowSeq++);
+    const match=posFindProduct(it.name,true);
+    const options='<option value="">— no match, use + New —</option>'+RETAIL_PRODUCTS.map(p=>`<option value="${p.id}" ${match&&match.id===p.id?'selected':''}>${p.name}</option>`).join('');
+    return `<div class="rs-review-row" data-row-id="${rowId}" style="display:grid;grid-template-columns:1.4fr auto 1fr 1fr;gap:7px;align-items:end;padding:8px 0;border-bottom:1px solid var(--border)">
+      <div>
+        <div style="font-size:10px;color:var(--text3);margin-bottom:3px">Receipt said: "${it.name}"</div>
+        <select class="rs-review-product" id="sel-${rowId}" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:7px 9px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none">${options}</select>
+      </div>
+      <button type="button" onclick="openQuickAddProduct('sel-${rowId}')" title="Add a new product without leaving this page" style="padding:7px 9px;background:transparent;border:1px dashed var(--gold2);border-radius:5px;color:var(--gold2);cursor:pointer;font-size:11px;white-space:nowrap">+ New</button>
+      <div><div style="font-size:10px;color:var(--text3);margin-bottom:3px">Qty</div><input class="rs-review-qty" type="number" value="${it.qty||0}" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:7px 9px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none"/></div>
+      <div><div style="font-size:10px;color:var(--text3);margin-bottom:3px">Unit Cost</div><input class="rs-review-cost" type="number" step="0.01" value="${it.unitCost||0}" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:7px 9px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none"/></div>
+    </div>`;
+  }).join('');
+  wrap.style.display='block';
+  wrap.innerHTML=`
+    <div class="fgrid"><div class="fg"><label>Supplier</label><input id="rs-review-supplier" type="text" value="${(parsed.supplier||'').replace(/"/g,'&quot;')}" placeholder="Supplier name"/></div><div class="fg"><label>Payment</label><select id="rs-review-pay"><option value="credit">Credit (AP)</option><option value="cash">Cash</option></select></div></div>
+    ${rows}
+    <div class="btn-row"><button class="btn btn-gold" onclick="confirmReceiptIntake()">✅ Confirm Receive All</button><button class="btn btn-outline" onclick="cancelReceiptReview()">Cancel</button></div>
+  `;
+}
+function cancelReceiptReview(){const wrap=document.getElementById('rsReceiptReview');if(wrap){wrap.style.display='none';wrap.innerHTML='';}RS_PARSED_RECEIPT=null;setRSReceiptStatus('');}
+// This is the only place the multi-item receipt review actually posts anything — mirrors
+// the same receiveStock + journal-entry pattern as the manual single-item flow below.
+async function confirmReceiptIntake(){
+  const wrap=document.getElementById('rsReceiptReview');if(!wrap)return;
+  const supplier=(document.getElementById('rs-review-supplier')||{}).value||'';
+  const payMethod=(document.getElementById('rs-review-pay')||{}).value||'credit';
+  const rowEls=wrap.querySelectorAll('.rs-review-row');
+  const lines=[];let skipped=0;
+  rowEls.forEach(row=>{
+    const sel=row.querySelector('.rs-review-product');
+    const productId=sel?sel.value:'';
+    const qty=parseFloat(row.querySelector('.rs-review-qty').value)||0;
+    const unitCost=parseFloat(row.querySelector('.rs-review-cost').value)||0;
+    if(!productId||qty<=0||unitCost<=0){skipped++;return;}
+    lines.push({productId:parseInt(productId),qty,unitCost});
+  });
+  if(!lines.length){setRSReceiptStatus('⚠️ Match a product (or use +New) for at least one row before confirming.',true);return;}
+  setRSReceiptStatus('⏳ Recording receipt...');
+  try{
+    let total=0;
+    for(const line of lines){
+      await dbApi({action:'receiveStock',companyId:SESSION.companyId,productId:line.productId,qty:line.qty,unitCost:line.unitCost,supplier,paymentMethod:payMethod});
+      total+=line.qty*line.unitCost;
+    }
+    const names=lines.map(l=>{const p=RETAIL_PRODUCTS.find(x=>x.id===l.productId);return p?`${p.name} ×${l.qty}`:`#${l.productId} ×${l.qty}`;});
+    DB.entries.push({id:DB.nextId++,date:today(),desc:`Stock received (from receipt): ${supplier||'supplier'} — ${names.join(', ')}`,type:'Stock Receipt',amount:total,project:'',debits:[{acct:'Inventory (Stock)',amt:total,atype:'asset'}],credits:payMethod==='cash'?[{acct:'Cash',amt:total,atype:'asset'}]:[{acct:'Accounts Payable',amt:total,atype:'liability'}]});
+    await saveData();
+    await loadRetailProducts();
+    renderAll();
+    cancelReceiptReview();
+    setRSReceiptStatus(`✅ Received ${lines.length} item(s) — ${fc(total)} recorded${skipped?` (${skipped} row(s) skipped — no product matched)`:''}`);
+    showToast(`✅ Stock receipt recorded — ${fc(total)}`);
+  }catch(e){
+    setRSReceiptStatus('❌ '+e.message,true);
+  }
+}
+
+// Manual stock intake with NO purchase order behind it (e.g. a walk-in supplier drop-off,
+// or the fields auto-filled above from a single-item receipt upload). Since there's no PO
+// to await, the journal entry is posted immediately here.
 async function receiveStock(){const productId=document.getElementById('si-product').value,qty=parseFloat(document.getElementById('si-qty').value)||0,unitCost=parseFloat(document.getElementById('si-cost').value)||0,supplier=document.getElementById('si-supplier').value.trim(),payMethod=document.getElementById('si-pay').value,st=document.getElementById('si-st');if(!productId||!qty||!unitCost){st.innerHTML='<span style="color:var(--red3)">Fill all fields</span>';return;}const product=RETAIL_PRODUCTS.find(p=>p.id===parseInt(productId));if(!product)return;const total=qty*unitCost;try{await dbApi({action:'receiveStock',companyId:SESSION.companyId,productId:parseInt(productId),qty,unitCost,supplier,paymentMethod:payMethod});DB.entries.push({id:DB.nextId++,date:today(),desc:`Stock received: ${product.name} × ${qty} from ${supplier||'supplier'}`,type:'Stock Receipt',amount:total,project:'',debits:[{acct:'Inventory (Stock)',amt:total,atype:'asset'}],credits:payMethod==='cash'?[{acct:'Cash',amt:total,atype:'asset'}]:[{acct:'Accounts Payable',amt:total,atype:'liability'}]});await saveData();await loadRetailProducts();renderAll();st.innerHTML=`<span style="color:var(--green3)">✅ Received ${qty} × ${product.name} — ${fc(total)}</span>`;['si-qty','si-cost','si-supplier'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});}catch(e){st.innerHTML=`<span style="color:var(--red3)">❌ ${e.message}</span>`;}setTimeout(()=>{const s=document.getElementById('si-st');if(s)s.innerHTML='';},5000);}
 
 // ── RECEIVE STOCK AGAINST A PURCHASE ORDER ────────────────────────
@@ -1085,6 +1233,16 @@ function injectRetailPages(){
   <div id="rs-po-st" style="font-size:11px;margin-top:7px"></div>
 </div>
 <div class="card"><div class="card-hdr">➕ Manual Stock Intake (no Purchase Order)</div>
+  <div class="fg">
+    <label>📄 Upload Supplier Receipt (Photo / PDF) — auto-fills the fields below</label>
+    <div id="rsReceiptDropzone" onclick="document.getElementById('rsReceiptFile').click()" ondragover="event.preventDefault();this.style.borderColor='var(--gold2)'" ondragleave="this.style.borderColor='var(--border2)'" ondrop="handleReceiptDrop(event)" style="border:2px dashed var(--border2);border-radius:8px;padding:16px;text-align:center;cursor:pointer;transition:border-color .15s">
+      <input type="file" id="rsReceiptFile" accept="image/*,.pdf" style="display:none" onchange="handleStockReceiptUpload(this.files[0])"/>
+      <div style="font-size:22px;margin-bottom:4px">📎</div>
+      <div style="font-size:12px;color:var(--text2)">Click or drag a receipt photo / PDF here</div>
+    </div>
+    <div id="rsReceiptStatus" style="font-size:11px;color:var(--text3);margin-top:6px"></div>
+    <div id="rsReceiptReview" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)"></div>
+  </div>
   <div class="fgrid">
     <div class="fg">
       <label>Product</label>
