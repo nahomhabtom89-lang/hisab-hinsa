@@ -342,6 +342,28 @@
   <div class="card"><div class="card-hdr">📋 Assets</div><div id="assetList"></div></div>
   <div class="card"><div class="card-hdr">📅 Due This Month</div><div id="depDueList"></div></div>
 </div>
+<!-- TAX REPORT -->
+<div class="page" id="pg-taxreport"><div class="ph"><h1>🧾 Tax Report</h1><p>Net VAT payable/refundable, by period</p></div>
+  <div id="taxReportNotRegistered" style="display:none" class="alert al-info"><span class="alert-ico">ℹ️</span><div class="alert-body"><div class="alert-title">Not VAT-registered</div>This company isn't marked as VAT-registered, so there's nothing to report yet. Turn it on in <a onclick="nav('settings',document.getElementById('sb-settings'))" style="color:var(--gold2);cursor:pointer;text-decoration:underline">Settings → Tax Settings</a> if that changes.</div></div>
+  <div id="taxReportBody" style="display:none">
+    <div class="card">
+      <div class="card-hdr">📅 Period</div>
+      <div class="fgrid">
+        <div class="fg"><label>Accounting Period</label><select id="taxReportPeriod" onchange="onTaxReportPeriodChange()"><option value="custom">Custom range</option></select></div>
+        <div class="fg"><label>From</label><input id="taxReportFrom" type="date"/></div>
+        <div class="fg"><label>To</label><input id="taxReportTo" type="date"/></div>
+      </div>
+      <div class="btn-row"><button class="btn btn-gold" onclick="loadTaxReport()">🔍 Run Report</button></div>
+    </div>
+    <div class="kgrid" id="taxReportKpis"></div>
+    <div class="card"><div class="card-hdr">📊 Breakdown by Tax Tier</div><div id="taxReportBreakdown"></div></div>
+    <div class="card">
+      <div class="card-hdr">🔒 Close Tax Period</div>
+      <div class="alert al-warn"><span class="alert-ico">⚠️</span><div class="alert-body">Closing locks every journal entry and VAT ledger line dated inside the selected accounting period — permanently. Nothing in that range can be edited, deleted, or backdated afterward, even by the Owner. Make sure the period above is fully reconciled first.</div></div>
+      <div id="taxReportCloseArea"></div>
+    </div>
+  </div>
+</div>
 <!-- SETTINGS -->
 <div class="page" id="pg-settings"><div class="ph"><h1>⚙️ Settings</h1></div>
   <div class="card"><div class="card-hdr">🏢 Company</div>
@@ -404,6 +426,7 @@ let CUR='USD',SSP_RATE=1300,BIZ_NAME='My Company',ACTIVE_PROJECT='',INV_COSTING_
 let APP_MODE='construction';
 let _pending=null,_mic=null,_isReg=false,REG_APP_MODE='construction';
 let CHART_OF_ACCOUNTS=[],PERIODS=[],RETAIL_PRODUCTS=[],POS_CART=[],POS_DISCOUNT=0;
+let TAX_SETTINGS={is_vat_registered:false,country:'OTHER'},TAX_TIERS=[],TAX_COUNTRY_OPTIONS=[];
 let SESSION={userId:null,username:'',companyId:null,role:'owner',projectScope:null,companies:[]};
 
 // ── UTILITIES ─────────────────────────────────────────────────────
@@ -496,7 +519,7 @@ async function enterCompany(c){
   APP_MODE=c.app_mode||'construction';
   BIZ_NAME=c.biz_name;SSP_RATE=parseFloat(c.ssp_rate)||1300;INV_COSTING_METHOD=c.costing_method||'WAC';
   ACTIVE_PROJECT='';CUR='USD';DB=freshDB();RETAIL_PRODUCTS=[];POS_CART=[];
-  await loadDB();await loadChartOfAccounts();await loadPeriods();
+  await loadDB();await loadChartOfAccounts();await loadPeriods();await loadTaxSettings();
   document.getElementById('companyScreen').style.display='none';
   document.getElementById('loginScreen').style.display='none';
   document.getElementById('mainApp').style.display='block';
@@ -513,8 +536,8 @@ function switchCompany(){document.getElementById('mainApp').style.display='none'
 function doLogout(){SESSION={userId:null,username:'',companyId:null,role:'owner',projectScope:null,companies:[]};DB=freshDB();APP_MODE='construction';BIZ_NAME='My Company';SSP_RATE=1300;RETAIL_PRODUCTS=[];POS_CART=[];document.getElementById('mainApp').style.display='none';document.getElementById('companyScreen').style.display='none';document.getElementById('loginScreen').style.display='flex';document.getElementById('lu').value='';document.getElementById('lp').value='';document.getElementById('lerr').style.display='none';_isReg=false;document.getElementById('regFields').style.display='none';document.getElementById('loginTitle').textContent='ኣቱ — Login';document.getElementById('loginBtn').textContent='🔓 ኣቱ — Login';const rmp=document.getElementById('regModePicker');if(rmp)rmp.remove();}
 
 // ── MODE SWITCHER ─────────────────────────────────────────────────
-const CONSTRUCTION_NAV=[{section:'ዕለታዊ',items:[{ico:'🎙️',ti:'ሓድሽ ምዝጋብ',en:'Record',page:'home'},{ico:'💵',ti:'ንዋት ጥረ',en:'Petty Cash',page:'petty'},{ico:'📱',ti:'ሞባይል ገንዘብ',en:'Mobile',page:'mobilemoney'},{ico:'🧱',ti:'ሸቀጥ',en:'Materials',page:'materials'},{ico:'🚚',ti:'ምብጻሕ',en:'Deliveries',page:'deliveries'},{ico:'👷',ti:'ሰራሕተኛ',en:'Workers',page:'workers'}]},{section:'ፕሮጀክት',items:[{ico:'🏗️',ti:'ፕሮጀክታት',en:'Projects',page:'projects',badge:'projBadge'},{ico:'🧾',ti:'ኢንቮይስ',en:'Invoice',page:'invoice'},{ico:'🔒',ti:'ሪቴንሽን',en:'Retention',page:'retention'}]},{section:'ሓላፍ ሒሳቢ',items:[{ico:'📋',ti:'Chart of Accounts',en:'COA',page:'coa'},{ico:'📒',ti:'ደፍተር',en:'Journal',page:'journal',badge:'jBadge'},{ico:'📗',ti:'ሌጀር',en:'Ledger',page:'ledger'},{ico:'⚖️',ti:'Trial Balance',en:'Trial',page:'trial'},{ico:'💰',ti:'Income Statement',en:'Income',page:'income'},{ico:'🏛️',ti:'Balance Sheet',en:'Balance',page:'balance'},{ico:'📈',ti:'Cash Forecast',en:'Forecast',page:'cashflow'},{ico:'🔢',ti:'Job Costing',en:'Job Cost',page:'jobcost'}]},{section:'ምቹ',items:[{ico:'📅',ti:'Periods',en:'Close',page:'periods'},{ico:'🤖',ti:'AI ሓጋዚ',en:'Advisor',page:'advisor'},{ico:'🔍',ti:'ምርመራ',en:'Audit',page:'audit',badge:'auditBadge'},{ico:'📉',ti:'ምምካን',en:'Dep',page:'depreciation'},{ico:'⚙️',ti:'ቅጥዒ',en:'Settings',page:'settings'}]}];
-const RETAIL_NAV=[{section:'ዕለታዊ',items:[{ico:'🎙️',ti:'ሓድሽ ምዝጋብ',en:'Record',page:'home'}]},{section:'🛒 Retail',items:[{ico:'🖥️',ti:'POS Register',en:'POS',page:'pos'},{ico:'📦',ti:'Products',en:'Catalogue',page:'products'},{ico:'📲',ti:'Receive Stock',en:'Stock In',page:'stockin'},{ico:'🚚',ti:'Purchase Orders',en:'PO',page:'purchaseorders'},{ico:'👷',ti:'ሰራሕተኛ',en:'Workers',page:'workers'}]},{section:'📊 Reports',items:[{ico:'💰',ti:'Sales Report',en:'Sales',page:'retailsales'},{ico:'📦',ti:'Stock Valuation',en:'Inventory',page:'stockval'},{ico:'📒',ti:'Journal',en:'Journal',page:'journal',badge:'jBadge'},{ico:'⚖️',ti:'Trial Balance',en:'Trial',page:'trial'},{ico:'💰',ti:'Income Statement',en:'Income',page:'income'},{ico:'🏛️',ti:'Balance Sheet',en:'Balance',page:'balance'}]},{section:'ምቹ',items:[{ico:'📋',ti:'Chart of Accounts',en:'COA',page:'coa'},{ico:'📅',ti:'Periods',en:'Close',page:'periods'},{ico:'🤖',ti:'AI ሓጋዚ',en:'Advisor',page:'advisor'},{ico:'🔍',ti:'Audit',en:'Audit',page:'audit',badge:'auditBadge'},{ico:'📉',ti:'Depreciation',en:'Dep',page:'depreciation'},{ico:'⚙️',ti:'Settings',en:'Settings',page:'settings'}]}];
+const CONSTRUCTION_NAV=[{section:'ዕለታዊ',items:[{ico:'🎙️',ti:'ሓድሽ ምዝጋብ',en:'Record',page:'home'},{ico:'💵',ti:'ንዋት ጥረ',en:'Petty Cash',page:'petty'},{ico:'📱',ti:'ሞባይል ገንዘብ',en:'Mobile',page:'mobilemoney'},{ico:'🧱',ti:'ሸቀጥ',en:'Materials',page:'materials'},{ico:'🚚',ti:'ምብጻሕ',en:'Deliveries',page:'deliveries'},{ico:'👷',ti:'ሰራሕተኛ',en:'Workers',page:'workers'}]},{section:'ፕሮጀክት',items:[{ico:'🏗️',ti:'ፕሮጀክታት',en:'Projects',page:'projects',badge:'projBadge'},{ico:'🧾',ti:'ኢንቮይስ',en:'Invoice',page:'invoice'},{ico:'🔒',ti:'ሪቴንሽን',en:'Retention',page:'retention'}]},{section:'ሓላፍ ሒሳቢ',items:[{ico:'📋',ti:'Chart of Accounts',en:'COA',page:'coa'},{ico:'📒',ti:'ደፍተር',en:'Journal',page:'journal',badge:'jBadge'},{ico:'📗',ti:'ሌጀር',en:'Ledger',page:'ledger'},{ico:'⚖️',ti:'Trial Balance',en:'Trial',page:'trial'},{ico:'💰',ti:'Income Statement',en:'Income',page:'income'},{ico:'🏛️',ti:'Balance Sheet',en:'Balance',page:'balance'},{ico:'📈',ti:'Cash Forecast',en:'Forecast',page:'cashflow'},{ico:'🔢',ti:'Job Costing',en:'Job Cost',page:'jobcost'}]},{section:'ምቹ',items:[{ico:'📅',ti:'Periods',en:'Close',page:'periods'},{ico:'🧾',ti:'Tax Report',en:'VAT',page:'taxreport'},{ico:'🤖',ti:'AI ሓጋዚ',en:'Advisor',page:'advisor'},{ico:'🔍',ti:'ምርመራ',en:'Audit',page:'audit',badge:'auditBadge'},{ico:'📉',ti:'ምምካን',en:'Dep',page:'depreciation'},{ico:'⚙️',ti:'ቅጥዒ',en:'Settings',page:'settings'}]}];
+const RETAIL_NAV=[{section:'ዕለታዊ',items:[{ico:'🎙️',ti:'ሓድሽ ምዝጋብ',en:'Record',page:'home'}]},{section:'🛒 Retail',items:[{ico:'🖥️',ti:'POS Register',en:'POS',page:'pos'},{ico:'📦',ti:'Products',en:'Catalogue',page:'products'},{ico:'📲',ti:'Receive Stock',en:'Stock In',page:'stockin'},{ico:'🚚',ti:'Purchase Orders',en:'PO',page:'purchaseorders'},{ico:'👷',ti:'ሰራሕተኛ',en:'Workers',page:'workers'}]},{section:'📊 Reports',items:[{ico:'💰',ti:'Sales Report',en:'Sales',page:'retailsales'},{ico:'📦',ti:'Stock Valuation',en:'Inventory',page:'stockval'},{ico:'📒',ti:'Journal',en:'Journal',page:'journal',badge:'jBadge'},{ico:'⚖️',ti:'Trial Balance',en:'Trial',page:'trial'},{ico:'💰',ti:'Income Statement',en:'Income',page:'income'},{ico:'🏛️',ti:'Balance Sheet',en:'Balance',page:'balance'}]},{section:'ምቹ',items:[{ico:'📋',ti:'Chart of Accounts',en:'COA',page:'coa'},{ico:'📅',ti:'Periods',en:'Close',page:'periods'},{ico:'🧾',ti:'Tax Report',en:'VAT',page:'taxreport'},{ico:'🤖',ti:'AI ሓጋዚ',en:'Advisor',page:'advisor'},{ico:'🔍',ti:'Audit',en:'Audit',page:'audit',badge:'auditBadge'},{ico:'📉',ti:'Depreciation',en:'Dep',page:'depreciation'},{ico:'⚙️',ti:'Settings',en:'Settings',page:'settings'}]}];
 
 function renderSidebar(mode){const sidebar=document.querySelector('.sidebar');if(!sidebar)return;const navDef=mode==='retail'?RETAIL_NAV:CONSTRUCTION_NAV;sidebar.innerHTML=navDef.map(section=>`<div class="sb-section"><div class="sb-label">${section.section}</div>${section.items.map(item=>`<div class="sb-item" id="sb-${item.page}" onclick="nav('${item.page}',this)"><span class="sb-ico">${item.ico}</span>${item.ti}<span class="en">${item.en}</span>${item.badge?`<span class="sb-badge gold" id="${item.badge}">0</span>`:''}</div>`).join('')}</div>`).join('');}
 function renderModeBadge(){const b=document.getElementById('modeBadge');if(!b)return;b.textContent=APP_MODE==='retail'?'🛒 Retail':'🏗️ Construction';b.style.background=APP_MODE==='retail'?'rgba(192,48,42,.15)':'rgba(26,94,255,.15)';b.style.color=APP_MODE==='retail'?'var(--red3)':'var(--blue3)';b.style.border=APP_MODE==='retail'?'1px solid rgba(192,48,42,.3)':'1px solid rgba(64,128,255,.2)';}
@@ -533,7 +556,7 @@ async function nav(page,el){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
   document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('on'));
   const pg=document.getElementById('pg-'+page);if(pg)pg.classList.add('on');if(el)el.classList.add('on');
-  if(page==='ledger')renderLedger();if(page==='trial')renderTrial();if(page==='income')renderIncome();if(page==='balance')renderBalance();if(page==='cashflow')renderCashflow();if(page==='jobcost')renderJobCost();if(page==='retention')renderRetention();if(page==='journal')renderJournal();if(page==='audit'){runAudit();switchAuditTab('bot');}if(page==='coa')renderCOA();if(page==='periods')loadPeriodList();if(page==='settings'){const bn=document.getElementById('bizName');if(bn)bn.value=BIZ_NAME;const sr=document.getElementById('sspRate');if(sr)sr.value=SSP_RATE;renderCostingButtons();renderProjectScopeCheckboxes();injectModeSettingsCard();}
+  if(page==='ledger')renderLedger();if(page==='trial')renderTrial();if(page==='income')renderIncome();if(page==='balance')renderBalance();if(page==='cashflow')renderCashflow();if(page==='jobcost')renderJobCost();if(page==='retention')renderRetention();if(page==='journal')renderJournal();if(page==='audit'){runAudit();switchAuditTab('bot');}if(page==='coa')renderCOA();if(page==='periods')loadPeriodList();if(page==='settings'){const bn=document.getElementById('bizName');if(bn)bn.value=BIZ_NAME;const sr=document.getElementById('sspRate');if(sr)sr.value=SSP_RATE;renderCostingButtons();renderProjectScopeCheckboxes();injectModeSettingsCard();await loadTaxSettings();renderTaxSettingsCard();}
   // Retail pages that depend on the product catalogue always refetch fresh from the DB on entry,
   // so newly added products (e.g. from the Products page or the Quick Add modal) show up immediately.
   if(page==='pos'){await loadRetailProducts();renderPOSCart();setTimeout(()=>{const s=document.getElementById('pos-scan');if(s)s.focus();},100);}
@@ -542,6 +565,7 @@ async function nav(page,el){
   if(page==='stockval'){await loadRetailProducts();}
   if(page==='retailsales'){renderRetailSalesPage();}
   if(page==='purchaseorders'){await loadRetailProducts();await loadPurchaseOrdersCache();renderPOList();}
+  if(page==='taxreport'){await loadTaxSettings();await loadPeriods();initTaxReportPage();}
 }
 function setCur(c){CUR=c;document.getElementById('cur-usd').classList.toggle('on',c==='USD');document.getElementById('cur-ssp').classList.toggle('on',c==='SSP');renderAll();}
 
@@ -553,9 +577,131 @@ function renderCOA(){const el=document.getElementById('coaTree');if(!el)return;c
 
 // ── PERIODS ───────────────────────────────────────────────────────
 async function loadPeriods(){try{const r=await dbApi({action:'listPeriods',companyId:SESSION.companyId});PERIODS=r.periods||[];}catch{}}
+
+// ── TAX ENGINE (Multi-country VAT) ──────────────────────────────────────────
+// Available in both Construction and Retail modes — see Settings > Tax Settings.
+async function loadTaxSettings(){
+  try{
+    const r=await dbApi({action:'getTaxSettings',companyId:SESSION.companyId});
+    TAX_SETTINGS=r.settings||{is_vat_registered:false,country:'OTHER'};
+    TAX_TIERS=r.tiers||[];
+    TAX_COUNTRY_OPTIONS=r.countryOptions||[];
+  }catch(e){console.error('loadTaxSettings',e);}
+}
+function getTaxTierById(id){if(!id)return null;return TAX_TIERS.find(t=>String(t.id)===String(id))||null;}
+function getDefaultTaxTier(){return TAX_TIERS.find(t=>t.is_default)||TAX_TIERS[0]||null;}
+// The one formula this whole engine hinges on: given a price and whether it already
+// includes tax, split it into base + tax using the tier's rate. Used identically by
+// POS sales (output VAT) and stock intake (input VAT) so the math never diverges.
+function computeTaxSplit(amount,ratePct,isInclusive){
+  const amt=parseFloat(amount)||0,rate=parseFloat(ratePct)||0;
+  if(rate<=0)return{base:amt,tax:0,grandTotal:amt};
+  if(isInclusive){
+    const base=amt/(1+rate/100);
+    const tax=amt-base;
+    return{base:Math.round(base*100)/100,tax:Math.round(tax*100)/100,grandTotal:amt};
+  }else{
+    const tax=amt*(rate/100);
+    return{base:amt,tax:Math.round(tax*100)/100,grandTotal:Math.round((amt+tax)*100)/100};
+  }
+}
+async function saveTaxSettingsUI(){
+  const country=document.getElementById('taxCountry').value;
+  const isReg=document.getElementById('taxIsRegistered').checked;
+  const st=document.getElementById('taxSettingsSt');
+  try{
+    await dbApi({action:'saveTaxSettings',companyId:SESSION.companyId,country,isVatRegistered:isReg});
+    await loadTaxSettings();
+    renderTaxTiersTable();
+    renderTaxSettingsCard(); // rebuild so newly-seeded tiers for a changed country show up immediately
+    if(st)st.innerHTML='<span style="color:var(--green3)">✅ Tax settings saved</span>';
+    showToast(isReg?'✅ VAT registration enabled':'✅ Tax settings saved');
+  }catch(e){
+    if(st)st.innerHTML=`<span style="color:var(--red3)">❌ ${e.message}</span>`;
+  }
+  setTimeout(()=>{if(st)st.innerHTML='';},4000);
+}
+async function saveTaxTierRow(id,name,code,rate,isDefault){
+  try{
+    await dbApi({action:'saveTaxTier',companyId:SESSION.companyId,id:id||null,name,code,rate,is_default:isDefault});
+    await loadTaxSettings();
+    renderTaxTiersTable();
+    showToast('✅ Tax tier saved');
+  }catch(e){showToast('❌ '+e.message,4000);}
+}
+async function deleteTaxTierRow(id){
+  if(!confirm('Delete this tax tier? Products using it will need a new tier assigned.'))return;
+  try{await dbApi({action:'deleteTaxTier',tierId:id});await loadTaxSettings();renderTaxTiersTable();showToast('✅ Tier removed');}catch(e){showToast('❌ '+e.message,4000);}
+}
+function addNewTaxTierRow(){
+  const el=document.getElementById('taxTiersList');if(!el)return;
+  const row=document.createElement('div');
+  row.className='coa-row';row.style.gap='8px';
+  row.innerHTML=`<input type="text" placeholder="Tier name" style="flex:2;background:var(--bg3);border:1px solid var(--border2);border-radius:4px;padding:5px 8px;font-size:11px;color:var(--text)"/><input type="text" placeholder="code" style="flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:4px;padding:5px 8px;font-size:11px;color:var(--text)"/><input type="number" step="0.01" placeholder="Rate %" style="width:70px;background:var(--bg3);border:1px solid var(--border2);border-radius:4px;padding:5px 8px;font-size:11px;color:var(--text)"/><button class="btn btn-gold" style="font-size:10px;padding:4px 9px" onclick="const r=this.closest('.coa-row');saveTaxTierRow(null,r.children[0].value.trim(),r.children[1].value.trim().toLowerCase(),r.children[2].value,false)">💾</button>`;
+  el.appendChild(row);
+}
+function renderTaxTiersTable(){
+  const el=document.getElementById('taxTiersList');if(!el)return;
+  if(!TAX_TIERS.length){el.innerHTML='<div style="color:var(--text3);font-size:11px;padding:8px 0">No tax tiers yet.</div>';return;}
+  el.innerHTML=TAX_TIERS.map(t=>`<div class="coa-row" style="gap:8px"><div style="flex:2">${t.name}${t.is_default?' <span class="tag t-gold" style="font-size:8px">default</span>':''}</div><div class="coa-code" style="width:auto">${t.code}</div><div style="width:70px;font-family:'JetBrains Mono',monospace">${parseFloat(t.rate).toFixed(2)}%</div><button style="padding:2px 6px;background:transparent;border:1px solid rgba(192,48,42,.3);border-radius:3px;color:var(--red3);font-size:10px;cursor:pointer" onclick="deleteTaxTierRow(${t.id})">✕</button></div>`).join('');
+}
+function taxTierSelectOptions(selectedId){
+  return '<option value="">— No tax —</option>'+TAX_TIERS.map(t=>`<option value="${t.id}" ${String(t.id)===String(selectedId)?'selected':''}>${t.name} (${parseFloat(t.rate)}%)</option>`).join('');
+}
 async function createPeriod(){const name=document.getElementById('perName').value.trim(),start=document.getElementById('perStart').value,end=document.getElementById('perEnd').value,st=document.getElementById('perSt');if(!name||!start||!end){st.innerHTML='<span style="color:var(--red3)">Fill all fields</span>';return;}try{await dbApi({action:'createPeriod',companyId:SESSION.companyId,period_name:name,period_start:start,period_end:end});await loadPeriods();loadPeriodList();document.getElementById('perName').value='';document.getElementById('perStart').value='';document.getElementById('perEnd').value='';st.innerHTML='<span style="color:var(--green3)">✅ Period created</span>';}catch(e){st.innerHTML=`<span style="color:var(--red3)">❌ ${e.message}</span>`;}setTimeout(()=>st.innerHTML='',4000);}
 function loadPeriodList(){const el=document.getElementById('periodList');if(!el)return;if(!PERIODS.length){el.innerHTML='<div style="text-align:center;padding:16px;color:var(--text3);font-size:12px">No periods yet</div>';return;}el.innerHTML=`<table><thead><tr><th>Period</th><th>Start</th><th>End</th><th>Status</th><th>Action</th></tr></thead><tbody>`+PERIODS.map(p=>{const ps=p.period_start?String(p.period_start).split('T')[0]:'-',pe=p.period_end?String(p.period_end).split('T')[0]:'-';return`<tr><td style="font-weight:500">${p.period_name}</td><td>${ps}</td><td>${pe}</td><td><span class="period-badge ${p.is_closed?'closed':'open'}">${p.is_closed?'🔒 Closed':'🟢 Open'}</span></td><td>${!p.is_closed&&SESSION.role==='owner'?`<button class="btn btn-danger" style="font-size:10px;padding:4px 9px" onclick="closePeriod(${p.id},'${p.period_name}','${ps}','${pe}')">🔒 Close</button>`:'—'}</td></tr>`;}).join('')+'</tbody></table>';}
-async function closePeriod(periodId,name,start,end){if(!canDo('closePeriod'))return;if(!confirm(`Close "${name}"? Locks all entries permanently.`))return;try{const r=await dbApi({action:'closePeriod',companyId:SESSION.companyId,periodId,username:SESSION.username,periodStart:start,periodEnd:end,entries:DB.entries});const netPnl=r.netPnl||0;const b=getBal();Object.entries(b).forEach(([acct,v])=>{if(v.atype==='revenue'&&v.net>0.01)DB.entries.push({id:DB.nextId++,date:today(),desc:`Period Close: ${acct} — ${name}`,type:'Closing Entry',amount:v.net,project:'',debits:[{acct,amt:v.net,atype:'revenue'}],credits:[]});if(v.atype==='expense'&&v.net>0.01)DB.entries.push({id:DB.nextId++,date:today(),desc:`Period Close: ${acct} — ${name}`,type:'Closing Entry',amount:v.net,project:'',debits:[],credits:[{acct,amt:v.net,atype:'expense'}]});});if(Math.abs(netPnl)>0.01)DB.entries.push({id:DB.nextId++,date:today(),desc:`P&L → Retained Earnings — ${name}`,type:'Closing Entry',amount:Math.abs(netPnl),project:'',debits:netPnl>0?[]:[{acct:'Retained Earnings',amt:Math.abs(netPnl),atype:'equity'}],credits:netPnl>0?[{acct:'Retained Earnings',amt:netPnl,atype:'equity'}]:[]});await saveData();await loadPeriods();loadPeriodList();renderAll();showToast(`✅ Period closed — Net: ${fc(netPnl)}`);}catch(e){showToast('❌ '+e.message,5000);}}
+async function closePeriod(periodId,name,start,end){if(!canDo('closePeriod'))return;if(!confirm(`Close "${name}"? Locks all entries permanently.`))return;try{const r=await dbApi({action:'closePeriod',companyId:SESSION.companyId,periodId,username:SESSION.username,periodStart:start,periodEnd:end,entries:DB.entries});const netPnl=r.netPnl||0;
+  // Actually flag every existing entry dated inside this period as locked — the server
+  // independently enforces this boundary regardless of the flag (see the 'save' action's
+  // closed-period guard), but the flag is what drives the 🔒 icon and delete-guard in the UI.
+  DB.entries.forEach(e=>{if(e.date>=start&&e.date<=end)e.is_locked=true;});
+  const b=getBal();Object.entries(b).forEach(([acct,v])=>{if(v.atype==='revenue'&&v.net>0.01)DB.entries.push({id:DB.nextId++,date:today(),desc:`Period Close: ${acct} — ${name}`,type:'Closing Entry',amount:v.net,project:'',debits:[{acct,amt:v.net,atype:'revenue'}],credits:[]});if(v.atype==='expense'&&v.net>0.01)DB.entries.push({id:DB.nextId++,date:today(),desc:`Period Close: ${acct} — ${name}`,type:'Closing Entry',amount:v.net,project:'',debits:[],credits:[{acct,amt:v.net,atype:'expense'}]});});if(Math.abs(netPnl)>0.01)DB.entries.push({id:DB.nextId++,date:today(),desc:`P&L → Retained Earnings — ${name}`,type:'Closing Entry',amount:Math.abs(netPnl),project:'',debits:netPnl>0?[]:[{acct:'Retained Earnings',amt:Math.abs(netPnl),atype:'equity'}],credits:netPnl>0?[{acct:'Retained Earnings',amt:netPnl,atype:'equity'}]:[]});await saveData();await dbApi({action:'lockTaxPeriod',companyId:SESSION.companyId,periodStart:start,periodEnd:end}).catch(()=>{});await loadPeriods();loadPeriodList();renderAll();showToast(`✅ Period closed — Net: ${fc(netPnl)}`);}catch(e){showToast('❌ '+e.message,5000);}}
+
+// ── TAX REPORT (Net VAT) ─────────────────────────────────────────────────
+// "Close Tax Period" deliberately reuses the SAME accounting period close as the
+// Periods page, rather than a second, competing period concept — one calendar, one
+// lock, everywhere in the app. This page is just a VAT-focused lens on it.
+function initTaxReportPage(){
+  const notReg=document.getElementById('taxReportNotRegistered'),body=document.getElementById('taxReportBody');
+  if(!TAX_SETTINGS.is_vat_registered){notReg.style.display='flex';body.style.display='none';return;}
+  notReg.style.display='none';body.style.display='block';
+  const sel=document.getElementById('taxReportPeriod');
+  sel.innerHTML='<option value="custom">Custom range</option>'+PERIODS.map(p=>`<option value="${p.id}">${p.period_name} (${p.is_closed?'closed':'open'})</option>`).join('');
+  if(PERIODS.length){sel.value=String(PERIODS[0].id);onTaxReportPeriodChange();}
+  loadTaxReport();
+}
+function onTaxReportPeriodChange(){
+  const sel=document.getElementById('taxReportPeriod'),from=document.getElementById('taxReportFrom'),to=document.getElementById('taxReportTo');
+  if(sel.value==='custom')return;
+  const p=PERIODS.find(x=>String(x.id)===sel.value);if(!p)return;
+  from.value=String(p.period_start).split('T')[0];to.value=String(p.period_end).split('T')[0];
+}
+async function loadTaxReport(){
+  const from=document.getElementById('taxReportFrom').value,to=document.getElementById('taxReportTo').value;
+  const kpiEl=document.getElementById('taxReportKpis'),breakdownEl=document.getElementById('taxReportBreakdown'),closeEl=document.getElementById('taxReportCloseArea');
+  try{
+    const r=await dbApi({action:'getVatSummary',companyId:SESSION.companyId,dateFrom:from||undefined,dateTo:to||undefined});
+    const net=r.netPayable||0;
+    kpiEl.innerHTML=`<div class="kpi"><div class="kpi-lbl">Output VAT (Sales)</div><div class="kpi-val pos">${fc(r.outputTotal||0)}</div></div><div class="kpi"><div class="kpi-lbl">Input VAT (Purchases)</div><div class="kpi-val warn">${fc(r.inputTotal||0)}</div></div><div class="kpi"><div class="kpi-lbl">${net>=0?'You Owe':'Credit Due'}</div><div class="kpi-val ${net>=0?'neg':'pos'}">${fc(Math.abs(net))}</div></div>`;
+    const alertHtml=net>0
+      ?`<div class="alert al-warn"><span class="alert-ico">📤</span><div class="alert-body"><div class="alert-title">You owe the tax authority ${fc(net)}</div>Output VAT collected on sales exceeds Input VAT paid on purchases for this period.</div></div>`
+      :net<0
+      ?`<div class="alert al-ok"><span class="alert-ico">📥</span><div class="alert-body"><div class="alert-title">You are due a tax credit refund of ${fc(Math.abs(net))}</div>Input VAT paid exceeds Output VAT collected for this period.</div></div>`
+      :`<div class="alert al-info"><span class="alert-ico">⚖️</span><div class="alert-body">Output and Input VAT are exactly balanced for this period.</div></div>`;
+    const rows=r.breakdown||[];
+    breakdownEl.innerHTML=alertHtml+(rows.length?`<table><thead><tr><th>Direction</th><th>Tax Tier</th><th>Rate</th><th>Base</th><th>VAT</th><th>Lines</th></tr></thead><tbody>${rows.map(row=>`<tr><td><span class="tag ${row.direction==='output'?'t-green':'t-orange'}">${row.direction==='output'?'Output (Sales)':'Input (Purchases)'}</span></td><td>${row.tier_name||'—'}</td><td>${parseFloat(row.rate).toFixed(2)}%</td><td style="font-family:'JetBrains Mono',monospace">${fc(row.base_total)}</td><td style="font-family:'JetBrains Mono',monospace">${fc(row.tax_total)}</td><td>${row.line_count}</td></tr>`).join('')}</tbody></table>`:'<div style="text-align:center;padding:14px;color:var(--text3)">No VAT activity in this range</div>');
+    const sel=document.getElementById('taxReportPeriod'),selectedPeriod=sel.value!=='custom'?PERIODS.find(p=>String(p.id)===sel.value):null;
+    if(selectedPeriod){
+      closeEl.innerHTML=selectedPeriod.is_closed
+        ?`<div class="alert al-ok" style="margin-top:0"><span class="alert-ico">🔒</span><div class="alert-body">"${selectedPeriod.period_name}" is already closed — these figures are final.</div></div>`
+        :(SESSION.role==='owner'?`<button class="btn btn-danger" onclick="closePeriod(${selectedPeriod.id},'${selectedPeriod.period_name}','${String(selectedPeriod.period_start).split('T')[0]}','${String(selectedPeriod.period_end).split('T')[0]}');setTimeout(loadTaxReport,600)">🔒 Close Tax Period — "${selectedPeriod.period_name}"</button>`:'<div style="color:var(--text3);font-size:12px">Only the Owner can close a period.</div>');
+    }else{
+      closeEl.innerHTML='<div style="color:var(--text3);font-size:12px">Select an accounting period above (not a custom range) to close it.</div>';
+    }
+  }catch(e){
+    kpiEl.innerHTML='';breakdownEl.innerHTML=`<div style="color:var(--red3);font-size:12px">${e.message}</div>`;closeEl.innerHTML='';
+  }
+}
 
 // ── LEDGER ENGINE ─────────────────────────────────────────────────
 function getBal(projectFilter){const b={};function add(acct,atype,dr,cr){if(!b[acct])b[acct]={atype,dr:0,cr:0,net:0};b[acct].dr+=dr;b[acct].cr+=cr;const t=(b[acct].atype||'').toLowerCase();b[acct].net=t==='asset'||t==='expense'?b[acct].dr-b[acct].cr:b[acct].cr-b[acct].dr;}let list=projectFilter?DB.entries.filter(e=>e.project===projectFilter):DB.entries;list=scopedEntries(list);list.forEach(e=>{(e.debits||[]).forEach(d=>add(d.acct,d.atype,d.amt,0));(e.credits||[]).forEach(c=>add(c.acct,c.atype,0,c.amt));});return b;}
@@ -754,6 +900,32 @@ async function renderStaffPanel(){const el=document.getElementById('staffList');
 async function removeStaff(membershipId){if(!confirm('Remove?'))return;try{await dbApi({action:'removeStaff',membershipId});renderStaffPanel();showToast('✅ Removed');}catch(e){showToast('❌ '+e.message);}}
 function injectModeSettingsCard(){const page=document.getElementById('pg-settings');if(!page||document.getElementById('modeSwitchCard'))return;const card=document.createElement('div');card.className='card';card.id='modeSwitchCard';card.innerHTML=`<div class="card-hdr">🔄 App Mode</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px"><div id="settingsModeConst" onclick="switchAppMode('construction')" style="padding:14px;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;cursor:pointer;text-align:center;transition:all .15s"><div style="font-size:24px;margin-bottom:5px">🏗️</div><div style="font-size:13px;font-weight:600">Construction</div><div style="font-size:10px;color:var(--text3);margin-top:3px">Job costing · WIP · Retention</div></div><div id="settingsModeRetail" onclick="switchAppMode('retail')" style="padding:14px;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;cursor:pointer;text-align:center;transition:all .15s"><div style="font-size:24px;margin-bottom:5px">🛒</div><div style="font-size:13px;font-weight:600">Retail / Supermarket</div><div style="font-size:10px;color:var(--text3);margin-top:3px">POS · Barcode · COGS</div></div></div><div class="alert al-info"><span class="alert-ico">ℹ️</span><div class="alert-body">All journal entries preserved when switching. Only sidebar and screens change.</div></div>`;page.appendChild(card);const c=document.getElementById('settingsModeConst'),r=document.getElementById('settingsModeRetail');if(c)c.style.borderColor=APP_MODE==='construction'?'var(--gold2)':'var(--border2)';if(r)r.style.borderColor=APP_MODE==='retail'?'var(--red3)':'var(--border2)';}
 
+function renderTaxSettingsCard(){
+  const page=document.getElementById('pg-settings');if(!page)return;
+  const existing=document.getElementById('taxSettingsCard');if(existing)existing.remove();
+  const isOwner=SESSION.role==='owner';
+  const card=document.createElement('div');
+  card.className='card';card.id='taxSettingsCard';
+  card.innerHTML=`
+    <div class="card-hdr">🧾 Tax Settings (VAT)</div>
+    <div class="fgrid">
+      <div class="fg"><label>Country</label><select id="taxCountry" ${isOwner?'':'disabled'} style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:9px 11px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none">${TAX_COUNTRY_OPTIONS.map(c=>`<option value="${c.code}" ${c.code===TAX_SETTINGS.country?'selected':''}>${c.label}</option>`).join('')}</select></div>
+      <div class="fg" style="display:flex;align-items:flex-end;padding-bottom:9px">
+        <label style="display:flex;align-items:center;gap:6px;cursor:${isOwner?'pointer':'default'};font-size:12px;color:var(--text2)">
+          <input type="checkbox" id="taxIsRegistered" ${TAX_SETTINGS.is_vat_registered?'checked':''} ${isOwner?'':'disabled'} style="accent-color:var(--gold2)"/> Is this business VAT-registered?
+        </label>
+      </div>
+    </div>
+    ${isOwner?'<div class="btn-row"><button class="btn btn-gold" onclick="saveTaxSettingsUI()">💾 Save Tax Settings</button></div><div id="taxSettingsSt" style="font-size:11px;margin-top:7px"></div>':''}
+    <div class="fs-section" style="margin-top:14px">Tax Tiers</div>
+    <div id="taxTiersList"></div>
+    ${isOwner?'<div class="btn-row"><button class="btn btn-outline" onclick="addNewTaxTierRow()">+ Add Tier</button></div>':''}
+    <div class="alert al-info" style="margin-top:10px"><span class="alert-ico">ℹ️</span><div class="alert-body">When VAT-registered, Products get a Tax Tier + inclusive/exclusive setting, POS sales calculate Output VAT automatically, and Receive Stock calculates Input VAT automatically. Rates are never hardcoded — everything here is fully editable.</div></div>
+  `;
+  page.appendChild(card);
+  renderTaxTiersTable();
+}
+
 // ── RETAIL PRODUCTS ───────────────────────────────────────────────
 async function loadRetailProducts(){
   try{
@@ -766,7 +938,7 @@ async function loadRetailProducts(){
     renderStockInProductSelect();  // keep Receive Stock select in sync
   }catch(e){console.error('loadRetailProducts',e);}
 }
-function renderProductsPage(){const el=document.getElementById('retailProductList');if(!el)return;if(!RETAIL_PRODUCTS.length){el.innerHTML='<div style="text-align:center;padding:22px;color:var(--text3)">No products yet</div>';return;}const q=(document.getElementById('productSearch')||{}).value||'';const items=RETAIL_PRODUCTS.filter(p=>!q||p.name.toLowerCase().includes(q.toLowerCase())||(p.sku||'').includes(q)||(p.barcode||'').includes(q));const canEditPrice=SESSION.role==='owner';el.innerHTML=`<table><thead><tr><th>SKU</th><th>Barcode</th><th>Product</th><th>Category</th><th>Sale Price</th><th>Cost</th><th>Stock</th><th>Min</th><th></th></tr></thead><tbody>${items.map(p=>{const cls=parseFloat(p.qty)<=0?'var(--red3)':parseFloat(p.qty)<=parseFloat(p.min_qty)?'var(--orange3)':'var(--green3)';const priceCell=canEditPrice?`<td data-price-cell="${p.id}" style="font-family:'JetBrains Mono',monospace;cursor:pointer;border-bottom:1px dashed var(--gold2)" title="Click to edit price" onclick="startInlineEditPrice(this,${p.id},${parseFloat(p.sale_price)||0})">${fc(p.sale_price)}</td>`:`<td style="font-family:'JetBrains Mono',monospace">${fc(p.sale_price)}</td>`;return`<tr><td style="font-family:'JetBrains Mono',monospace;font-size:10px">${p.sku||'—'}</td><td style="font-family:'JetBrains Mono',monospace;font-size:10px">${p.barcode||'—'}</td><td style="font-weight:500">${p.name}</td><td><span class="tag t-blue" style="font-size:9px">${p.category}</span></td>${priceCell}<td style="font-family:'JetBrains Mono',monospace;color:var(--text3)">${fc(p.cost_price)}</td><td style="font-family:'JetBrains Mono',monospace;font-weight:700;color:${cls}">${p.qty} ${p.unit}</td><td style="font-family:'JetBrains Mono',monospace;color:var(--text3)">${p.min_qty}</td><td><button style="padding:2px 6px;background:transparent;border:1px solid rgba(192,48,42,.3);border-radius:3px;color:var(--red3);font-size:10px;cursor:pointer" onclick="deleteProduct(${p.id})">✕</button></td></tr>`;}).join('')}</tbody></table>`;}
+function renderProductsPage(){const el=document.getElementById('retailProductList');if(!el)return;populateProductTaxTierSelect();if(!RETAIL_PRODUCTS.length){el.innerHTML='<div style="text-align:center;padding:22px;color:var(--text3)">No products yet</div>';return;}const q=(document.getElementById('productSearch')||{}).value||'';const items=RETAIL_PRODUCTS.filter(p=>!q||p.name.toLowerCase().includes(q.toLowerCase())||(p.sku||'').includes(q)||(p.barcode||'').includes(q));const canEditPrice=SESSION.role==='owner';el.innerHTML=`<table><thead><tr><th>SKU</th><th>Barcode</th><th>Product</th><th>Category</th><th>Sale Price</th><th>Cost</th><th>Tax</th><th>Stock</th><th>Min</th><th></th></tr></thead><tbody>${items.map(p=>{const cls=parseFloat(p.qty)<=0?'var(--red3)':parseFloat(p.qty)<=parseFloat(p.min_qty)?'var(--orange3)':'var(--green3)';const priceCell=canEditPrice?`<td data-price-cell="${p.id}" style="font-family:'JetBrains Mono',monospace;cursor:pointer;border-bottom:1px dashed var(--gold2)" title="Click to edit price" onclick="startInlineEditPrice(this,${p.id},${parseFloat(p.sale_price)||0})">${fc(p.sale_price)}</td>`:`<td style="font-family:'JetBrains Mono',monospace">${fc(p.sale_price)}</td>`;const tier=getTaxTierById(p.tax_tier_id);const taxCell=tier?`<span class="tag t-purple" style="font-size:9px">${tier.name} ${parseFloat(tier.rate)}%${p.price_inclusive?' incl.':' excl.'}</span>`:`<span class="tag t-blue" style="font-size:9px">No tax</span>`;return`<tr><td style="font-family:'JetBrains Mono',monospace;font-size:10px">${p.sku||'—'}</td><td style="font-family:'JetBrains Mono',monospace;font-size:10px">${p.barcode||'—'}</td><td style="font-weight:500">${p.name}</td><td><span class="tag t-blue" style="font-size:9px">${p.category}</span></td>${priceCell}<td style="font-family:'JetBrains Mono',monospace;color:var(--text3)">${fc(p.cost_price)}</td><td>${taxCell}</td><td style="font-family:'JetBrains Mono',monospace;font-weight:700;color:${cls}">${p.qty} ${p.unit}</td><td style="font-family:'JetBrains Mono',monospace;color:var(--text3)">${p.min_qty}</td><td><button style="padding:2px 6px;background:transparent;border:1px solid rgba(192,48,42,.3);border-radius:3px;color:var(--red3);font-size:10px;cursor:pointer" onclick="deleteProduct(${p.id})">✕</button></td></tr>`;}).join('')}</tbody></table>`;}
 // ── INLINE SALE PRICE EDITING (Owner only) ─────────────────────────
 // Role check happens both here (defense in depth — the cell isn't even clickable/rendered
 // with a handler for non-owners in renderProductsPage above) and again before saving.
@@ -800,13 +972,16 @@ async function updateProductSalePrice(productId,newPrice){
     showToast('❌ Failed to save price: '+e.message,4000);
   }
 }
-async function saveProduct(){const name=document.getElementById('prd-name').value.trim();const st=document.getElementById('prd-st');if(!name){st.innerHTML='<span style="color:var(--red3)">Enter product name</span>';return;}const sku=document.getElementById('prd-sku').value.trim(),barcode=document.getElementById('prd-barcode').value.trim(),category=document.getElementById('prd-cat').value,sale_price=parseFloat(document.getElementById('prd-sale').value)||0,cost_price=parseFloat(document.getElementById('prd-cost').value)||0,qty=parseFloat(document.getElementById('prd-qty').value)||0,min_qty=parseFloat(document.getElementById('prd-min').value)||0,unit=document.getElementById('prd-unit').value||'unit';try{await dbApi({action:'saveProduct',companyId:SESSION.companyId,name,sku,barcode,category,sale_price,cost_price,qty,min_qty,unit});if(qty>0&&cost_price>0){const total=qty*cost_price;DB.entries.push({id:DB.nextId++,date:today(),desc:`Opening stock: ${name}`,type:'Stock Receipt',amount:total,project:'',debits:[{acct:'Inventory (Stock)',amt:total,atype:'asset'}],credits:[{acct:'Accounts Payable',amt:total,atype:'liability'}]});await saveData();}await loadRetailProducts();renderAll();st.innerHTML=`<span style="color:var(--green3)">✅ ${name} saved</span>`;['prd-name','prd-sku','prd-barcode','prd-sale','prd-cost','prd-qty','prd-min'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});}catch(e){st.innerHTML=`<span style="color:var(--red3)">❌ ${e.message}</span>`;}setTimeout(()=>{const s=document.getElementById('prd-st');if(s)s.innerHTML='';},4000);}
+async function saveProduct(){const name=document.getElementById('prd-name').value.trim();const st=document.getElementById('prd-st');if(!name){st.innerHTML='<span style="color:var(--red3)">Enter product name</span>';return;}const sku=document.getElementById('prd-sku').value.trim(),barcode=document.getElementById('prd-barcode').value.trim(),category=document.getElementById('prd-cat').value,sale_price=parseFloat(document.getElementById('prd-sale').value)||0,cost_price=parseFloat(document.getElementById('prd-cost').value)||0,qty=parseFloat(document.getElementById('prd-qty').value)||0,min_qty=parseFloat(document.getElementById('prd-min').value)||0,unit=document.getElementById('prd-unit').value||'unit';const taxTierEl=document.getElementById('prd-tax-tier'),taxInclEl=document.getElementById('prd-tax-inclusive');const tax_tier_id=taxTierEl?taxTierEl.value:'',price_inclusive=taxInclEl?taxInclEl.checked:false;try{await dbApi({action:'saveProduct',companyId:SESSION.companyId,name,sku,barcode,category,sale_price,cost_price,qty,min_qty,unit,tax_tier_id,price_inclusive});if(qty>0&&cost_price>0){const total=qty*cost_price;DB.entries.push({id:DB.nextId++,date:today(),desc:`Opening stock: ${name}`,type:'Stock Receipt',amount:total,project:'',debits:[{acct:'Inventory (Stock)',amt:total,atype:'asset'}],credits:[{acct:'Accounts Payable',amt:total,atype:'liability'}]});await saveData();}await loadRetailProducts();renderAll();st.innerHTML=`<span style="color:var(--green3)">✅ ${name} saved</span>`;['prd-name','prd-sku','prd-barcode','prd-sale','prd-cost','prd-qty','prd-min'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});if(taxInclEl)taxInclEl.checked=false;}catch(e){st.innerHTML=`<span style="color:var(--red3)">❌ ${e.message}</span>`;}setTimeout(()=>{const s=document.getElementById('prd-st');if(s)s.innerHTML='';},4000);}
+function populateProductTaxTierSelect(){const el=document.getElementById('prd-tax-tier');if(!el)return;el.innerHTML=taxTierSelectOptions('');const hint=document.getElementById('prd-tax-hint');if(hint)hint.textContent=TAX_SETTINGS.is_vat_registered?'':'Tax tiers only affect accounting once this business is marked VAT-registered in Settings.';}
 async function deleteProduct(id){if(!confirm('Delete?'))return;try{await dbApi({action:'deleteProduct',productId:id});await loadRetailProducts();}catch(e){showToast('❌ '+e.message);}}
 function renderStockInProductSelect(){
   const el=document.getElementById('si-product');if(!el)return;
   const prevValue=el.value;
   el.innerHTML='<option value="">Select product...</option>'+RETAIL_PRODUCTS.map(p=>`<option value="${p.id}">${p.name} (stock: ${p.qty} ${p.unit})</option>`).join('');
   if(prevValue&&RETAIL_PRODUCTS.some(p=>String(p.id)===String(prevValue)))el.value=prevValue;
+  const taxSel=document.getElementById('si-tax-tier');if(taxSel)taxSel.innerHTML=taxTierSelectOptions('');
+  const invWrap=document.getElementById('si-invoice-wrap');if(invWrap)invWrap.style.display=TAX_SETTINGS.is_vat_registered?'block':'none';
 }
 
 // ── AI RECEIPT/INVOICE UPLOAD FOR STOCK INTAKE (retail only) ──────────────
@@ -910,11 +1085,13 @@ function populateSingleIntakeForm(supplier,item){
 let _rsReviewRowSeq=0;
 function renderReceiptReviewTable(parsed){
   const wrap=document.getElementById('rsReceiptReview');if(!wrap)return;
+  const vatOn=TAX_SETTINGS.is_vat_registered;
   const rows=parsed.items.map(it=>{
     const rowId='rsrow-'+(_rsReviewRowSeq++);
     const match=posFindProduct(it.name,true);
     const options='<option value="">— no match, will auto-create on confirm —</option>'+RETAIL_PRODUCTS.map(p=>`<option value="${p.id}" ${match&&match.id===p.id?'selected':''}>${p.name}</option>`).join('');
-    return `<div class="rs-review-row" data-row-id="${rowId}" data-parsed-name="${(it.name||'').replace(/"/g,'&quot;')}" style="display:grid;grid-template-columns:1.4fr auto 1fr 1fr;gap:7px;align-items:end;padding:8px 0;border-bottom:1px solid var(--border)">
+    const defaultTierId=match&&match.tax_tier_id?match.tax_tier_id:(getDefaultTaxTier()?getDefaultTaxTier().id:'');
+    return `<div class="rs-review-row" data-row-id="${rowId}" data-parsed-name="${(it.name||'').replace(/"/g,'&quot;')}" style="display:grid;grid-template-columns:1.4fr auto 1fr 1fr${vatOn?' 1.2fr auto':''};gap:7px;align-items:end;padding:8px 0;border-bottom:1px solid var(--border)">
       <div>
         <div style="font-size:10px;color:var(--text3);margin-bottom:3px">Receipt said: "${it.name}"</div>
         <select class="rs-review-product" id="sel-${rowId}" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:7px 9px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none">${options}</select>
@@ -922,11 +1099,13 @@ function renderReceiptReviewTable(parsed){
       <button type="button" onclick="openQuickAddProduct('sel-${rowId}')" title="Add a new product without leaving this page" style="padding:7px 9px;background:transparent;border:1px dashed var(--gold2);border-radius:5px;color:var(--gold2);cursor:pointer;font-size:11px;white-space:nowrap">+ New</button>
       <div><div style="font-size:10px;color:var(--text3);margin-bottom:3px">Qty</div><input class="rs-review-qty" type="number" value="${it.qty||0}" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:7px 9px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none"/></div>
       <div><div style="font-size:10px;color:var(--text3);margin-bottom:3px">Unit Cost</div><input class="rs-review-cost" type="number" step="0.01" value="${it.unitCost||0}" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:7px 9px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none"/></div>
+      ${vatOn?`<div><div style="font-size:10px;color:var(--text3);margin-bottom:3px">Tax Tier</div><select class="rs-review-tax-tier" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:7px 9px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text);outline:none">${taxTierSelectOptions(defaultTierId)}</select></div><label style="display:flex;align-items:center;gap:4px;font-size:9px;color:var(--text3);padding-bottom:7px;white-space:nowrap"><input type="checkbox" class="rs-review-tax-incl" style="accent-color:var(--gold2)"/> incl.</label>`:''}
     </div>`;
   }).join('');
   wrap.style.display='block';
   wrap.innerHTML=`
     <div class="fgrid"><div class="fg"><label>Supplier</label><input id="rs-review-supplier" type="text" value="${(parsed.supplier||'').replace(/"/g,'&quot;')}" placeholder="Supplier name"/></div><div class="fg"><label>Payment</label><select id="rs-review-pay"><option value="credit">Credit (AP)</option><option value="cash">Cash</option></select></div></div>
+    ${vatOn?`<div class="fg"><label>Supplier Tax Invoice Number <span style="color:var(--red3)">*</span></label><input id="rs-review-invoice" type="text" placeholder="Required for VAT-registered businesses"/></div>`:''}
     ${rows}
     <div class="btn-row"><button class="btn btn-gold" onclick="confirmReceiptIntake()">✅ Confirm Receive All</button><button class="btn btn-outline" onclick="cancelReceiptReview()">Cancel</button></div>
   `;
@@ -941,6 +1120,8 @@ async function confirmReceiptIntake(){
   const wrap=document.getElementById('rsReceiptReview');if(!wrap)return;
   const supplier=(document.getElementById('rs-review-supplier')||{}).value||'';
   const payMethod=(document.getElementById('rs-review-pay')||{}).value||'credit';
+  const invoiceNo=(document.getElementById('rs-review-invoice')||{}).value?.trim()||'';
+  if(TAX_SETTINGS.is_vat_registered&&!invoiceNo){setRSReceiptStatus('⚠️ Supplier Tax Invoice Number is required for VAT-registered businesses.',true);return;}
   const rowEls=Array.from(wrap.querySelectorAll('.rs-review-row'));
   const candidates=[];let skipped=0;
   rowEls.forEach(row=>{
@@ -949,8 +1130,11 @@ async function confirmReceiptIntake(){
     const parsedName=row.dataset.parsedName||'';
     const qty=parseFloat(row.querySelector('.rs-review-qty').value)||0;
     const unitCost=parseFloat(row.querySelector('.rs-review-cost').value)||0;
+    const taxTierSel=row.querySelector('.rs-review-tax-tier');
+    const taxTierId=taxTierSel?taxTierSel.value:'';
+    const priceInclusive=row.querySelector('.rs-review-tax-incl')?row.querySelector('.rs-review-tax-incl').checked:false;
     if(qty<=0||unitCost<=0){skipped++;return;} // still skip rows with no usable qty/cost — that's a data problem, not a matching one
-    candidates.push({productId,parsedName,qty,unitCost});
+    candidates.push({productId,parsedName,qty,unitCost,taxTierId,priceInclusive});
   });
   if(!candidates.length){setRSReceiptStatus('⚠️ No rows have both a quantity and a unit cost — nothing to receive.',true);return;}
   setRSReceiptStatus('⏳ Recording receipt...');
@@ -962,23 +1146,38 @@ async function confirmReceiptIntake(){
         productId=await autoCreateProductFromReceiptLine(c.parsedName,c.unitCost);
         autoCreated.push(c.parsedName||'Unnamed Item');
       }
-      lines.push({productId,qty:c.qty,unitCost:c.unitCost});
+      const tier=getTaxTierById(c.taxTierId);
+      const rate=(TAX_SETTINGS.is_vat_registered&&tier)?parseFloat(tier.rate):0;
+      const split=computeTaxSplit(c.unitCost*c.qty,rate,c.priceInclusive);
+      lines.push({productId,qty:c.qty,unitCostForStock:split.base/c.qty,base:split.base,tax:split.tax,grand:split.grandTotal,tierName:tier?tier.name:'',rate});
     }
     if(autoCreated.length)await loadRetailProducts(); // refresh catalogue/dropdowns before we reference names below
-    let total=0;
+    let totalBase=0,totalTax=0,totalGrand=0;
+    const tierTotals={};
     for(const line of lines){
-      await dbApi({action:'receiveStock',companyId:SESSION.companyId,productId:line.productId,qty:line.qty,unitCost:line.unitCost,supplier,paymentMethod:payMethod});
-      total+=line.qty*line.unitCost;
+      await dbApi({action:'receiveStock',companyId:SESSION.companyId,productId:line.productId,qty:line.qty,unitCost:line.unitCostForStock,supplier,paymentMethod:payMethod});
+      totalBase+=line.base;totalTax+=line.tax;totalGrand+=line.grand;
+      if(line.tierName){
+        const key=line.tierName||'—';
+        if(!tierTotals[key])tierTotals[key]={tierName:line.tierName,rate:line.rate,base:0,tax:0};
+        tierTotals[key].base+=line.base;tierTotals[key].tax+=line.tax;
+      }
     }
     const names=lines.map(l=>{const p=RETAIL_PRODUCTS.find(x=>x.id===l.productId);return p?`${p.name} ×${l.qty}`:`#${l.productId} ×${l.qty}`;});
-    DB.entries.push({id:DB.nextId++,date:today(),desc:`Stock received (from receipt): ${supplier||'supplier'} — ${names.join(', ')}`,type:'Stock Receipt',amount:total,project:'',debits:[{acct:'Inventory (Stock)',amt:total,atype:'asset'}],credits:payMethod==='cash'?[{acct:'Cash',amt:total,atype:'asset'}]:[{acct:'Accounts Payable',amt:total,atype:'liability'}]});
+    const debits=[{acct:'Inventory (Stock)',amt:Math.round(totalBase*100)/100,atype:'asset'}];
+    if(totalTax>0.001)debits.push({acct:'VAT Receivable (Input VAT)',amt:Math.round(totalTax*100)/100,atype:'asset'});
+    DB.entries.push({id:DB.nextId++,date:today(),desc:`Stock received (from receipt): ${supplier||'supplier'}${invoiceNo?` (Inv# ${invoiceNo})`:''} — ${names.join(', ')}`,type:'Stock Receipt',amount:Math.round(totalGrand*100)/100,project:'',debits,credits:payMethod==='cash'?[{acct:'Cash',amt:Math.round(totalGrand*100)/100,atype:'asset'}]:[{acct:'Accounts Payable',amt:Math.round(totalGrand*100)/100,atype:'liability'}]});
+    for(const t of Object.values(tierTotals)){
+      await dbApi({action:'recordVatLedger',companyId:SESSION.companyId,direction:'input',tierName:t.tierName,rate:t.rate,baseAmount:t.base,taxAmount:t.tax,sourceType:'stock_receipt',sourceDesc:`Receipt: ${supplier||'supplier'} — ${names.join(', ')}`,supplierInvoiceNo:invoiceNo,entryDate:today()}).catch(e=>console.error('recordVatLedger',e));
+    }
     await saveData();
     await loadRetailProducts();
     renderAll();
     cancelReceiptReview();
     const createdMsg=autoCreated.length?` — created new product(s): ${autoCreated.join(', ')} (set your sale price in Catalogue)`:'';
-    setRSReceiptStatus(`✅ Received ${lines.length} item(s) — ${fc(total)} recorded${createdMsg}${skipped?` (${skipped} row(s) skipped — no qty/cost)`:''}`);
-    showToast(`✅ Stock receipt recorded — ${fc(total)}${autoCreated.length?` (${autoCreated.length} new product${autoCreated.length>1?'s':''})`:''}`);
+    const vatMsg=totalTax>0.001?` (base ${fc(totalBase)} + VAT ${fc(totalTax)})`:'';
+    setRSReceiptStatus(`✅ Received ${lines.length} item(s) — ${fc(totalGrand)} recorded${vatMsg}${createdMsg}${skipped?` (${skipped} row(s) skipped — no qty/cost)`:''}`);
+    showToast(`✅ Stock receipt recorded — ${fc(totalGrand)}${autoCreated.length?` (${autoCreated.length} new product${autoCreated.length>1?'s':''})`:''}`);
   }catch(e){
     setRSReceiptStatus('❌ '+e.message,true);
   }
@@ -990,32 +1189,50 @@ async function confirmReceiptIntake(){
 // unmatched after a receipt auto-fill, this auto-creates the product from the receipt's
 // own name rather than blocking the intake — true manual entry (no receipt involved)
 // still requires picking a product, since there's no parsed name to create one from.
+// When the business is VAT-registered, the amount typed here is treated as Base or Grand
+// Total depending on the inclusive checkbox, split via computeTaxSplit, and posted as
+// Dr Inventory [base] + Dr VAT Receivable [tax] + Cr AP/Cash [grand] — otherwise the
+// full amount is capitalized into inventory exactly as before (zero behavior change).
 async function receiveStock(){
   const productIdRaw=document.getElementById('si-product').value;
   const qty=parseFloat(document.getElementById('si-qty').value)||0;
-  const unitCost=parseFloat(document.getElementById('si-cost').value)||0;
+  const enteredAmount=parseFloat(document.getElementById('si-cost').value)||0;
   const supplier=document.getElementById('si-supplier').value.trim();
   const payMethod=document.getElementById('si-pay').value;
+  const taxTierId=(document.getElementById('si-tax-tier')||{}).value||'';
+  const priceInclusive=(document.getElementById('si-tax-inclusive')||{}).checked||false;
+  const invoiceNo=(document.getElementById('si-invoice-no')||{}).value.trim()||'';
   const st=document.getElementById('si-st');
-  if(!qty||!unitCost){st.innerHTML='<span style="color:var(--red3)">Fill all fields</span>';return;}
+  if(!qty||!enteredAmount){st.innerHTML='<span style="color:var(--red3)">Fill all fields</span>';return;}
+  if(TAX_SETTINGS.is_vat_registered&&!invoiceNo){st.innerHTML='<span style="color:var(--red3)">Supplier Tax Invoice Number is required for VAT-registered businesses</span>';return;}
   try{
     let productId=productIdRaw?parseInt(productIdRaw):null;
     let product=productId?RETAIL_PRODUCTS.find(p=>p.id===productId):null;
     if(!productId){
       if(!RS_LAST_SINGLE_ITEM_NAME){st.innerHTML='<span style="color:var(--red3)">Select a product</span>';return;}
       st.innerHTML=`<span style="color:var(--text3)">Auto-creating product "${RS_LAST_SINGLE_ITEM_NAME}"...</span>`;
-      productId=await autoCreateProductFromReceiptLine(RS_LAST_SINGLE_ITEM_NAME,unitCost);
+      productId=await autoCreateProductFromReceiptLine(RS_LAST_SINGLE_ITEM_NAME,enteredAmount);
       await loadRetailProducts();
       product=RETAIL_PRODUCTS.find(p=>p.id===productId);
     }
     if(!product){st.innerHTML='<span style="color:var(--red3)">Product not found</span>';return;}
-    const total=qty*unitCost;
-    await dbApi({action:'receiveStock',companyId:SESSION.companyId,productId,qty,unitCost,supplier,paymentMethod:payMethod});
-    DB.entries.push({id:DB.nextId++,date:today(),desc:`Stock received: ${product.name} × ${qty} from ${supplier||'supplier'}`,type:'Stock Receipt',amount:total,project:'',debits:[{acct:'Inventory (Stock)',amt:total,atype:'asset'}],credits:payMethod==='cash'?[{acct:'Cash',amt:total,atype:'asset'}]:[{acct:'Accounts Payable',amt:total,atype:'liability'}]});
+    const tier=getTaxTierById(taxTierId);
+    const rate=(TAX_SETTINGS.is_vat_registered&&tier)?parseFloat(tier.rate):0;
+    const split=computeTaxSplit(enteredAmount*qty,rate,priceInclusive);
+    const unitCostForStock=split.base/qty; // inventory is always carried at the tax-exclusive cost
+    await dbApi({action:'receiveStock',companyId:SESSION.companyId,productId,qty,unitCost:unitCostForStock,supplier,paymentMethod:payMethod});
+    const debits=[{acct:'Inventory (Stock)',amt:split.base,atype:'asset'}];
+    if(split.tax>0.001)debits.push({acct:'VAT Receivable (Input VAT)',amt:split.tax,atype:'asset'});
+    DB.entries.push({id:DB.nextId++,date:today(),desc:`Stock received: ${product.name} × ${qty} from ${supplier||'supplier'}${invoiceNo?` (Inv# ${invoiceNo})`:''}`,type:'Stock Receipt',amount:split.grandTotal,project:'',debits,credits:payMethod==='cash'?[{acct:'Cash',amt:split.grandTotal,atype:'asset'}]:[{acct:'Accounts Payable',amt:split.grandTotal,atype:'liability'}]});
+    if(TAX_SETTINGS.is_vat_registered&&tier){
+      await dbApi({action:'recordVatLedger',companyId:SESSION.companyId,direction:'input',tierName:tier.name,rate,baseAmount:split.base,taxAmount:split.tax,sourceType:'stock_receipt',sourceDesc:`${product.name} from ${supplier||'supplier'}`,supplierInvoiceNo:invoiceNo,entryDate:today()}).catch(e=>console.error('recordVatLedger',e));
+    }
     await saveData();await loadRetailProducts();renderAll();
     const createdMsg=RS_LAST_SINGLE_ITEM_NAME&&!productIdRaw?' — new product created (set your sale price in Catalogue)':'';
-    st.innerHTML=`<span style="color:var(--green3)">✅ Received ${qty} × ${product.name} — ${fc(total)}${createdMsg}</span>`;
-    ['si-qty','si-cost','si-supplier'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+    const vatMsg=split.tax>0.001?` (base ${fc(split.base)} + VAT ${fc(split.tax)})`:'';
+    st.innerHTML=`<span style="color:var(--green3)">✅ Received ${qty} × ${product.name} — ${fc(split.grandTotal)}${vatMsg}${createdMsg}</span>`;
+    ['si-qty','si-cost','si-supplier','si-invoice-no'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+    const inclEl=document.getElementById('si-tax-inclusive');if(inclEl)inclEl.checked=false;
     RS_LAST_SINGLE_ITEM_NAME=null;
   }catch(e){
     st.innerHTML=`<span style="color:var(--red3)">❌ ${e.message}</span>`;
@@ -1038,46 +1255,81 @@ function renderPOReceiveSelect(){
 }
 function renderPOReceiptLines(){
   const wrap=document.getElementById('rs-po-lines');if(!wrap)return;
+  const invWrap=document.getElementById('rs-po-invoice-wrap');if(invWrap)invWrap.style.display=TAX_SETTINGS.is_vat_registered?'block':'none';
   const poId=document.getElementById('rs-po-select').value;
   if(!poId){wrap.innerHTML='<div style="color:var(--text3);font-size:12px;padding:10px 0">Select a purchase order above to see its remaining items.</div>';return;}
   const po=PO_ORDERS.find(o=>String(o.id)===String(poId));
   if(!po){wrap.innerHTML='';return;}
+  const vatOn=TAX_SETTINGS.is_vat_registered;
   const items=Array.isArray(po.items)?po.items:JSON.parse(po.items||'[]');
   const rows=items.map((it,idx)=>{
     const ordered=parseFloat(it.qty)||0,received=parseFloat(it.receivedQty)||0,remaining=Math.max(0,ordered-received);
-    return `<div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr;gap:7px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)" data-po-product-id="${it.productId}">
+    const product=RETAIL_PRODUCTS.find(p=>p.id===it.productId);
+    const defaultTierId=product&&product.tax_tier_id?product.tax_tier_id:(getDefaultTaxTier()?getDefaultTaxTier().id:'');
+    return `<div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr${vatOn?' 1.2fr auto':''};gap:7px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)" data-po-product-id="${it.productId}">
       <div style="font-size:12px">${it.name}</div>
       <div style="font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace">Ordered: ${ordered}</div>
       <div style="font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace">Received: ${received}</div>
       <input class="rs-accept-qty" type="number" min="0" max="${remaining}" value="${remaining}" placeholder="Accept qty" style="background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:7px 9px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none"/>
       <input class="rs-accept-cost" type="number" step="0.01" value="${it.unitCost||0}" placeholder="Unit cost" style="background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:7px 9px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none"/>
+      ${vatOn?`<select class="rs-accept-tax-tier" style="background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:7px 9px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text);outline:none">${taxTierSelectOptions(defaultTierId)}</select><label style="display:flex;align-items:center;gap:4px;font-size:9px;color:var(--text3);white-space:nowrap"><input type="checkbox" class="rs-accept-tax-incl" style="accent-color:var(--gold2)"/> incl.</label>`:''}
     </div>`;
   }).join('');
-  wrap.innerHTML=`<div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr;gap:7px;font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);padding-bottom:5px;border-bottom:1px solid var(--border2)"><div>Product</div><div>Ordered</div><div>Received</div><div>Accept Qty</div><div>Unit Cost</div></div>${rows}`;
+  wrap.innerHTML=`<div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr${vatOn?' 1.2fr auto':''};gap:7px;font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);padding-bottom:5px;border-bottom:1px solid var(--border2)"><div>Product</div><div>Ordered</div><div>Received</div><div>Accept Qty</div><div>Unit Cost</div>${vatOn?'<div>Tax Tier</div><div></div>':''}</div>${rows}`;
 }
 async function confirmPOReceipt(){
   const poId=document.getElementById('rs-po-select').value,st=document.getElementById('rs-po-st');
   if(!poId){st.innerHTML='<span style="color:var(--red3)">Select a purchase order</span>';return;}
+  const invoiceNo=(document.getElementById('rs-po-invoice')||{}).value?.trim()||'';
+  if(TAX_SETTINGS.is_vat_registered&&!invoiceNo){st.innerHTML='<span style="color:var(--red3)">Supplier Tax Invoice Number is required for VAT-registered businesses</span>';return;}
   const lineEls=document.querySelectorAll('#rs-po-lines [data-po-product-id]');
-  const receipts=[];
+  const candidates=[];
   lineEls.forEach(row=>{
     const productId=row.dataset.poProductId;
     const qty=parseFloat(row.querySelector('.rs-accept-qty').value)||0;
     const unitCost=parseFloat(row.querySelector('.rs-accept-cost').value)||0;
-    if(qty>0)receipts.push({productId:parseInt(productId),qty,unitCost});
+    const taxTierSel=row.querySelector('.rs-accept-tax-tier');
+    const taxTierId=taxTierSel?taxTierSel.value:'';
+    const priceInclusive=row.querySelector('.rs-accept-tax-incl')?row.querySelector('.rs-accept-tax-incl').checked:false;
+    if(qty>0)candidates.push({productId:parseInt(productId),qty,unitCost,taxTierId,priceInclusive});
   });
-  if(!receipts.length){st.innerHTML='<span style="color:var(--red3)">Enter at least one accepted quantity</span>';return;}
+  if(!candidates.length){st.innerHTML='<span style="color:var(--red3)">Enter at least one accepted quantity</span>';return;}
   st.innerHTML='<span style="color:var(--text3)">Confirming receipt...</span>';
   try{
+    // Pre-compute the tax split per line and send the server the tax-EXCLUSIVE cost, so
+    // inventory is always carried at base cost regardless of how the invoice presented it.
+    const splitByProduct={};
+    const receipts=candidates.map(c=>{
+      const tier=getTaxTierById(c.taxTierId);
+      const rate=(TAX_SETTINGS.is_vat_registered&&tier)?parseFloat(tier.rate):0;
+      const split=computeTaxSplit(c.unitCost*c.qty,rate,c.priceInclusive);
+      splitByProduct[c.productId]={...split,tierName:tier?tier.name:'',rate};
+      return{productId:c.productId,qty:c.qty,unitCost:split.base/c.qty};
+    });
     const r=await dbApi({action:'receivePOStock',companyId:SESSION.companyId,poId:parseInt(poId),receipts});
-    // Post the journal entry HERE, using the exact accepted quantities/costs the server confirmed —
-    // this is the only point in the PO workflow where inventory hits the books.
+    // Post the journal entry HERE, using the exact accepted quantities the server confirmed —
+    // this is the only point in the PO workflow where inventory (and now VAT) hits the books.
     const accepted=r.accepted||[];
-    const total=accepted.reduce((s,a)=>s+(a.qty*a.unitCost),0);
-    if(total>0){
+    let totalBase=0,totalTax=0,totalGrand=0;
+    const tierTotals={};
+    accepted.forEach(a=>{
+      const split=splitByProduct[a.productId]||{base:a.qty*a.unitCost,tax:0,grandTotal:a.qty*a.unitCost,tierName:'',rate:0};
+      totalBase+=split.base;totalTax+=split.tax;totalGrand+=split.grandTotal;
+      if(split.tierName){
+        const key=split.tierName||'—';
+        if(!tierTotals[key])tierTotals[key]={tierName:split.tierName,rate:split.rate,base:0,tax:0};
+        tierTotals[key].base+=split.base;tierTotals[key].tax+=split.tax;
+      }
+    });
+    if(totalGrand>0){
       const po=PO_ORDERS.find(o=>String(o.id)===String(poId));
-      DB.entries.push({id:DB.nextId++,date:today(),desc:`Stock received: PO #${poId} — ${po?po.supplier:'supplier'} (${accepted.map(a=>a.name+' ×'+a.qty).join(', ')})`,type:'Stock Receipt',amount:total,project:'',debits:[{acct:'Inventory (Stock)',amt:total,atype:'asset'}],credits:[{acct:'Accounts Payable',amt:total,atype:'liability'}]});
+      const debits=[{acct:'Inventory (Stock)',amt:Math.round(totalBase*100)/100,atype:'asset'}];
+      if(totalTax>0.001)debits.push({acct:'VAT Receivable (Input VAT)',amt:Math.round(totalTax*100)/100,atype:'asset'});
+      DB.entries.push({id:DB.nextId++,date:today(),desc:`Stock received: PO #${poId} — ${po?po.supplier:'supplier'}${invoiceNo?` (Inv# ${invoiceNo})`:''} (${accepted.map(a=>a.name+' ×'+a.qty).join(', ')})`,type:'Stock Receipt',amount:Math.round(totalGrand*100)/100,project:'',debits,credits:[{acct:'Accounts Payable',amt:Math.round(totalGrand*100)/100,atype:'liability'}]});
       await saveData();
+      for(const t of Object.values(tierTotals)){
+        await dbApi({action:'recordVatLedger',companyId:SESSION.companyId,direction:'input',tierName:t.tierName,rate:t.rate,baseAmount:t.base,taxAmount:t.tax,sourceType:'po_receipt',sourceDesc:`PO #${poId} — ${po?po.supplier:'supplier'}`,supplierInvoiceNo:invoiceNo,entryDate:today()}).catch(e=>console.error('recordVatLedger',e));
+      }
     }
     await loadRetailProducts();      // refresh stock levels + every open dropdown, instantly
     await loadPurchaseOrdersCache(); // refresh PO cache so status/received qty are current
@@ -1085,7 +1337,8 @@ async function confirmPOReceipt(){
     renderPOReceiveSelect();         // drop it from the list if now completed
     await renderPOList();            // update the Purchase Orders table live, no refresh needed
     renderAll();
-    st.innerHTML=`<span style="color:var(--green3)">✅ Receipt confirmed — PO now ${(PO_STATUS_LABEL[r.status]||r.status).toLowerCase()}</span>`;
+    const vatMsg=totalTax>0.001?` (base ${fc(totalBase)} + VAT ${fc(totalTax)})`:'';
+    st.innerHTML=`<span style="color:var(--green3)">✅ Receipt confirmed${vatMsg} — PO now ${(PO_STATUS_LABEL[r.status]||r.status).toLowerCase()}</span>`;
     showToast(`✅ Stock received — PO #${poId} is now ${PO_STATUS_LABEL[r.status]||r.status}`);
   }catch(e){
     st.innerHTML=`<span style="color:var(--red3)">❌ ${e.message}</span>`;
@@ -1107,7 +1360,18 @@ function posFindProduct(raw,allowFuzzy){
   return RETAIL_PRODUCTS.find(p=>p.name.toLowerCase().includes(s)||s.includes(p.name.toLowerCase()))||null;
 }
 function posLookup(val){val=(val||(document.getElementById('pos-scan')||{}).value||'').trim();if(!val)return;const product=posFindProduct(val,false);if(!product){showToast('⚠️ Not found: '+val,3000);return;}posAddToCart(product);const s=document.getElementById('pos-scan');if(s)s.value='';}
-function posAddToCart(product,qty=1){const existing=POS_CART.find(i=>i.id===product.id);if(existing){existing.qty+=qty;}else{POS_CART.push({id:product.id,name:product.name,sku:product.sku||'',sale_price:parseFloat(product.sale_price)||0,cost_price:parseFloat(product.cost_price)||0,qty,unit:product.unit||'unit'});}renderPOSCart();}
+function posAddToCart(product,qty=1){const existing=POS_CART.find(i=>i.id===product.id);if(existing){existing.qty+=qty;}else{POS_CART.push({id:product.id,name:product.name,sku:product.sku||'',sale_price:parseFloat(product.sale_price)||0,cost_price:parseFloat(product.cost_price)||0,qty,unit:product.unit||'unit',tax_tier_id:product.tax_tier_id||null,price_inclusive:!!product.price_inclusive});}renderPOSCart();}
+// Single source of truth for what a cart line actually costs the customer and how much
+// of that is tax — used identically by the cart display, the totals bar, and the sale
+// journal, so none of them can ever disagree with each other.
+function getCartLineAmounts(item){
+  const raw=item.sale_price*item.qty;
+  if(!TAX_SETTINGS.is_vat_registered||!item.tax_tier_id)return{base:raw,tax:0,grand:raw};
+  const tier=getTaxTierById(item.tax_tier_id);
+  const rate=tier?parseFloat(tier.rate):0;
+  const split=computeTaxSplit(raw,rate,item.price_inclusive);
+  return{base:split.base,tax:split.tax,grand:split.grandTotal};
+}
 
 // ── POS VOICE-ACTIVATED ADD ────────────────────────────────────────
 // Say a product name → matched (exact, then fuzzy) → posAddToCart → input cleared →
@@ -1186,10 +1450,60 @@ async function closeCameraScanner(){
 }
 function posRemoveFromCart(productId){POS_CART=POS_CART.filter(i=>i.id!==productId);renderPOSCart();}
 function posUpdateQty(productId,newQty){const item=POS_CART.find(i=>i.id===productId);if(!item)return;item.qty=Math.max(0,parseFloat(newQty)||0);if(item.qty===0)POS_CART=POS_CART.filter(i=>i.id!==productId);renderPOSCart();}
-function getPOSTotals(){const subtotal=POS_CART.reduce((s,i)=>s+i.sale_price*i.qty,0),discountAmt=POS_DISCOUNT>0?subtotal*POS_DISCOUNT/100:0;return{subtotal,discountAmt,total:subtotal-discountAmt,cogs:POS_CART.reduce((s,i)=>s+i.cost_price*i.qty,0)};}
-function renderPOSCart(){const el=document.getElementById('pos-cart-items');const {subtotal,discountAmt,total}=getPOSTotals();if(!el)return;if(!POS_CART.length){el.innerHTML='<div style="text-align:center;padding:22px;color:var(--text3);font-size:12px">🛒 Scan or click a product</div>';['pos-subtotal','pos-discount-amt','pos-total'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=fc(0);});return;}el.innerHTML=POS_CART.map(item=>`<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)"><div style="flex:1"><div style="font-size:13px;color:var(--text)">${item.name}</div><div style="font-size:10px;color:var(--text3);font-family:'JetBrains Mono',monospace">${fc(item.sale_price)}/${item.unit}</div></div><input type="number" value="${item.qty}" min="0" step="1" onchange="posUpdateQty(${item.id},this.value)" style="width:55px;background:var(--bg3);border:1px solid var(--border2);border-radius:4px;padding:4px 6px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none;text-align:center"/><div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--gold3);width:80px;text-align:right">${fc(item.sale_price*item.qty)}</div><button onclick="posRemoveFromCart(${item.id})" style="padding:2px 7px;background:transparent;border:1px solid rgba(192,48,42,.3);border-radius:3px;color:var(--red3);font-size:11px;cursor:pointer">✕</button></div>`).join('');const sub=document.getElementById('pos-subtotal');if(sub)sub.textContent=fc(subtotal);const disc=document.getElementById('pos-discount-amt');if(disc)disc.textContent=discountAmt>0?`-${fc(discountAmt)}`:fc(0);const tot=document.getElementById('pos-total');if(tot)tot.textContent=fc(total);}
-async function completeSale(){if(!POS_CART.length){showToast('⚠️ Cart is empty');return;}const payMethod=document.getElementById('pos-payment').value;const {subtotal,discountAmt,total,cogs}=getPOSTotals();const payAcct=payMethod==='cash'?'Cash':payMethod==='mobile'?'Mobile Money':'Bank Account';const saleEntry={id:DB.nextId++,date:today(),desc:`POS Sale — ${POS_CART.length} item(s)`,type:'POS Sale',amount:total,project:'',debits:[{acct:payAcct,amt:total,atype:'asset'}],credits:[{acct:'Retail Sales Revenue',amt:total,atype:'revenue'}]};DB.entries.push(saleEntry);if(cogs>0)DB.entries.push({id:DB.nextId++,date:today(),desc:`COGS — POS Sale`,type:'COGS',amount:cogs,project:'',debits:[{acct:'Cost of Goods Sold',amt:cogs,atype:'expense'}],credits:[{acct:'Inventory (Stock)',amt:cogs,atype:'asset'}]});for(const item of POS_CART){const product=RETAIL_PRODUCTS.find(p=>p.id===item.id);if(product){product.qty=Math.max(0,(parseFloat(product.qty)||0)-item.qty);await dbApi({action:'saveProduct',companyId:SESSION.companyId,id:product.id,name:product.name,sku:product.sku,barcode:product.barcode,category:product.category,sale_price:product.sale_price,cost_price:product.cost_price,qty:product.qty,min_qty:product.min_qty,unit:product.unit}).catch(()=>{});}}await dbApi({action:'savePOSSale',companyId:SESSION.companyId,items:POS_CART,subtotal,discount:discountAmt,total,paymentMethod:payMethod,cashier:SESSION.username,journalEntryId:saleEntry.id}).catch(()=>{});await saveData();POS_CART=[];POS_DISCOUNT=0;const pd=document.getElementById('pos-discount');if(pd)pd.value='';renderPOSCart();renderAll();showToast(`✅ Sale complete — ${fc(total)} via ${payMethod}`);const s=document.getElementById('pos-scan');if(s)s.focus();}
-function renderPOSProductGrid(){const el=document.getElementById('pos-product-grid');if(!el)return;if(!RETAIL_PRODUCTS.length){el.innerHTML='<div style="color:var(--text3);font-size:12px;text-align:center;padding:14px;grid-column:1/-1">No products — add them in Products page</div>';return;}el.innerHTML=RETAIL_PRODUCTS.map(p=>{const cls=parseFloat(p.qty)<=0?'var(--red3)':parseFloat(p.qty)<=parseFloat(p.min_qty)?'var(--orange3)':'var(--green3)';const obj=JSON.stringify({id:p.id,name:p.name,sku:p.sku||'',sale_price:parseFloat(p.sale_price)||0,cost_price:parseFloat(p.cost_price)||0,qty:1,unit:p.unit||'unit'}).replace(/'/g,'&apos;');return`<div class="pos-product-btn" onclick='posAddToCart(${obj})'><div style="font-size:11px;font-weight:600;color:var(--text);line-height:1.3;word-break:break-word">${p.name}</div><div style="font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--gold3)">${fc(p.sale_price)}</div><div style="font-size:9px;font-family:'JetBrains Mono',monospace;color:${cls}">${p.qty} ${p.unit}</div></div>`;}).join('');}
+function getPOSTotals(){
+  let subtotal=0,totalBase=0,totalTax=0,totalCogs=0;
+  POS_CART.forEach(item=>{const amt=getCartLineAmounts(item);subtotal+=amt.grand;totalBase+=amt.base;totalTax+=amt.tax;totalCogs+=item.cost_price*item.qty;});
+  const discountAmt=POS_DISCOUNT>0?subtotal*POS_DISCOUNT/100:0;
+  const discRatio=subtotal>0?(subtotal-discountAmt)/subtotal:1; // spread the discount proportionally so VAT is computed on what the customer actually pays
+  return{subtotal,discountAmt,total:subtotal-discountAmt,cogs:totalCogs,taxBase:totalBase*discRatio,taxAmount:totalTax*discRatio};
+}
+// Per-tier split (still after the same discount ratio) so the VAT ledger — and the Tax
+// Report that reads it — can show Output VAT broken down by Standard/Reduced/Zero/Exempt.
+function getPOSTaxBreakdownByTier(){
+  if(!TAX_SETTINGS.is_vat_registered)return[];
+  const {subtotal,discountAmt}=getPOSTotals();
+  const discRatio=subtotal>0?(subtotal-discountAmt)/subtotal:1;
+  const groups={};
+  POS_CART.forEach(item=>{
+    if(!item.tax_tier_id)return;
+    const amt=getCartLineAmounts(item);
+    const tier=getTaxTierById(item.tax_tier_id);
+    if(!groups[item.tax_tier_id])groups[item.tax_tier_id]={tierName:tier?tier.name:'Unknown',rate:tier?parseFloat(tier.rate):0,base:0,tax:0};
+    groups[item.tax_tier_id].base+=amt.base*discRatio;
+    groups[item.tax_tier_id].tax+=amt.tax*discRatio;
+  });
+  return Object.values(groups).filter(g=>g.tax>0.001||g.base>0.001);
+}
+function renderPOSCart(){const el=document.getElementById('pos-cart-items');const {subtotal,discountAmt,total,taxAmount}=getPOSTotals();if(!el)return;if(!POS_CART.length){el.innerHTML='<div style="text-align:center;padding:22px;color:var(--text3);font-size:12px">🛒 Scan or click a product</div>';['pos-subtotal','pos-discount-amt','pos-total'].forEach(id=>{const e=document.getElementById(id);if(e)e.textContent=fc(0);});const tr=document.getElementById('pos-tax-row');if(tr)tr.style.display='none';return;}el.innerHTML=POS_CART.map(item=>{const lineAmt=getCartLineAmounts(item);return`<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)"><div style="flex:1"><div style="font-size:13px;color:var(--text)">${item.name}</div><div style="font-size:10px;color:var(--text3);font-family:'JetBrains Mono',monospace">${fc(item.sale_price)}/${item.unit}${TAX_SETTINGS.is_vat_registered&&item.tax_tier_id?` · ${item.price_inclusive?'incl.':'excl.'} tax`:''}</div></div><input type="number" value="${item.qty}" min="0" step="1" onchange="posUpdateQty(${item.id},this.value)" style="width:55px;background:var(--bg3);border:1px solid var(--border2);border-radius:4px;padding:4px 6px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none;text-align:center"/><div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--gold3);width:80px;text-align:right">${fc(lineAmt.grand)}</div><button onclick="posRemoveFromCart(${item.id})" style="padding:2px 7px;background:transparent;border:1px solid rgba(192,48,42,.3);border-radius:3px;color:var(--red3);font-size:11px;cursor:pointer">✕</button></div>`;}).join('');const sub=document.getElementById('pos-subtotal');if(sub)sub.textContent=fc(subtotal);const disc=document.getElementById('pos-discount-amt');if(disc)disc.textContent=discountAmt>0?`-${fc(discountAmt)}`:fc(0);const tot=document.getElementById('pos-total');if(tot)tot.textContent=fc(total);const tr=document.getElementById('pos-tax-row'),tv=document.getElementById('pos-tax-amt');if(tr){tr.style.display=TAX_SETTINGS.is_vat_registered?'flex':'none';if(tv)tv.textContent=fc(taxAmount);}}
+async function completeSale(){
+  if(!POS_CART.length){showToast('⚠️ Cart is empty');return;}
+  const payMethod=document.getElementById('pos-payment').value;
+  const {subtotal,discountAmt,total,cogs,taxAmount}=getPOSTotals();
+  const payAcct=payMethod==='cash'?'Cash':payMethod==='mobile'?'Mobile Money':'Bank Account';
+  const isVatJournal=TAX_SETTINGS.is_vat_registered&&taxAmount>0.001; // whether the journal needs a separate VAT Payable line
+  const hasTieredItems=TAX_SETTINGS.is_vat_registered&&POS_CART.some(i=>i.tax_tier_id); // whether to log to the VAT ledger at all — includes 0% tiers like Zero-Rated/Exempt, which still belong on a VAT return even though they collect no tax
+  const revenueBase=isVatJournal?total-taxAmount:total; // Dr Cash [total] = Cr Revenue [base] + Cr VAT Payable [tax]
+  const credits=isVatJournal
+    ?[{acct:'Retail Sales Revenue',amt:Math.round(revenueBase*100)/100,atype:'revenue'},{acct:'VAT Payable (Output VAT)',amt:Math.round(taxAmount*100)/100,atype:'liability'}]
+    :[{acct:'Retail Sales Revenue',amt:total,atype:'revenue'}];
+  const saleEntry={id:DB.nextId++,date:today(),desc:`POS Sale — ${POS_CART.length} item(s)${isVatJournal?` (incl. ${fc(taxAmount)} VAT)`:''}`,type:'POS Sale',amount:total,project:'',debits:[{acct:payAcct,amt:total,atype:'asset'}],credits};
+  DB.entries.push(saleEntry);
+  if(cogs>0)DB.entries.push({id:DB.nextId++,date:today(),desc:`COGS — POS Sale`,type:'COGS',amount:cogs,project:'',debits:[{acct:'Cost of Goods Sold',amt:cogs,atype:'expense'}],credits:[{acct:'Inventory (Stock)',amt:cogs,atype:'asset'}]});
+  for(const item of POS_CART){const product=RETAIL_PRODUCTS.find(p=>p.id===item.id);if(product){product.qty=Math.max(0,(parseFloat(product.qty)||0)-item.qty);await dbApi({action:'saveProduct',companyId:SESSION.companyId,id:product.id,name:product.name,sku:product.sku,barcode:product.barcode,category:product.category,sale_price:product.sale_price,cost_price:product.cost_price,qty:product.qty,min_qty:product.min_qty,unit:product.unit,tax_tier_id:product.tax_tier_id,price_inclusive:product.price_inclusive}).catch(()=>{});}}
+  try{
+    await dbApi({action:'savePOSSale',companyId:SESSION.companyId,items:POS_CART,subtotal,discount:discountAmt,total,paymentMethod:payMethod,cashier:SESSION.username,journalEntryId:saleEntry.id});
+  }catch(e){showToast('❌ '+e.message,5000);return;} // e.g. a closed period would reject here — don't silently lose the sale record
+  if(hasTieredItems){
+    const breakdown=getPOSTaxBreakdownByTier();
+    for(const g of breakdown){
+      await dbApi({action:'recordVatLedger',companyId:SESSION.companyId,direction:'output',tierName:g.tierName,rate:g.rate,baseAmount:g.base,taxAmount:g.tax,sourceType:'pos_sale',sourceDesc:saleEntry.desc,entryDate:today()}).catch(e=>console.error('recordVatLedger',e));
+    }
+  }
+  await saveData();POS_CART=[];POS_DISCOUNT=0;const pd=document.getElementById('pos-discount');if(pd)pd.value='';renderPOSCart();renderAll();
+  showToast(`✅ Sale complete — ${fc(total)} via ${payMethod}${isVatJournal?` (${fc(taxAmount)} VAT)`:''}`);
+  const s=document.getElementById('pos-scan');if(s)s.focus();
+}
+function renderPOSProductGrid(){const el=document.getElementById('pos-product-grid');if(!el)return;if(!RETAIL_PRODUCTS.length){el.innerHTML='<div style="color:var(--text3);font-size:12px;text-align:center;padding:14px;grid-column:1/-1">No products — add them in Products page</div>';return;}el.innerHTML=RETAIL_PRODUCTS.map(p=>{const cls=parseFloat(p.qty)<=0?'var(--red3)':parseFloat(p.qty)<=parseFloat(p.min_qty)?'var(--orange3)':'var(--green3)';const obj=JSON.stringify({id:p.id,name:p.name,sku:p.sku||'',sale_price:parseFloat(p.sale_price)||0,cost_price:parseFloat(p.cost_price)||0,qty:1,unit:p.unit||'unit',tax_tier_id:p.tax_tier_id||null,price_inclusive:!!p.price_inclusive}).replace(/'/g,'&apos;');return`<div class="pos-product-btn" onclick='posAddToCart(${obj})'><div style="font-size:11px;font-weight:600;color:var(--text);line-height:1.3;word-break:break-word">${p.name}</div><div style="font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--gold3)">${fc(p.sale_price)}</div><div style="font-size:9px;font-family:'JetBrains Mono',monospace;color:${cls}">${p.qty} ${p.unit}</div></div>`;}).join('');}
 
 // ── PURCHASE ORDERS ───────────────────────────────────────────────
 // Rebuilds every currently-rendered PO line-item <select> from the latest RETAIL_PRODUCTS,
@@ -1304,6 +1618,7 @@ function injectRetailPages(){
     <div style="border-top:1px solid var(--border);padding-top:10px">
       <div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:var(--text2)"><span>Subtotal</span><span id="pos-subtotal" style="font-family:'JetBrains Mono',monospace">$0.00</span></div>
       <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:3px 0;color:var(--text2)"><div style="display:flex;align-items:center;gap:6px">Discount<input id="pos-discount" type="number" min="0" max="100" placeholder="0" oninput="POS_DISCOUNT=parseFloat(this.value)||0;renderPOSCart()" style="width:50px;background:var(--bg3);border:1px solid var(--border2);border-radius:4px;padding:2px 6px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text);outline:none"/> %</div><span id="pos-discount-amt" style="font-family:'JetBrains Mono',monospace;color:var(--red3)">$0.00</span></div>
+      <div id="pos-tax-row" style="display:none;justify-content:space-between;font-size:11px;padding:3px 0;color:var(--purple3)"><span>VAT (included in total)</span><span id="pos-tax-amt" style="font-family:'JetBrains Mono',monospace">$0.00</span></div>
       <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:600;padding:6px 0;margin-top:4px"><span>TOTAL</span><span id="pos-total" style="font-size:22px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--gold3)">$0.00</span></div>
       <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;margin-top:8px"><span style="color:var(--text2)">Payment</span><select id="pos-payment" style="background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:5px 9px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none"><option value="cash">💵 Cash</option><option value="mobile">📱 Mobile Money</option><option value="card">💳 Card</option></select></div>
       <button onclick="completeSale()" style="width:100%;padding:14px;background:linear-gradient(135deg,var(--green),var(--green2));color:#fff;border:none;border-radius:8px;font-size:16px;font-weight:700;cursor:pointer;margin-top:10px">✅ Complete Sale</button>
@@ -1313,7 +1628,8 @@ function injectRetailPages(){
 </div>`],
     ['pg-products',`<div class="ph"><h1>📦 Products</h1></div>
 <div class="card"><div class="card-hdr">➕ Add Product</div>
-  <div class="fgrid"><div class="fg"><label>Product Name</label><input id="prd-name" type="text" placeholder="Soda 500ml"/></div><div class="fg"><label>SKU</label><input id="prd-sku" type="text" placeholder="BEV-001"/></div><div class="fg"><label>Barcode</label><input id="prd-barcode" type="text" placeholder="6931234567890"/></div><div class="fg"><label>Category</label><select id="prd-cat"><option>Beverages</option><option>Food</option><option>Household</option><option>Electronics</option><option>Clothing</option><option>General</option></select></div><div class="fg"><label>Sale Price</label><input id="prd-sale" type="number" step="0.01" placeholder="2.50"/></div><div class="fg"><label>Cost Price</label><input id="prd-cost" type="number" step="0.01" placeholder="1.80"/></div><div class="fg"><label>Opening Stock</label><input id="prd-qty" type="number" placeholder="0"/></div><div class="fg"><label>Min Stock</label><input id="prd-min" type="number" placeholder="5"/></div><div class="fg"><label>Unit</label><select id="prd-unit"><option>unit</option><option>kg</option><option>liters</option><option>pack</option><option>dozen</option><option>box</option><option>carton</option></select></div></div>
+  <div class="fgrid"><div class="fg"><label>Product Name</label><input id="prd-name" type="text" placeholder="Soda 500ml"/></div><div class="fg"><label>SKU</label><input id="prd-sku" type="text" placeholder="BEV-001"/></div><div class="fg"><label>Barcode</label><input id="prd-barcode" type="text" placeholder="6931234567890"/></div><div class="fg"><label>Category</label><select id="prd-cat"><option>Beverages</option><option>Food</option><option>Household</option><option>Electronics</option><option>Clothing</option><option>General</option></select></div><div class="fg"><label>Sale Price</label><input id="prd-sale" type="number" step="0.01" placeholder="2.50"/></div><div class="fg"><label>Cost Price</label><input id="prd-cost" type="number" step="0.01" placeholder="1.80"/></div><div class="fg"><label>Opening Stock</label><input id="prd-qty" type="number" placeholder="0"/></div><div class="fg"><label>Min Stock</label><input id="prd-min" type="number" placeholder="5"/></div><div class="fg"><label>Unit</label><select id="prd-unit"><option>unit</option><option>kg</option><option>liters</option><option>pack</option><option>dozen</option><option>box</option><option>carton</option></select></div><div class="fg"><label>Tax Tier</label><select id="prd-tax-tier"></select></div><div class="fg" style="display:flex;align-items:flex-end;padding-bottom:9px"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text2)"><input type="checkbox" id="prd-tax-inclusive" style="accent-color:var(--gold2)"/> Sale price is tax-inclusive</label></div></div>
+  <div id="prd-tax-hint" style="font-size:10px;color:var(--text3);margin:-4px 0 8px"></div>
   <div class="btn-row"><button class="btn btn-gold" onclick="saveProduct()">➕ Add Product</button></div>
   <div id="prd-st" style="font-size:11px;margin-top:7px"></div>
 </div>
@@ -1323,6 +1639,7 @@ function injectRetailPages(){
   <div class="card-hdr">📥 Receive Against Purchase Order</div>
   <div class="alert al-info" style="margin-bottom:12px"><span class="alert-ico">ℹ️</span><div class="alert-body">This is where the accounting actually happens — confirming a receipt here posts the journal entry (Inventory / Accounts Payable) for the exact quantities accepted, and updates the PO's status. Submitting a PO by itself does not.</div></div>
   <div class="fg"><label>Purchase Order</label><select id="rs-po-select" onchange="renderPOReceiptLines()" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:9px 11px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none"></select></div>
+  <div class="fg" id="rs-po-invoice-wrap" style="display:none"><label>Supplier Tax Invoice Number <span style="color:var(--red3)">*</span></label><input id="rs-po-invoice" type="text" placeholder="Required for VAT-registered businesses"/></div>
   <div id="rs-po-lines"></div>
   <div class="btn-row"><button class="btn btn-gold" onclick="confirmPOReceipt()">✅ Confirm Receipt</button></div>
   <div id="rs-po-st" style="font-size:11px;margin-top:7px"></div>
@@ -1346,7 +1663,8 @@ function injectRetailPages(){
         <button type="button" onclick="openQuickAddProduct('si-product')" title="Add a new product without leaving this page" style="padding:9px 10px;background:transparent;border:1px dashed var(--gold2);border-radius:5px;color:var(--gold2);cursor:pointer;font-size:11px;white-space:nowrap">+ New</button>
       </div>
     </div>
-    <div class="fg"><label>Qty</label><input id="si-qty" type="number" placeholder="50"/></div><div class="fg"><label>Unit Cost</label><input id="si-cost" type="number" step="0.01" placeholder="1.80"/></div><div class="fg"><label>Supplier</label><input id="si-supplier" type="text" placeholder="Supplier name"/></div><div class="fg"><label>Payment</label><select id="si-pay"><option value="credit">Credit (AP)</option><option value="cash">Cash</option></select></div></div>
+    <div class="fg"><label>Qty</label><input id="si-qty" type="number" placeholder="50"/></div><div class="fg"><label>Unit Cost</label><input id="si-cost" type="number" step="0.01" placeholder="1.80"/></div><div class="fg"><label>Supplier</label><input id="si-supplier" type="text" placeholder="Supplier name"/></div><div class="fg"><label>Payment</label><select id="si-pay"><option value="credit">Credit (AP)</option><option value="cash">Cash</option></select></div><div class="fg"><label>Tax Tier</label><select id="si-tax-tier"></select></div><div class="fg" style="display:flex;align-items:flex-end;padding-bottom:9px"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text2)"><input type="checkbox" id="si-tax-inclusive" style="accent-color:var(--gold2)"/> Cost is tax-inclusive</label></div></div>
+  <div class="fg" id="si-invoice-wrap" style="display:none"><label>Supplier Tax Invoice Number <span style="color:var(--red3)">*</span></label><input id="si-invoice-no" type="text" placeholder="Required for VAT-registered businesses"/></div>
   <div class="btn-row"><button class="btn btn-gold" onclick="receiveStock()">📦 Receive Stock</button></div>
   <div id="si-st" style="font-size:11px;margin-top:7px"></div>
 </div>`],
