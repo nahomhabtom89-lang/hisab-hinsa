@@ -97,6 +97,7 @@ const SYSTEM_ACCOUNTS = [
   { code:'1050', name:'Construction Materials',     parent_group:'Current Assets',    account_type:'asset',     is_system:true },
   { code:'1060', name:'Prepaid Rent',               parent_group:'Current Assets',    account_type:'asset',     is_system:true },
   { code:'1070', name:'Work in Progress',           parent_group:'Current Assets',    account_type:'asset',     is_system:true },
+  { code:'1080', name:'VAT Receivable (Input VAT)', parent_group:'Current Assets',    account_type:'asset',     is_system:true },
   // Non-current Assets
   { code:'1500', name:'Equipment',                  parent_group:'Non-current Assets',account_type:'asset',     is_system:true },
   { code:'1510', name:'Vehicles',                   parent_group:'Non-current Assets',account_type:'asset',     is_system:true },
@@ -110,6 +111,7 @@ const SYSTEM_ACCOUNTS = [
   { code:'2030', name:'NSSF Payable',               parent_group:'Liabilities',       account_type:'liability', is_system:true },
   { code:'2040', name:'Accrued Liabilities',        parent_group:'Liabilities',       account_type:'liability', is_system:true },
   { code:'2050', name:'Loan Payable',               parent_group:'Liabilities',       account_type:'liability', is_system:true },
+  { code:'2060', name:'VAT Payable (Output VAT)',   parent_group:'Liabilities',       account_type:'liability', is_system:true },
   // Equity
   { code:'3000', name:'Owner Capital',              parent_group:'Equity',            account_type:'equity',    is_system:true },
   { code:'3010', name:'Retained Earnings',          parent_group:'Equity',            account_type:'equity',    is_system:true },
@@ -157,12 +159,14 @@ const RETAIL_ACCOUNTS = [
   { code:'1030', name:'Accounts Receivable',       parent_group:'Current Assets',     account_type:'asset',    is_system:true },
   { code:'1050', name:'Inventory (Stock)',          parent_group:'Current Assets',     account_type:'asset',    is_system:true },
   { code:'1060', name:'Prepaid Expenses',          parent_group:'Current Assets',     account_type:'asset',    is_system:true },
+  { code:'1070', name:'VAT Receivable (Input VAT)',parent_group:'Current Assets',     account_type:'asset',    is_system:true },
   { code:'1500', name:'Shop Equipment',            parent_group:'Non-current Assets', account_type:'asset',    is_system:true },
   { code:'1530', name:'Accumulated Depreciation - Equipment', parent_group:'Non-current Assets', account_type:'contra-asset', is_system:true },
   { code:'2000', name:'Accounts Payable',          parent_group:'Liabilities',        account_type:'liability',is_system:true },
   { code:'2010', name:'Salaries Payable',          parent_group:'Liabilities',        account_type:'liability',is_system:true },
   { code:'2020', name:'PAYE Payable',              parent_group:'Liabilities',        account_type:'liability',is_system:true },
   { code:'2030', name:'NSSF Payable',              parent_group:'Liabilities',        account_type:'liability',is_system:true },
+  { code:'2040', name:'VAT Payable (Output VAT)',  parent_group:'Liabilities',        account_type:'liability',is_system:true },
   { code:'3000', name:'Owner Capital',             parent_group:'Equity',             account_type:'equity',   is_system:true },
   { code:'3010', name:'Retained Earnings',         parent_group:'Equity',             account_type:'equity',   is_system:true },
   { code:'4000', name:'Retail Sales Revenue',      parent_group:'Revenue',            account_type:'revenue',  is_system:true },
@@ -202,6 +206,8 @@ async function ensureRetailTables() {
       layers JSONB DEFAULT '[]', created_at TIMESTAMPTZ DEFAULT NOW(),
       UNIQUE(company_id, name)
     );
+    ALTER TABLE hh_products ADD COLUMN IF NOT EXISTS tax_tier_id INTEGER;
+    ALTER TABLE hh_products ADD COLUMN IF NOT EXISTS price_inclusive BOOLEAN DEFAULT FALSE;
     CREATE TABLE IF NOT EXISTS hh_pos_sales (
       id SERIAL PRIMARY KEY,
       company_id INTEGER NOT NULL REFERENCES hh_companies(id),
@@ -221,6 +227,94 @@ async function ensureRetailTables() {
       notes TEXT, created_at TIMESTAMPTZ DEFAULT NOW()
     );
   `);
+}
+
+// ── TAX ENGINE (Multi-country VAT) ───────────────────────────────────────────
+// Available to BOTH construction and retail modes — materials purchases and contract
+// invoices are just as taxable as retail sales, so this isn't gated by app_mode.
+async function ensureTaxTables() {
+  await query(`
+    CREATE TABLE IF NOT EXISTS hh_tax_settings (
+      company_id INTEGER PRIMARY KEY REFERENCES hh_companies(id),
+      is_vat_registered BOOLEAN DEFAULT FALSE,
+      country TEXT DEFAULT 'OTHER',
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS hh_tax_tiers (
+      id SERIAL PRIMARY KEY,
+      company_id INTEGER NOT NULL REFERENCES hh_companies(id),
+      name TEXT NOT NULL,
+      code TEXT NOT NULL,
+      rate NUMERIC NOT NULL DEFAULT 0,
+      is_default BOOLEAN DEFAULT FALSE,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(company_id, code)
+    );
+    CREATE TABLE IF NOT EXISTS hh_vat_ledger (
+      id SERIAL PRIMARY KEY,
+      company_id INTEGER NOT NULL REFERENCES hh_companies(id),
+      direction TEXT NOT NULL,
+      tier_name TEXT, rate NUMERIC DEFAULT 0,
+      base_amount NUMERIC DEFAULT 0, tax_amount NUMERIC DEFAULT 0,
+      source_type TEXT,
+      source_desc TEXT,
+      supplier_invoice_no TEXT,
+      entry_date DATE NOT NULL DEFAULT CURRENT_DATE,
+      is_locked BOOLEAN DEFAULT FALSE,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  `);
+}
+
+// Country presets: only rates we could actually verify are included. Everything else
+// falls back to 'OTHER' with 0% placeholders so we never fabricate a number — the Owner
+// fills in their real rate, same principle used elsewhere in this app (e.g. AI receipt
+// parsing never invents figures that aren't in the source document).
+const COUNTRY_TAX_DEFAULTS = {
+  UG: { label: 'Uganda',          tiers: [{name:'Standard Rate', code:'standard', rate:18}, {name:'Zero-Rated', code:'zero', rate:0}, {name:'Exempt', code:'exempt', rate:0}] },
+  KE: { label: 'Kenya',           tiers: [{name:'Standard Rate', code:'standard', rate:16}, {name:'Zero-Rated', code:'zero', rate:0}, {name:'Exempt', code:'exempt', rate:0}] },
+  TZ: { label: 'Tanzania',        tiers: [{name:'Standard Rate', code:'standard', rate:18}, {name:'Zero-Rated', code:'zero', rate:0}, {name:'Exempt', code:'exempt', rate:0}] },
+  RW: { label: 'Rwanda',          tiers: [{name:'Standard Rate', code:'standard', rate:18}, {name:'Zero-Rated', code:'zero', rate:0}, {name:'Exempt', code:'exempt', rate:0}] },
+  NG: { label: 'Nigeria',         tiers: [{name:'Standard Rate', code:'standard', rate:7.5}, {name:'Zero-Rated', code:'zero', rate:0}, {name:'Exempt', code:'exempt', rate:0}] },
+  ZA: { label: 'South Africa',    tiers: [{name:'Standard Rate', code:'standard', rate:15}, {name:'Zero-Rated', code:'zero', rate:0}, {name:'Exempt', code:'exempt', rate:0}] },
+  GB: { label: 'United Kingdom',  tiers: [{name:'Standard Rate', code:'standard', rate:20}, {name:'Reduced Rate', code:'reduced', rate:5}, {name:'Zero-Rated', code:'zero', rate:0}, {name:'Exempt', code:'exempt', rate:0}] },
+  SS: { label: 'South Sudan',     tiers: [{name:'Standard Rate', code:'standard', rate:0}, {name:'Exempt', code:'exempt', rate:0}] },
+  OTHER: { label: 'Other / Custom', tiers: [{name:'Standard Rate', code:'standard', rate:0}, {name:'Zero-Rated', code:'zero', rate:0}, {name:'Exempt', code:'exempt', rate:0}] },
+};
+async function seedTaxTiers(companyId, country) {
+  const preset = COUNTRY_TAX_DEFAULTS[country] || COUNTRY_TAX_DEFAULTS.OTHER;
+  for (const [i, t] of preset.tiers.entries()) {
+    await query(`
+      INSERT INTO hh_tax_tiers(company_id,name,code,rate,is_default)
+      VALUES($1,$2,$3,$4,$5) ON CONFLICT(company_id,code) DO NOTHING
+    `, [companyId, t.name, t.code, t.rate, i === 0]);
+  }
+}
+
+// Server-side fraud control: once a period covering this date is closed, nothing that
+// creates a new dated transaction may reference that date — enforced here, not just in
+// the UI, so it can't be bypassed by calling the API directly or editing client JS.
+async function isDateInClosedPeriod(companyId, dateStr) {
+  if (!dateStr) return false;
+  const r = await query(
+    `SELECT 1 FROM hh_accounting_periods WHERE company_id=$1 AND is_closed=TRUE AND period_start<=$2 AND period_end>=$2 LIMIT 1`,
+    [parseInt(companyId), dateStr]
+  );
+  return r.rows.length > 0;
+}
+// Order-independent deep JSON comparison, so field-ordering differences never cause a
+// false mismatch when comparing an entry against its previously-saved version.
+function stableStringify(obj) {
+  if (obj === null || typeof obj !== 'object') return JSON.stringify(obj);
+  if (Array.isArray(obj)) return '[' + obj.map(stableStringify).join(',') + ']';
+  const keys = Object.keys(obj).sort();
+  return '{' + keys.map(k => JSON.stringify(k) + ':' + stableStringify(obj[k])).join(',') + '}';
+}
+// The ONLY change a closed-period entry may legitimately undergo is being flagged
+// is_locked:true (the act of closing itself) — everything else about it is frozen.
+function entryUnchangedExceptLocking(oldEntry, newEntry) {
+  const strip = e => { const c = { ...e }; delete c.is_locked; return c; };
+  return stableStringify(strip(oldEntry)) === stableStringify(strip(newEntry));
 }
 
 // ── UNIFIED HANDLER ───────────────────────────────────────────────────────────
@@ -247,6 +341,7 @@ module.exports = async function handler(req, res) {
     }
     await ensureTables();
     await ensureRetailTables();
+    await ensureTaxTables();
     const { action } = body;
 
     // ── REGISTER ─────────────────────────────────────────────────────────────
@@ -344,6 +439,41 @@ module.exports = async function handler(req, res) {
     if (action === 'save') {
       const { companyId, key, value } = body;
       if (!companyId || !key) return res.status(400).json({ error: 'Missing fields' });
+
+      // Fraud control for the general journal specifically: entries dated inside a closed
+      // period may not be added, deleted, or altered — the ONLY allowed change is flagging
+      // one is_locked:true (the close operation itself). This is enforced here so it can't
+      // be bypassed by editing client JS or calling this endpoint directly.
+      if (key === 'entries') {
+        const periodsR = await query('SELECT period_start, period_end FROM hh_accounting_periods WHERE company_id=$1 AND is_closed=TRUE', [parseInt(companyId)]);
+        if (periodsR.rows.length) {
+          const closedRanges = periodsR.rows.map(p => ({
+            start: p.period_start.toISOString().split('T')[0],
+            end: p.period_end.toISOString().split('T')[0]
+          }));
+          const inClosedRange = d => closedRanges.some(r => d >= r.start && d <= r.end);
+          const prevR = await query('SELECT data_value FROM hh_data WHERE company_id=$1 AND data_key=$2', [parseInt(companyId), 'entries']);
+          const prevEntries = prevR.rows.length ? (prevR.rows[0].data_value || []) : [];
+          const newEntries = Array.isArray(value) ? value : [];
+          const newById = {}; newEntries.forEach(e => { newById[e.id] = e; });
+
+          for (const oldE of prevEntries) {
+            if (!inClosedRange(oldE.date)) continue;
+            const newE = newById[oldE.id];
+            if (!newE) return res.status(409).json({ error: `Cannot delete entry #${oldE.id} — it falls in a closed period.` });
+            if (!entryUnchangedExceptLocking(oldE, newE)) {
+              return res.status(409).json({ error: `Cannot modify entry #${oldE.id} — it falls in a closed period.` });
+            }
+          }
+          const prevIds = new Set(prevEntries.map(e => e.id));
+          for (const newE of newEntries) {
+            if (!prevIds.has(newE.id) && inClosedRange(newE.date)) {
+              return res.status(409).json({ error: `Cannot add a new entry dated ${newE.date} — that period is closed.` });
+            }
+          }
+        }
+      }
+
       await query(`
         INSERT INTO hh_data(company_id,data_key,data_value,updated_at) VALUES($1,$2,$3::jsonb,NOW())
         ON CONFLICT(company_id,data_key) DO UPDATE SET data_value=$3::jsonb, updated_at=NOW()
@@ -500,17 +630,19 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true, products: r.rows });
     }
     if (action === 'saveProduct') {
-      const { companyId, id, sku, barcode, name, category, sale_price, cost_price, qty, min_qty, unit } = body;
+      const { companyId, id, sku, barcode, name, category, sale_price, cost_price, qty, min_qty, unit, tax_tier_id, price_inclusive } = body;
       if (!companyId || !name) return res.status(400).json({ error: 'Missing fields' });
+      const taxTierId = tax_tier_id ? parseInt(tax_tier_id) : null;
+      const priceIncl = !!price_inclusive;
       if (id) {
         await query(`UPDATE hh_products SET sku=$1,barcode=$2,name=$3,category=$4,sale_price=$5,
-          cost_price=$6,qty=$7,min_qty=$8,unit=$9 WHERE id=$10 AND company_id=$11`,
-          [sku,barcode,name,category||'General',sale_price||0,cost_price||0,qty||0,min_qty||0,unit||'unit',parseInt(id),parseInt(companyId)]);
+          cost_price=$6,qty=$7,min_qty=$8,unit=$9,tax_tier_id=$10,price_inclusive=$11 WHERE id=$12 AND company_id=$13`,
+          [sku,barcode,name,category||'General',sale_price||0,cost_price||0,qty||0,min_qty||0,unit||'unit',taxTierId,priceIncl,parseInt(id),parseInt(companyId)]);
       } else {
-        const r = await query(`INSERT INTO hh_products(company_id,sku,barcode,name,category,sale_price,cost_price,qty,min_qty,unit,layers)
-          VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'[]') ON CONFLICT(company_id,name)
-          DO UPDATE SET sku=$2,barcode=$3,sale_price=$6,cost_price=$7,qty=$8,min_qty=$9,unit=$10 RETURNING id`,
-          [parseInt(companyId),sku||null,barcode||null,name,category||'General',sale_price||0,cost_price||0,qty||0,min_qty||0,unit||'unit']);
+        const r = await query(`INSERT INTO hh_products(company_id,sku,barcode,name,category,sale_price,cost_price,qty,min_qty,unit,layers,tax_tier_id,price_inclusive)
+          VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'[]',$11,$12) ON CONFLICT(company_id,name)
+          DO UPDATE SET sku=$2,barcode=$3,sale_price=$6,cost_price=$7,qty=$8,min_qty=$9,unit=$10,tax_tier_id=$11,price_inclusive=$12 RETURNING id`,
+          [parseInt(companyId),sku||null,barcode||null,name,category||'General',sale_price||0,cost_price||0,qty||0,min_qty||0,unit||'unit',taxTierId,priceIncl]);
         return res.status(200).json({ ok: true, productId: r.rows[0]?.id });
       }
       return res.status(200).json({ ok: true });
@@ -531,11 +663,13 @@ module.exports = async function handler(req, res) {
     if (action === 'receiveStock') {
       const { companyId, productId, qty, unitCost, supplier, paymentMethod } = body;
       if (!companyId || !productId || !qty || !unitCost) return res.status(400).json({ error: 'Missing fields' });
+      const today = new Date().toISOString().split('T')[0];
+      if (await isDateInClosedPeriod(companyId, today)) return res.status(409).json({ error: 'Today falls in a closed accounting period.' });
       const r = await query('SELECT * FROM hh_products WHERE id=$1 AND company_id=$2', [parseInt(productId), parseInt(companyId)]);
       if (!r.rows.length) return res.status(404).json({ error: 'Product not found' });
       const product = r.rows[0];
       const layers = Array.isArray(product.layers) ? product.layers : JSON.parse(product.layers || '[]');
-      layers.push({ qty: parseFloat(qty), unitCost: parseFloat(unitCost), date: new Date().toISOString().split('T')[0] });
+      layers.push({ qty: parseFloat(qty), unitCost: parseFloat(unitCost), date: today });
       const newQty = (parseFloat(product.qty) || 0) + parseFloat(qty);
       await query('UPDATE hh_products SET qty=$1, layers=$2::jsonb WHERE id=$3',
         [newQty, JSON.stringify(layers), parseInt(productId)]);
@@ -546,6 +680,8 @@ module.exports = async function handler(req, res) {
     if (action === 'savePOSSale') {
       const { companyId, items, subtotal, discount, total, paymentMethod, cashier, journalEntryId } = body;
       if (!companyId || !items) return res.status(400).json({ error: 'Missing fields' });
+      const today = new Date().toISOString().split('T')[0];
+      if (await isDateInClosedPeriod(companyId, today)) return res.status(409).json({ error: 'Today falls in a closed accounting period.' });
       const r = await query(`INSERT INTO hh_pos_sales(company_id,items,subtotal,discount,total,payment_method,cashier,journal_entry_id)
         VALUES($1,$2::jsonb,$3,$4,$5,$6,$7,$8) RETURNING id`,
         [parseInt(companyId), JSON.stringify(items), subtotal||0, discount||0, total||0, paymentMethod||'cash', cashier||'', journalEntryId||null]);
@@ -586,6 +722,7 @@ module.exports = async function handler(req, res) {
     if (action === 'receivePOStock') {
       const { companyId, poId, receipts } = body; // receipts: [{productId, qty, unitCost}]
       if (!companyId || !poId || !Array.isArray(receipts) || !receipts.length) return res.status(400).json({ error: 'Missing fields' });
+      if (await isDateInClosedPeriod(companyId, new Date().toISOString().split('T')[0])) return res.status(409).json({ error: 'Today falls in a closed accounting period.' });
       const poR = await query('SELECT * FROM hh_purchase_orders WHERE id=$1 AND company_id=$2', [parseInt(poId), parseInt(companyId)]);
       if (!poR.rows.length) return res.status(404).json({ error: 'Purchase order not found' });
       const po = poR.rows[0];
@@ -617,6 +754,107 @@ module.exports = async function handler(req, res) {
         [JSON.stringify(items), newStatus, parseInt(poId)]);
 
       return res.status(200).json({ ok: true, poId: parseInt(poId), status: newStatus, items, accepted });
+    }
+
+    // ── TAX ENGINE (Multi-country VAT) ────────────────────────────────────────
+    // getTaxSettings: returns registration status/country plus the full editable tier list.
+    // If this company has never configured tax before, seeds sensible country defaults
+    // (or the zeroed-out 'OTHER' preset) so the screen never opens completely empty.
+    if (action === 'getTaxSettings') {
+      const { companyId } = body;
+      if (!companyId) return res.status(400).json({ error: 'Missing companyId' });
+      let settingsR = await query('SELECT * FROM hh_tax_settings WHERE company_id=$1', [parseInt(companyId)]);
+      if (!settingsR.rows.length) {
+        await query('INSERT INTO hh_tax_settings(company_id,is_vat_registered,country) VALUES($1,FALSE,$2) ON CONFLICT(company_id) DO NOTHING', [parseInt(companyId), 'OTHER']);
+        await seedTaxTiers(parseInt(companyId), 'OTHER');
+        settingsR = await query('SELECT * FROM hh_tax_settings WHERE company_id=$1', [parseInt(companyId)]);
+      }
+      const tiersR = await query('SELECT * FROM hh_tax_tiers WHERE company_id=$1 ORDER BY is_default DESC, rate DESC', [parseInt(companyId)]);
+      return res.status(200).json({ ok: true, settings: settingsR.rows[0], tiers: tiersR.rows, countryOptions: Object.entries(COUNTRY_TAX_DEFAULTS).map(([code, v]) => ({ code, label: v.label })) });
+    }
+    // saveTaxSettings: updates registration + country. Changing country only SEEDS any
+    // tiers that don't already exist (by code) — it never overwrites tiers the Owner has
+    // already customized, so switching country by mistake can't clobber real data.
+    if (action === 'saveTaxSettings') {
+      const { companyId, country, isVatRegistered } = body;
+      if (!companyId) return res.status(400).json({ error: 'Missing companyId' });
+      const c = COUNTRY_TAX_DEFAULTS[country] ? country : 'OTHER';
+      await query(`
+        INSERT INTO hh_tax_settings(company_id,is_vat_registered,country,updated_at) VALUES($1,$2,$3,NOW())
+        ON CONFLICT(company_id) DO UPDATE SET is_vat_registered=$2,country=$3,updated_at=NOW()
+      `, [parseInt(companyId), !!isVatRegistered, c]);
+      await seedTaxTiers(parseInt(companyId), c);
+      return res.status(200).json({ ok: true });
+    }
+    if (action === 'saveTaxTier') {
+      const { companyId, id, name, code, rate, is_default } = body;
+      if (!companyId || !name || !code) return res.status(400).json({ error: 'Missing fields' });
+      if (id) {
+        await query('UPDATE hh_tax_tiers SET name=$1,code=$2,rate=$3,is_default=$4 WHERE id=$5 AND company_id=$6',
+          [name, code, parseFloat(rate) || 0, !!is_default, parseInt(id), parseInt(companyId)]);
+      } else {
+        await query(`INSERT INTO hh_tax_tiers(company_id,name,code,rate,is_default) VALUES($1,$2,$3,$4,$5)
+          ON CONFLICT(company_id,code) DO UPDATE SET name=$2,rate=$4,is_default=$5`,
+          [parseInt(companyId), name, code, parseFloat(rate) || 0, !!is_default]);
+      }
+      return res.status(200).json({ ok: true });
+    }
+    if (action === 'deleteTaxTier') {
+      const { tierId } = body;
+      if (!tierId) return res.status(400).json({ error: 'Missing tierId' });
+      await query('DELETE FROM hh_tax_tiers WHERE id=$1', [parseInt(tierId)]);
+      return res.status(200).json({ ok: true });
+    }
+    // recordVatLedger: the compliance-grade audit trail behind the Tax Report — every
+    // input/output VAT line from a sale or a stock receipt lands here with its tier, rate,
+    // base/tax split, and (for purchases) the supplier's tax invoice number. Rejected
+    // outright if entry_date falls inside an already-closed period — the same fraud
+    // control as the general journal, enforced independently for this ledger too.
+    if (action === 'recordVatLedger') {
+      const { companyId, direction, tierName, rate, baseAmount, taxAmount, sourceType, sourceDesc, supplierInvoiceNo, entryDate } = body;
+      if (!companyId || !direction || (direction !== 'input' && direction !== 'output')) return res.status(400).json({ error: 'Missing/invalid fields' });
+      const date = entryDate || new Date().toISOString().split('T')[0];
+      if (await isDateInClosedPeriod(companyId, date)) {
+        return res.status(409).json({ error: `Cannot record a VAT line dated ${date} — that period is closed.` });
+      }
+      const r = await query(`
+        INSERT INTO hh_vat_ledger(company_id,direction,tier_name,rate,base_amount,tax_amount,source_type,source_desc,supplier_invoice_no,entry_date)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id
+      `, [parseInt(companyId), direction, tierName || '', parseFloat(rate) || 0, parseFloat(baseAmount) || 0, parseFloat(taxAmount) || 0, sourceType || 'manual', sourceDesc || '', supplierInvoiceNo || null, date]);
+      return res.status(200).json({ ok: true, id: r.rows[0].id });
+    }
+    if (action === 'listVatLedger') {
+      const { companyId, dateFrom, dateTo } = body;
+      if (!companyId) return res.status(400).json({ error: 'Missing companyId' });
+      const params = [parseInt(companyId)]; let where = 'company_id=$1';
+      if (dateFrom) { params.push(dateFrom); where += ` AND entry_date>=$${params.length}`; }
+      if (dateTo)   { params.push(dateTo);   where += ` AND entry_date<=$${params.length}`; }
+      const r = await query(`SELECT * FROM hh_vat_ledger WHERE ${where} ORDER BY entry_date DESC, id DESC`, params);
+      return res.status(200).json({ ok: true, rows: r.rows });
+    }
+    // getVatSummary: the numbers behind the Tax Report screen — total output/input VAT,
+    // net payable-or-refundable, and a per-tier breakdown for the chosen date range.
+    if (action === 'getVatSummary') {
+      const { companyId, dateFrom, dateTo } = body;
+      if (!companyId) return res.status(400).json({ error: 'Missing companyId' });
+      const params = [parseInt(companyId)]; let where = 'company_id=$1';
+      if (dateFrom) { params.push(dateFrom); where += ` AND entry_date>=$${params.length}`; }
+      if (dateTo)   { params.push(dateTo);   where += ` AND entry_date<=$${params.length}`; }
+      const r = await query(`SELECT direction, tier_name, rate, SUM(base_amount)::float AS base_total, SUM(tax_amount)::float AS tax_total, COUNT(*)::int AS line_count
+        FROM hh_vat_ledger WHERE ${where} GROUP BY direction, tier_name, rate ORDER BY direction, tier_name`, params);
+      const outputTotal = r.rows.filter(x => x.direction === 'output').reduce((s, x) => s + x.tax_total, 0);
+      const inputTotal  = r.rows.filter(x => x.direction === 'input').reduce((s, x) => s + x.tax_total, 0);
+      return res.status(200).json({ ok: true, breakdown: r.rows, outputTotal, inputTotal, netPayable: outputTotal - inputTotal });
+    }
+    // lockTaxPeriod: companion to closePeriod — marks every VAT ledger row in the range as
+    // locked (mirrors the general journal's is_locked flag) so the Tax Report can visibly
+    // show which figures are final versus still-open.
+    if (action === 'lockTaxPeriod') {
+      const { companyId, periodStart, periodEnd } = body;
+      if (!companyId || !periodStart || !periodEnd) return res.status(400).json({ error: 'Missing fields' });
+      await query('UPDATE hh_vat_ledger SET is_locked=TRUE WHERE company_id=$1 AND entry_date>=$2 AND entry_date<=$3',
+        [parseInt(companyId), periodStart, periodEnd]);
+      return res.status(200).json({ ok: true });
     }
 
     return res.status(400).json({ error: 'Unknown action' });
