@@ -1114,6 +1114,12 @@ function renderManualIntakeRows(){
   wrap.innerHTML='';_siRowSeq=0;
   addManualIntakeRow();
   const invWrap=document.getElementById('si-invoice-wrap');if(invWrap)invWrap.style.display=TAX_SETTINGS.is_vat_registered?'block':'none';
+  const hintWrap=document.getElementById('si-tax-hint');
+  if(hintWrap){
+    hintWrap.innerHTML=TAX_SETTINGS.is_vat_registered
+      ?''
+      :`<div class="alert al-warn" style="margin-bottom:10px"><span class="alert-ico">💰</span><div class="alert-body">This business isn't VAT-registered. If a row's tax tier applies, that tax is absorbed straight into Inventory cost (Accounts Payable still matches the full invoice) — nothing is tracked as a VAT Receivable.</div></div>`;
+  }
 }
 // Rebuilds just the <option> list inside every currently-rendered row's product select,
 // preserving whichever product is already chosen — mirrors refreshPOProductDropdowns().
@@ -1133,19 +1139,18 @@ function addManualIntakeRow(prefill){
   const wrap=document.getElementById('si-rows');if(!wrap)return;
   prefill=prefill||{};
   const rowId='si-row-'+(_siRowSeq++);
-  const vatOn=TAX_SETTINGS.is_vat_registered;
   const row=document.createElement('div');
   row.className='si-intake-row';
   row.dataset.rowId=rowId;
   row.dataset.parsedName=prefill.parsedName||'';
-  row.style.cssText=`display:grid;grid-template-columns:1.6fr auto 1fr 1fr${vatOn?' 1.1fr auto':''} auto;gap:7px;align-items:end;margin-bottom:7px;padding-bottom:7px;border-bottom:1px solid var(--border)`;
+  row.style.cssText=`display:grid;grid-template-columns:1.6fr auto 1fr 1fr 1.1fr auto auto;gap:7px;align-items:end;margin-bottom:7px;padding-bottom:7px;border-bottom:1px solid var(--border)`;
   const productOptions='<option value="">Select product...</option>'+RETAIL_PRODUCTS.map(p=>`<option value="${p.id}" ${prefill.productId&&String(p.id)===String(prefill.productId)?'selected':''}>${p.name} (stock: ${p.qty} ${p.unit})</option>`).join('');
   row.innerHTML=`
     <div class="fg" style="margin:0"><label>Product</label><select class="si-row-product" id="sel-${rowId}" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:9px 11px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none">${productOptions}</select></div>
     <button type="button" onclick="openQuickAddProduct('sel-${rowId}')" title="Add a new product without leaving this page" style="padding:9px 10px;background:transparent;border:1px dashed var(--gold2);border-radius:5px;color:var(--gold2);cursor:pointer;font-size:11px;white-space:nowrap">+ New</button>
     <div class="fg" style="margin:0"><label>Qty</label><input class="si-row-qty" type="number" value="${prefill.qty||''}" placeholder="50"/></div>
     <div class="fg" style="margin:0"><label>Unit Cost</label><input class="si-row-cost" type="number" step="0.01" value="${prefill.unitCost||''}" placeholder="1.80"/></div>
-    ${vatOn?`<div class="fg" style="margin:0"><label>Tax Tier</label><select class="si-row-tax-tier" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:9px 11px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text);outline:none">${taxTierSelectOptions(prefill.taxTierId||'')}</select></div><label style="display:flex;align-items:center;gap:4px;font-size:9px;color:var(--text3);padding-bottom:9px;white-space:nowrap"><input type="checkbox" class="si-row-tax-incl" ${prefill.priceInclusive?'checked':''} style="accent-color:var(--gold2)"/> incl.</label>`:''}
+    <div class="fg" style="margin:0"><label>Tax Tier</label><select class="si-row-tax-tier" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:9px 11px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text);outline:none">${taxTierSelectOptions(prefill.taxTierId||'')}</select></div><label style="display:flex;align-items:center;gap:4px;font-size:9px;color:var(--text3);padding-bottom:9px;white-space:nowrap"><input type="checkbox" class="si-row-tax-incl" ${prefill.priceInclusive?'checked':''} style="accent-color:var(--gold2)"/> incl.</label>
     <button type="button" onclick="this.closest('.si-intake-row').remove()" title="Remove this item" style="padding:9px 11px;background:transparent;border:1px solid rgba(192,48,42,.3);border-radius:5px;color:var(--red3);cursor:pointer;font-size:14px">✕</button>
   `;
   wrap.appendChild(row);
@@ -1172,19 +1177,32 @@ async function autoCreateProductFromReceiptLine(name,costPrice,taxTierId,priceIn
 }
 // Whatever tax tier / inclusive flag was actually used to receive a product's stock becomes
 // that product's new default going forward — so the Owner never has to open the Catalogue
-// and re-enter the same tax settings a second time after an intake. Used by all three
-// intake paths (manual, AI receipt review, PO receipt) so behavior is identical everywhere.
-async function syncProductTaxFromIntake(productId,taxTierId,priceInclusive){
+// and re-enter the same tax settings a second time after an intake. This ALSO rolls the
+// received qty/cost into cost_price as a running weighted average — the field COGS actually
+// reads on every POS sale — which previously only ever got set once, at product creation,
+// and never updated on later receipts. That's what let a stale, pre-tax cost basis leak into
+// COGS even after tax had been absorbed into inventory on a non-VAT-registered intake.
+// Used by all three intake paths (manual, AI receipt review, PO receipt) identically.
+async function syncProductAfterIntake(productId,taxTierId,priceInclusive,qtyReceived,unitCostReceived){
   const product=RETAIL_PRODUCTS.find(p=>p.id===productId);
   if(!product)return;
+  const oldQty=parseFloat(product.qty)||0;
+  const oldCost=parseFloat(product.cost_price)||0;
+  const newQtyTotal=oldQty+(parseFloat(qtyReceived)||0);
+  const newAvgCost=newQtyTotal>0?((oldQty*oldCost)+((parseFloat(qtyReceived)||0)*(parseFloat(unitCostReceived)||0)))/newQtyTotal:(parseFloat(unitCostReceived)||0);
+  const roundedCost=Math.round(newAvgCost*100)/100;
   const tierChanged=String(product.tax_tier_id||'')!==String(taxTierId||'');
   const inclChanged=!!product.price_inclusive!==!!priceInclusive;
-  if(!tierChanged&&!inclChanged)return; // nothing to sync — skip the round trip
+  const costChanged=Math.abs(roundedCost-oldCost)>0.001;
+  if(!tierChanged&&!inclChanged&&!costChanged)return; // nothing to sync — skip the round trip
   try{
-    await dbApi({action:'saveProduct',companyId:SESSION.companyId,id:product.id,name:product.name,sku:product.sku,barcode:product.barcode,category:product.category,sale_price:product.sale_price,cost_price:product.cost_price,qty:product.qty,min_qty:product.min_qty,unit:product.unit,tax_tier_id:taxTierId||'',price_inclusive:!!priceInclusive});
-    product.tax_tier_id=taxTierId||null; // keep the local cache in sync too, so the Catalogue reflects it before any refetch
+    await dbApi({action:'saveProduct',companyId:SESSION.companyId,id:product.id,name:product.name,sku:product.sku,barcode:product.barcode,category:product.category,sale_price:product.sale_price,cost_price:roundedCost,qty:newQtyTotal,min_qty:product.min_qty,unit:product.unit,tax_tier_id:taxTierId||'',price_inclusive:!!priceInclusive});
+    // Keep the local cache in sync too, so every view reflects it before any refetch.
+    product.tax_tier_id=taxTierId||null;
     product.price_inclusive=!!priceInclusive;
-  }catch(e){console.error('syncProductTaxFromIntake',e);}
+    product.cost_price=roundedCost;
+    product.qty=newQtyTotal;
+  }catch(e){console.error('syncProductAfterIntake',e);}
 }
 // The one place that builds an intake's journal entry, for all three intake paths — each
 // product gets its OWN clearly-labeled Inventory debit line rather than one lump sum, VAT
@@ -1231,7 +1249,11 @@ Rules:
 3. List every distinct line item separately — never merge different products into one line.
 4. If a field truly cannot be found, use 0 for numbers and "" for the supplier — never fabricate values.
 5. taxCategory: classify EACH item using standard VAT conventions common across East Africa/UK — "standard" for ordinary taxable goods (alcohol, soft drinks, electronics, cosmetics, household goods, processed/packaged foods); "exempt" for goods typically VAT-exempt or zero-rated (fresh unprocessed produce, fresh milk, raw grains/flour, unprocessed agricultural output, basic medicines); "zero" only if the receipt itself explicitly states a 0% rate for that line. Default to "standard" if genuinely unsure — never leave it blank.
-6. taxInclusive: true only if the receipt's own wording indicates the printed price already includes tax (e.g. "incl. VAT", "VAT inclusive", a tax-inclusive grand total). Default to false (tax-exclusive) if the receipt doesn't say either way — this matches standard B2B invoicing convention and avoids guessing in the wrong direction.`;
+6. taxInclusive: work this out from the receipt's own arithmetic, not just wording.
+   - If the receipt shows a Subtotal, a separate VAT/Tax line, and a Grand Total where Subtotal + VAT ≈ Grand Total, then the printed line/unit prices are tax-EXCLUSIVE (taxInclusive:false) — the VAT was added on top as its own line.
+   - If the line items already sum directly to the Grand Total with no additional VAT line added on top (any VAT mentioned is only informational, already folded into the prices shown), set taxInclusive:true.
+   - Explicit wording like "incl. VAT" or "VAT inclusive" also implies taxInclusive:true; "excl. VAT" or "plus VAT" implies false.
+   - If the receipt gives no separate VAT figure and no such wording at all, default to false (tax-exclusive) — this matches standard B2B invoicing convention and avoids guessing in the wrong direction.`;
 function safeParseReceiptJson(raw){
   if(!raw)return null;
   raw=raw.trim().replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
@@ -1299,12 +1321,14 @@ function renderReceiptReviewTable(parsed){
     // An already-known product's own configured tier wins; otherwise trust the AI's own
     // classification of this specific line item rather than a single global default —
     // that's what lets a genuinely new "Fresh Milk" and a new "Whiskey" land on different
-    // tiers automatically, with zero dropdown-hunting from the user.
+    // tiers automatically, with zero dropdown-hunting from the user. Tax tier selection
+    // matters whether or not the business is VAT-registered: registered businesses reclaim
+    // it as Input VAT, unregistered ones still need it to absorb the tax into inventory cost.
     const aiTier=pickTierForCategory(it.taxCategory);
     const defaultTier=(match&&match.tax_tier_id)?getTaxTierById(match.tax_tier_id):aiTier;
     const defaultInclusive=(match&&match.tax_tier_id)?!!match.price_inclusive:!!it.taxInclusive;
-    const aiHint=(!match&&vatOn&&aiTier)?`<div style="font-size:9px;color:var(--purple3);margin-top:2px">🤖 AI: ${aiTier.name}${it.taxInclusive?' · incl.':''}</div>`:'';
-    return `<div class="rs-review-row" data-row-id="${rowId}" data-parsed-name="${(it.name||'').replace(/"/g,'&quot;')}" style="display:grid;grid-template-columns:1.4fr auto 1fr 1fr${vatOn?' 1.2fr auto':''};gap:7px;align-items:end;padding:8px 0;border-bottom:1px solid var(--border)">
+    const aiHint=(!match&&aiTier)?`<div style="font-size:9px;color:var(--purple3);margin-top:2px">🤖 AI: ${aiTier.name}${it.taxInclusive?' · incl.':''}</div>`:'';
+    return `<div class="rs-review-row" data-row-id="${rowId}" data-parsed-name="${(it.name||'').replace(/"/g,'&quot;')}" style="display:grid;grid-template-columns:1.4fr auto 1fr 1fr 1.2fr auto;gap:7px;align-items:end;padding:8px 0;border-bottom:1px solid var(--border)">
       <div>
         <div style="font-size:10px;color:var(--text3);margin-bottom:3px">Receipt said: "${it.name}"</div>
         <select class="rs-review-product" id="sel-${rowId}" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:7px 9px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none">${options}</select>
@@ -1313,13 +1337,17 @@ function renderReceiptReviewTable(parsed){
       <button type="button" onclick="openQuickAddProduct('sel-${rowId}')" title="Add a new product without leaving this page" style="padding:7px 9px;background:transparent;border:1px dashed var(--gold2);border-radius:5px;color:var(--gold2);cursor:pointer;font-size:11px;white-space:nowrap">+ New</button>
       <div><div style="font-size:10px;color:var(--text3);margin-bottom:3px">Qty</div><input class="rs-review-qty" type="number" value="${it.qty||0}" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:7px 9px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none"/></div>
       <div><div style="font-size:10px;color:var(--text3);margin-bottom:3px">Unit Cost</div><input class="rs-review-cost" type="number" step="0.01" value="${it.unitCost||0}" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:7px 9px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none"/></div>
-      ${vatOn?`<div><div style="font-size:10px;color:var(--text3);margin-bottom:3px">Tax Tier</div><select class="rs-review-tax-tier" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:7px 9px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text);outline:none">${taxTierSelectOptions(defaultTier?defaultTier.id:'')}</select></div><label style="display:flex;align-items:center;gap:4px;font-size:9px;color:var(--text3);padding-bottom:7px;white-space:nowrap"><input type="checkbox" class="rs-review-tax-incl" ${defaultInclusive?'checked':''} style="accent-color:var(--gold2)"/> incl.</label>`:''}
+      <div><div style="font-size:10px;color:var(--text3);margin-bottom:3px">Tax Tier</div><select class="rs-review-tax-tier" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:7px 9px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text);outline:none">${taxTierSelectOptions(defaultTier?defaultTier.id:'')}</select></div><label style="display:flex;align-items:center;gap:4px;font-size:9px;color:var(--text3);padding-bottom:7px;white-space:nowrap"><input type="checkbox" class="rs-review-tax-incl" ${defaultInclusive?'checked':''} style="accent-color:var(--gold2)"/> incl.</label>
     </div>`;
   }).join('');
   wrap.style.display='block';
+  const taxHint=vatOn
+    ?`<div class="alert al-info" style="margin-bottom:10px"><span class="alert-ico">🤖</span><div class="alert-body">Tax tiers below are auto-classified by AI for new items (🤖 badge) — review and adjust any row before confirming.</div></div>`
+    :`<div class="alert al-warn" style="margin-bottom:10px"><span class="alert-ico">💰</span><div class="alert-body">This business isn't VAT-registered. If a tax tier applies to a row, that tax is absorbed straight into Inventory cost (Accounts Payable still matches the full invoice) — nothing is tracked as a VAT Receivable.</div></div>`;
   wrap.innerHTML=`
     <div class="fgrid"><div class="fg"><label>Supplier</label><input id="rs-review-supplier" type="text" value="${(parsed.supplier||'').replace(/"/g,'&quot;')}" placeholder="Supplier name"/></div><div class="fg"><label>Payment</label><select id="rs-review-pay"><option value="credit">Credit (AP)</option><option value="cash">Cash</option></select></div></div>
-    ${vatOn?`<div class="fg"><label>Supplier Tax Invoice Number <span style="color:var(--red3)">*</span></label><input id="rs-review-invoice" type="text" placeholder="Required for VAT-registered businesses"/></div><div class="alert al-info" style="margin-bottom:10px"><span class="alert-ico">🤖</span><div class="alert-body">Tax tiers below are auto-classified by AI for new items (🤖 badge) — review and adjust any row before confirming.</div></div>`:''}
+    ${vatOn?`<div class="fg"><label>Supplier Tax Invoice Number <span style="color:var(--red3)">*</span></label><input id="rs-review-invoice" type="text" placeholder="Required for VAT-registered businesses"/></div>`:''}
+    ${taxHint}
     ${rows}
     <div class="btn-row"><button class="btn btn-gold" onclick="confirmReceiptIntake()">✅ Confirm Receive All</button><button class="btn btn-outline" onclick="cancelReceiptReview()">Cancel</button></div>
   `;
@@ -1335,7 +1363,8 @@ async function confirmReceiptIntake(){
   const supplier=(document.getElementById('rs-review-supplier')||{}).value||'';
   const payMethod=(document.getElementById('rs-review-pay')||{}).value||'credit';
   const invoiceNo=(document.getElementById('rs-review-invoice')||{}).value?.trim()||'';
-  if(TAX_SETTINGS.is_vat_registered&&!invoiceNo){setRSReceiptStatus('⚠️ Supplier Tax Invoice Number is required for VAT-registered businesses.',true);return;}
+  const isRegistered=TAX_SETTINGS.is_vat_registered;
+  if(isRegistered&&!invoiceNo){setRSReceiptStatus('⚠️ Supplier Tax Invoice Number is required for VAT-registered businesses.',true);return;}
   const rowEls=Array.from(wrap.querySelectorAll('.rs-review-row'));
   const candidates=[];let skipped=0;
   rowEls.forEach(row=>{
@@ -1361,31 +1390,41 @@ async function confirmReceiptIntake(){
         autoCreated.push(c.parsedName||'Unnamed Item');
       }
       const tier=getTaxTierById(c.taxTierId);
-      const rate=(TAX_SETTINGS.is_vat_registered&&tier)?parseFloat(tier.rate):0;
+      const rate=tier?parseFloat(tier.rate):0; // computed regardless of registration — a non-registered business still needs to know what tax the supplier charged, to absorb it correctly
       const split=computeTaxSplit(c.unitCost*c.qty,rate,c.priceInclusive);
-      lines.push({productId,qty:c.qty,unitCostForStock:split.base/c.qty,base:split.base,tax:split.tax,grand:split.grandTotal,tierName:tier?tier.name:'',rate,taxTierId:c.taxTierId,priceInclusive:c.priceInclusive});
+      // Registered: Inventory carries the pre-tax base, tax is separately recoverable.
+      // Not registered: no VAT to reclaim, so the FULL tax-inclusive amount is absorbed
+      // straight into Inventory (and therefore into the stored unit cost that COGS uses).
+      const inventoryAmt=isRegistered?split.base:split.grandTotal;
+      const recoverableTax=isRegistered?split.tax:0;
+      lines.push({productId,qty:c.qty,unitCostForStock:inventoryAmt/c.qty,inventoryAmt,recoverableTax,tierName:tier?tier.name:'',rate,taxTierId:c.taxTierId,priceInclusive:c.priceInclusive});
     }
     if(autoCreated.length)await loadRetailProducts(); // refresh catalogue/dropdowns before we reference names below
     const tierTotals={};
     const journalLines=[];
     for(const line of lines){
       await dbApi({action:'receiveStock',companyId:SESSION.companyId,productId:line.productId,qty:line.qty,unitCost:line.unitCostForStock,supplier,paymentMethod:payMethod});
-      // Whatever tax tier this line actually used becomes the product's new default —
-      // no re-entering the same setting on the Products page afterward.
-      if(TAX_SETTINGS.is_vat_registered)await syncProductTaxFromIntake(line.productId,line.taxTierId,line.priceInclusive);
+      // Whatever tax tier this line actually used becomes the product's new default, and its
+      // cost_price rolls forward as a weighted average — no re-entering tax settings, and
+      // COGS on the next sale reflects the true (possibly tax-absorbed) cost. Synced
+      // regardless of registration status, so it's already in place if the business
+      // registers later.
+      await syncProductAfterIntake(line.productId,line.taxTierId,line.priceInclusive,line.qty,line.unitCostForStock);
       const p=RETAIL_PRODUCTS.find(x=>x.id===line.productId);
-      journalLines.push({productName:p?p.name:`Product #${line.productId}`,base:line.base,tax:line.tax});
-      if(line.tierName){
+      journalLines.push({productName:p?p.name:`Product #${line.productId}`,base:line.inventoryAmt,tax:line.recoverableTax});
+      if(isRegistered&&line.tierName){
         const key=line.tierName||'—';
         if(!tierTotals[key])tierTotals[key]={tierName:line.tierName,rate:line.rate,base:0,tax:0};
-        tierTotals[key].base+=line.base;tierTotals[key].tax+=line.tax;
+        tierTotals[key].base+=line.inventoryAmt;tierTotals[key].tax+=line.recoverableTax;
       }
     }
     const names=lines.map(l=>{const p=RETAIL_PRODUCTS.find(x=>x.id===l.productId);return p?`${p.name} ×${l.qty}`:`#${l.productId} ×${l.qty}`;});
     const totalBase=journalLines.reduce((s,l)=>s+l.base,0),totalTax=journalLines.reduce((s,l)=>s+l.tax,0),totalGrand=totalBase+totalTax;
     DB.entries.push(buildIntakeJournalEntry(`Stock received (from receipt): ${supplier||'supplier'}${invoiceNo?` (Inv# ${invoiceNo})`:''} — ${names.join(', ')}`,journalLines,payMethod));
-    for(const t of Object.values(tierTotals)){
-      await dbApi({action:'recordVatLedger',companyId:SESSION.companyId,direction:'input',tierName:t.tierName,rate:t.rate,baseAmount:t.base,taxAmount:t.tax,sourceType:'stock_receipt',sourceDesc:`Receipt: ${supplier||'supplier'} — ${names.join(', ')}`,supplierInvoiceNo:invoiceNo,entryDate:today()}).catch(e=>console.error('recordVatLedger',e));
+    if(isRegistered){
+      for(const t of Object.values(tierTotals)){
+        await dbApi({action:'recordVatLedger',companyId:SESSION.companyId,direction:'input',tierName:t.tierName,rate:t.rate,baseAmount:t.base,taxAmount:t.tax,sourceType:'stock_receipt',sourceDesc:`Receipt: ${supplier||'supplier'} — ${names.join(', ')}`,supplierInvoiceNo:invoiceNo,entryDate:today()}).catch(e=>console.error('recordVatLedger',e));
+      }
     }
     await saveData();
     await loadRetailProducts();
@@ -1407,13 +1446,14 @@ async function confirmReceiptIntake(){
 // unmatched after a receipt auto-fill auto-create the product from the receipt's own name;
 // true manual entry (typed with no receipt) still requires picking a product, since there's
 // no parsed name to create one from. Whatever tax tier each row actually used becomes that
-// product's new default going forward — see syncProductTaxFromIntake.
+// product's new default going forward — see syncProductAfterIntake.
 async function receiveStock(){
   const supplier=document.getElementById('si-supplier').value.trim();
   const payMethod=document.getElementById('si-pay').value;
   const invoiceNo=(document.getElementById('si-invoice-no')||{}).value.trim()||'';
   const st=document.getElementById('si-st');
-  if(TAX_SETTINGS.is_vat_registered&&!invoiceNo){st.innerHTML='<span style="color:var(--red3)">Supplier Tax Invoice Number is required for VAT-registered businesses</span>';return;}
+  const isRegistered=TAX_SETTINGS.is_vat_registered;
+  if(isRegistered&&!invoiceNo){st.innerHTML='<span style="color:var(--red3)">Supplier Tax Invoice Number is required for VAT-registered businesses</span>';return;}
   const rowEls=Array.from(document.querySelectorAll('#si-rows .si-intake-row'));
   const candidates=[];
   rowEls.forEach(row=>{
@@ -1442,24 +1482,34 @@ async function receiveStock(){
         autoCreated.push(c.parsedName);
       }
       const tier=getTaxTierById(c.taxTierId);
-      const rate=(TAX_SETTINGS.is_vat_registered&&tier)?parseFloat(tier.rate):0;
+      const rate=tier?parseFloat(tier.rate):0; // computed regardless of registration
       const split=computeTaxSplit(c.unitCost*c.qty,rate,c.priceInclusive);
-      await dbApi({action:'receiveStock',companyId:SESSION.companyId,productId,qty:c.qty,unitCost:split.base/c.qty,supplier,paymentMethod:payMethod});
-      if(TAX_SETTINGS.is_vat_registered)await syncProductTaxFromIntake(productId,c.taxTierId,c.priceInclusive);
+      // Registered: inventory carries the pre-tax base, tax is separately recoverable.
+      // Not registered: no VAT to reclaim, so the FULL tax-inclusive amount is absorbed
+      // into Inventory (and the stored unit cost), so it flows correctly into COGS later.
+      const inventoryAmt=isRegistered?split.base:split.grandTotal;
+      const recoverableTax=isRegistered?split.tax:0;
+      await dbApi({action:'receiveStock',companyId:SESSION.companyId,productId,qty:c.qty,unitCost:inventoryAmt/c.qty,supplier,paymentMethod:payMethod});
+      // Whatever tax tier this row actually used becomes the product's new default, and its
+      // cost_price rolls forward as a weighted average — synced regardless of registration
+      // status, so it's already in place if the business registers later.
+      await syncProductAfterIntake(productId,c.taxTierId,c.priceInclusive,c.qty,inventoryAmt/c.qty);
       const p=RETAIL_PRODUCTS.find(x=>x.id===productId);
-      journalLines.push({productName:p?p.name:(c.parsedName||`Product #${productId}`),base:split.base,tax:split.tax});
-      if(tier){
+      journalLines.push({productName:p?p.name:(c.parsedName||`Product #${productId}`),base:inventoryAmt,tax:recoverableTax});
+      if(isRegistered&&tier){
         const key=tier.name;
         if(!tierTotals[key])tierTotals[key]={tierName:tier.name,rate,base:0,tax:0};
-        tierTotals[key].base+=split.base;tierTotals[key].tax+=split.tax;
+        tierTotals[key].base+=inventoryAmt;tierTotals[key].tax+=recoverableTax;
       }
     }
     if(autoCreated.length)await loadRetailProducts();
     const totalBase=journalLines.reduce((s,l)=>s+l.base,0),totalTax=journalLines.reduce((s,l)=>s+l.tax,0),totalGrand=totalBase+totalTax;
     const names=journalLines.map(l=>l.productName);
     DB.entries.push(buildIntakeJournalEntry(`Stock received: ${supplier||'supplier'}${invoiceNo?` (Inv# ${invoiceNo})`:''} — ${names.join(', ')}`,journalLines,payMethod));
-    for(const t of Object.values(tierTotals)){
-      await dbApi({action:'recordVatLedger',companyId:SESSION.companyId,direction:'input',tierName:t.tierName,rate:t.rate,baseAmount:t.base,taxAmount:t.tax,sourceType:'stock_receipt',sourceDesc:`${supplier||'supplier'} — ${names.join(', ')}`,supplierInvoiceNo:invoiceNo,entryDate:today()}).catch(e=>console.error('recordVatLedger',e));
+    if(isRegistered){
+      for(const t of Object.values(tierTotals)){
+        await dbApi({action:'recordVatLedger',companyId:SESSION.companyId,direction:'input',tierName:t.tierName,rate:t.rate,baseAmount:t.base,taxAmount:t.tax,sourceType:'stock_receipt',sourceDesc:`${supplier||'supplier'} — ${names.join(', ')}`,supplierInvoiceNo:invoiceNo,entryDate:today()}).catch(e=>console.error('recordVatLedger',e));
+      }
     }
     await saveData();await loadRetailProducts();renderAll();
     const createdMsg=autoCreated.length?` — new product(s): ${autoCreated.join(', ')} (set sale price in Catalogue)`:'';
@@ -1494,28 +1544,28 @@ function renderPOReceiptLines(){
   if(!poId){wrap.innerHTML='<div style="color:var(--text3);font-size:12px;padding:10px 0">Select a purchase order above to see its remaining items.</div>';return;}
   const po=PO_ORDERS.find(o=>String(o.id)===String(poId));
   if(!po){wrap.innerHTML='';return;}
-  const vatOn=TAX_SETTINGS.is_vat_registered;
   const items=Array.isArray(po.items)?po.items:JSON.parse(po.items||'[]');
   const rows=items.map((it,idx)=>{
     const ordered=parseFloat(it.qty)||0,received=parseFloat(it.receivedQty)||0,remaining=Math.max(0,ordered-received);
     const product=RETAIL_PRODUCTS.find(p=>p.id===it.productId);
     const defaultTierId=product&&product.tax_tier_id?product.tax_tier_id:(getDefaultTaxTier()?getDefaultTaxTier().id:'');
-    return `<div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr${vatOn?' 1.2fr auto':''};gap:7px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)" data-po-product-id="${it.productId}">
+    return `<div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr 1.2fr auto;gap:7px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)" data-po-product-id="${it.productId}">
       <div style="font-size:12px">${it.name}</div>
       <div style="font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace">Ordered: ${ordered}</div>
       <div style="font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace">Received: ${received}</div>
       <input class="rs-accept-qty" type="number" min="0" max="${remaining}" value="${remaining}" placeholder="Accept qty" style="background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:7px 9px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none"/>
       <input class="rs-accept-cost" type="number" step="0.01" value="${it.unitCost||0}" placeholder="Unit cost" style="background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:7px 9px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none"/>
-      ${vatOn?`<select class="rs-accept-tax-tier" style="background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:7px 9px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text);outline:none">${taxTierSelectOptions(defaultTierId)}</select><label style="display:flex;align-items:center;gap:4px;font-size:9px;color:var(--text3);white-space:nowrap"><input type="checkbox" class="rs-accept-tax-incl" style="accent-color:var(--gold2)"/> incl.</label>`:''}
+      <select class="rs-accept-tax-tier" style="background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:7px 9px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text);outline:none">${taxTierSelectOptions(defaultTierId)}</select><label style="display:flex;align-items:center;gap:4px;font-size:9px;color:var(--text3);white-space:nowrap"><input type="checkbox" class="rs-accept-tax-incl" style="accent-color:var(--gold2)"/> incl.</label>
     </div>`;
   }).join('');
-  wrap.innerHTML=`<div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr${vatOn?' 1.2fr auto':''};gap:7px;font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);padding-bottom:5px;border-bottom:1px solid var(--border2)"><div>Product</div><div>Ordered</div><div>Received</div><div>Accept Qty</div><div>Unit Cost</div>${vatOn?'<div>Tax Tier</div><div></div>':''}</div>${rows}`;
+  wrap.innerHTML=`<div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr 1.2fr auto;gap:7px;font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);padding-bottom:5px;border-bottom:1px solid var(--border2)"><div>Product</div><div>Ordered</div><div>Received</div><div>Accept Qty</div><div>Unit Cost</div><div>Tax Tier</div><div></div></div>${rows}`;
 }
 async function confirmPOReceipt(){
   const poId=document.getElementById('rs-po-select').value,st=document.getElementById('rs-po-st');
   if(!poId){st.innerHTML='<span style="color:var(--red3)">Select a purchase order</span>';return;}
   const invoiceNo=(document.getElementById('rs-po-invoice')||{}).value?.trim()||'';
-  if(TAX_SETTINGS.is_vat_registered&&!invoiceNo){st.innerHTML='<span style="color:var(--red3)">Supplier Tax Invoice Number is required for VAT-registered businesses</span>';return;}
+  const isRegistered=TAX_SETTINGS.is_vat_registered;
+  if(isRegistered&&!invoiceNo){st.innerHTML='<span style="color:var(--red3)">Supplier Tax Invoice Number is required for VAT-registered businesses</span>';return;}
   const lineEls=document.querySelectorAll('#rs-po-lines [data-po-product-id]');
   const candidates=[];
   lineEls.forEach(row=>{
@@ -1530,15 +1580,19 @@ async function confirmPOReceipt(){
   if(!candidates.length){st.innerHTML='<span style="color:var(--red3)">Enter at least one accepted quantity</span>';return;}
   st.innerHTML='<span style="color:var(--text3)">Confirming receipt...</span>';
   try{
-    // Pre-compute the tax split per line and send the server the tax-EXCLUSIVE cost, so
-    // inventory is always carried at base cost regardless of how the invoice presented it.
+    // Pre-compute the tax split per line. Registered: inventory carries the pre-tax base and
+    // tax is separately recoverable. Not registered: no VAT to reclaim, so the FULL
+    // tax-inclusive amount is absorbed into inventory (and the unit cost sent to the server),
+    // so it flows correctly into COGS whenever this stock is later sold.
     const splitByProduct={};
     const receipts=candidates.map(c=>{
       const tier=getTaxTierById(c.taxTierId);
-      const rate=(TAX_SETTINGS.is_vat_registered&&tier)?parseFloat(tier.rate):0;
+      const rate=tier?parseFloat(tier.rate):0; // computed regardless of registration
       const split=computeTaxSplit(c.unitCost*c.qty,rate,c.priceInclusive);
-      splitByProduct[c.productId]={...split,tierName:tier?tier.name:'',rate};
-      return{productId:c.productId,qty:c.qty,unitCost:split.base/c.qty};
+      const inventoryAmt=isRegistered?split.base:split.grandTotal;
+      const recoverableTax=isRegistered?split.tax:0;
+      splitByProduct[c.productId]={inventoryAmt,recoverableTax,tierName:tier?tier.name:'',rate};
+      return{productId:c.productId,qty:c.qty,unitCost:inventoryAmt/c.qty};
     });
     const r=await dbApi({action:'receivePOStock',companyId:SESSION.companyId,poId:parseInt(poId),receipts});
     // Post the journal entry HERE, using the exact accepted quantities the server confirmed —
@@ -1547,18 +1601,17 @@ async function confirmPOReceipt(){
     const tierTotals={};
     const journalLines=[];
     for(const a of accepted){
-      const split=splitByProduct[a.productId]||{base:a.qty*a.unitCost,tax:0,grandTotal:a.qty*a.unitCost,tierName:'',rate:0};
-      // Whatever tax tier this line actually used becomes the product's new default —
-      // no re-entering the same setting on the Products page afterward.
-      if(TAX_SETTINGS.is_vat_registered){
-        const c=candidates.find(x=>x.productId===a.productId);
-        if(c)await syncProductTaxFromIntake(a.productId,c.taxTierId,c.priceInclusive);
-      }
-      journalLines.push({productName:a.name,base:split.base,tax:split.tax});
-      if(split.tierName){
+      const split=splitByProduct[a.productId]||{inventoryAmt:a.qty*a.unitCost,recoverableTax:0,tierName:'',rate:0};
+      // Whatever tax tier this line actually used becomes the product's new default, and its
+      // cost_price rolls forward as a weighted average — synced regardless of registration
+      // status, so it's already in place if the business registers later.
+      const c=candidates.find(x=>x.productId===a.productId);
+      if(c)await syncProductAfterIntake(a.productId,c.taxTierId,c.priceInclusive,a.qty,split.inventoryAmt/a.qty);
+      journalLines.push({productName:a.name,base:split.inventoryAmt,tax:split.recoverableTax});
+      if(isRegistered&&split.tierName){
         const key=split.tierName||'—';
         if(!tierTotals[key])tierTotals[key]={tierName:split.tierName,rate:split.rate,base:0,tax:0};
-        tierTotals[key].base+=split.base;tierTotals[key].tax+=split.tax;
+        tierTotals[key].base+=split.inventoryAmt;tierTotals[key].tax+=split.recoverableTax;
       }
     }
     const totalBase=journalLines.reduce((s,l)=>s+l.base,0),totalTax=journalLines.reduce((s,l)=>s+l.tax,0),totalGrand=totalBase+totalTax;
@@ -1566,8 +1619,10 @@ async function confirmPOReceipt(){
       const po=PO_ORDERS.find(o=>String(o.id)===String(poId));
       DB.entries.push(buildIntakeJournalEntry(`Stock received: PO #${poId} — ${po?po.supplier:'supplier'}${invoiceNo?` (Inv# ${invoiceNo})`:''} (${accepted.map(a=>a.name+' ×'+a.qty).join(', ')})`,journalLines,'credit'));
       await saveData();
-      for(const t of Object.values(tierTotals)){
-        await dbApi({action:'recordVatLedger',companyId:SESSION.companyId,direction:'input',tierName:t.tierName,rate:t.rate,baseAmount:t.base,taxAmount:t.tax,sourceType:'po_receipt',sourceDesc:`PO #${poId} — ${po?po.supplier:'supplier'}`,supplierInvoiceNo:invoiceNo,entryDate:today()}).catch(e=>console.error('recordVatLedger',e));
+      if(isRegistered){
+        for(const t of Object.values(tierTotals)){
+          await dbApi({action:'recordVatLedger',companyId:SESSION.companyId,direction:'input',tierName:t.tierName,rate:t.rate,baseAmount:t.base,taxAmount:t.tax,sourceType:'po_receipt',sourceDesc:`PO #${poId} — ${po?po.supplier:'supplier'}`,supplierInvoiceNo:invoiceNo,entryDate:today()}).catch(e=>console.error('recordVatLedger',e));
+        }
       }
     }
     await loadRetailProducts();      // refresh stock levels + every open dropdown, instantly
@@ -1591,12 +1646,30 @@ async function renderRetailSalesPage(){const el=document.getElementById('retailS
 // Single shared matcher used by every input method (typed, camera-scanned, spoken) so
 // they all funnel into the exact same "add to cart" behavior — no separate code paths.
 // allowFuzzy is used by voice only, since spoken product names rarely match exactly.
+function normalizeForMatch(s){return(s||'').toLowerCase().replace(/[^a-z0-9\s]/g,'').replace(/\s+/g,' ').trim();}
 function posFindProduct(raw,allowFuzzy){
   const val=(raw||'').trim();if(!val)return null;
   const exact=RETAIL_PRODUCTS.find(p=>p.barcode===val||p.sku===val||p.name.toLowerCase()===val.toLowerCase());
   if(exact||!allowFuzzy)return exact||null;
-  const s=val.toLowerCase();
-  return RETAIL_PRODUCTS.find(p=>p.name.toLowerCase().includes(s)||s.includes(p.name.toLowerCase()))||null;
+  const normVal=normalizeForMatch(val);
+  if(!normVal)return null;
+  // Direct substring match either direction first — cheap and usually right (e.g. "Whiskey"
+  // inside "Classic Malt Whiskey 750ml", or vice versa).
+  const substringMatch=RETAIL_PRODUCTS.find(p=>{const np=normalizeForMatch(p.name);return np&&(np.includes(normVal)||normVal.includes(np));});
+  if(substringMatch)return substringMatch;
+  // Fallback: token-overlap scoring, tolerant of OCR noise, word order, and minor spelling
+  // differences (e.g. "Malt Whisky Classic" vs "Classic Malt Whiskey 750ml").
+  const valTokens=normVal.split(' ').filter(t=>t.length>2);
+  if(!valTokens.length)return null;
+  let best=null,bestScore=0;
+  RETAIL_PRODUCTS.forEach(p=>{
+    const pTokens=normalizeForMatch(p.name).split(' ').filter(t=>t.length>2);
+    if(!pTokens.length)return;
+    const overlap=valTokens.filter(t=>pTokens.some(pt=>pt.includes(t)||t.includes(pt))).length;
+    const score=overlap/Math.max(valTokens.length,pTokens.length);
+    if(score>bestScore){bestScore=score;best=p;}
+  });
+  return bestScore>=0.5?best:null;
 }
 function posLookup(val){val=(val||(document.getElementById('pos-scan')||{}).value||'').trim();if(!val)return;const product=posFindProduct(val,false);if(!product){showToast('⚠️ Not found: '+val,3000);return;}posAddToCart(product);const s=document.getElementById('pos-scan');if(s)s.value='';}
 function posAddToCart(product,qty=1){const existing=POS_CART.find(i=>i.id===product.id);if(existing){existing.qty+=qty;}else{POS_CART.push({id:product.id,name:product.name,sku:product.sku||'',sale_price:parseFloat(product.sale_price)||0,cost_price:parseFloat(product.cost_price)||0,qty,unit:product.unit||'unit',tax_tier_id:product.tax_tier_id||null,price_inclusive:!!product.price_inclusive});}renderPOSCart();}
@@ -1896,6 +1969,7 @@ function injectRetailPages(){
   </div>
   <div class="fgrid"><div class="fg"><label>Supplier</label><input id="si-supplier" type="text" placeholder="Supplier name"/></div><div class="fg"><label>Payment</label><select id="si-pay"><option value="credit">Credit (AP)</option><option value="cash">Cash</option></select></div></div>
   <div class="fg" id="si-invoice-wrap" style="display:none"><label>Supplier Tax Invoice Number <span style="color:var(--red3)">*</span></label><input id="si-invoice-no" type="text" placeholder="Required for VAT-registered businesses"/></div>
+  <div id="si-tax-hint"></div>
   <div style="font-size:10px;color:var(--text2);margin-bottom:7px">Line Items</div>
   <div id="si-rows"></div>
   <div class="btn-row"><button class="btn btn-outline" onclick="addManualIntakeRow()">➕ Add Item</button></div>
@@ -1928,4 +2002,3 @@ window.addEventListener('DOMContentLoaded',()=>{
 </script>
 </body>
 </html>
-
