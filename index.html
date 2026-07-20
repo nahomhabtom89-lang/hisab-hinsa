@@ -1058,9 +1058,6 @@ async function updateProductSalePrice(productId,newPrice){
   }
 }
 // ── EDIT PRODUCT MODAL (Owner only) ─────────────────────────────────────
-// A focused edit for the four fields that actually need changing after the fact — Sale
-// Price, Cost Price, Tax Tier, and the tax-inclusive toggle — without deleting and
-// recreating the product (which would lose its stock history and layers).
 let _editProductId=null;
 function openEditProduct(productId){
   if(SESSION.role!=='owner')return;
@@ -1094,7 +1091,6 @@ async function saveEditProduct(){
   st.innerHTML='<span style="color:var(--text3)">Saving...</span>';
   try{
     await dbApi({action:'saveProduct',companyId:SESSION.companyId,id:product.id,name:product.name,sku:product.sku,barcode:product.barcode,category:product.category,sale_price:salePrice,cost_price:costPrice,qty:product.qty,min_qty:product.min_qty,unit:product.unit,tax_tier_id:taxTierId||'',price_inclusive:!!priceInclusive});
-    // Update the local cache immediately so every view reflects it before any refetch.
     product.sale_price=salePrice;product.cost_price=costPrice;product.tax_tier_id=taxTierId||null;product.price_inclusive=!!priceInclusive;
     renderProductsPage();renderPOSProductGrid();renderStockValPage();
     closeEditProductModal();
@@ -1106,9 +1102,6 @@ async function saveEditProduct(){
 async function saveProduct(){const name=document.getElementById('prd-name').value.trim();const st=document.getElementById('prd-st');if(!name){st.innerHTML='<span style="color:var(--red3)">Enter product name</span>';return;}const sku=document.getElementById('prd-sku').value.trim(),barcode=document.getElementById('prd-barcode').value.trim(),category=document.getElementById('prd-cat').value,sale_price=parseFloat(document.getElementById('prd-sale').value)||0,cost_price=parseFloat(document.getElementById('prd-cost').value)||0,qty=parseFloat(document.getElementById('prd-qty').value)||0,min_qty=parseFloat(document.getElementById('prd-min').value)||0,unit=document.getElementById('prd-unit').value||'unit';const taxTierEl=document.getElementById('prd-tax-tier'),taxInclEl=document.getElementById('prd-tax-inclusive');const tax_tier_id=taxTierEl?taxTierEl.value:'',price_inclusive=taxInclEl?taxInclEl.checked:false;try{await dbApi({action:'saveProduct',companyId:SESSION.companyId,name,sku,barcode,category,sale_price,cost_price,qty,min_qty,unit,tax_tier_id,price_inclusive});if(qty>0&&cost_price>0){const total=qty*cost_price;DB.entries.push({id:DB.nextId++,date:today(),desc:`Opening stock: ${name}`,type:'Stock Receipt',amount:total,project:'',debits:[{acct:'Inventory (Stock)',amt:total,atype:'asset'}],credits:[{acct:'Accounts Payable',amt:total,atype:'liability'}]});await saveData();}await loadRetailProducts();renderAll();st.innerHTML=`<span style="color:var(--green3)">✅ ${name} saved</span>`;['prd-name','prd-sku','prd-barcode','prd-sale','prd-cost','prd-qty','prd-min'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});if(taxInclEl)taxInclEl.checked=false;}catch(e){st.innerHTML=`<span style="color:var(--red3)">❌ ${e.message}</span>`;}setTimeout(()=>{const s=document.getElementById('prd-st');if(s)s.innerHTML='';},4000);}
 function populateProductTaxTierSelect(){const el=document.getElementById('prd-tax-tier');if(!el)return;el.innerHTML=taxTierSelectOptions('');const hint=document.getElementById('prd-tax-hint');if(hint)hint.textContent=TAX_SETTINGS.is_vat_registered?'':'Tax tiers only affect accounting once this business is marked VAT-registered in Settings.';}
 async function deleteProduct(id){if(!confirm('Delete?'))return;try{await dbApi({action:'deleteProduct',productId:id});await loadRetailProducts();}catch(e){showToast('❌ '+e.message);}}
-// Resets the Manual Stock Intake grid to a single blank row — called when the page is
-// first opened. NOT called on every catalogue refresh, since that would wipe out
-// qty/cost the user is mid-way through entering across several rows.
 function renderManualIntakeRows(){
   const wrap=document.getElementById('si-rows');if(!wrap)return;
   wrap.innerHTML='';_siRowSeq=0;
@@ -1121,10 +1114,6 @@ function renderManualIntakeRows(){
       :`<div class="alert al-warn" style="margin-bottom:10px"><span class="alert-ico">💰</span><div class="alert-body">This business isn't VAT-registered. If a row's tax tier applies, that tax is absorbed straight into Inventory cost (Accounts Payable still matches the full invoice) — nothing is tracked as a VAT Receivable.</div></div>`;
   }
 }
-// Rebuilds just the <option> list inside every currently-rendered row's product select,
-// preserving whichever product is already chosen — mirrors refreshPOProductDropdowns().
-// Called whenever the catalogue changes (e.g. Quick Add), so a brand-new product shows up
-// in every open row without disturbing qty/cost the user already typed.
 function refreshManualIntakeProductDropdowns(){
   document.querySelectorAll('.si-row-product').forEach(sel=>{
     const prevValue=sel.value;
@@ -1133,8 +1122,6 @@ function refreshManualIntakeProductDropdowns(){
   });
 }
 let _siRowSeq=0;
-// Appends one blank (or pre-filled) line item row to the Manual Stock Intake grid. `prefill`
-// is used by the single-item AI receipt auto-fill path; manual "➕ Add Item" clicks pass none.
 function addManualIntakeRow(prefill){
   const wrap=document.getElementById('si-rows');if(!wrap)return;
   prefill=prefill||{};
@@ -1158,31 +1145,13 @@ function addManualIntakeRow(prefill){
 }
 
 // ── AI RECEIPT/INVOICE UPLOAD FOR STOCK INTAKE (retail only) ──────────────
-// Reuses the same OCR/PDF text extraction already built for the Home "Record" page,
-// then sends the raw text to /api/ai with a receipt-specific systemPrompt (no backend
-// changes needed — ai.js already supports a custom systemPrompt override). The parsed
-// result is a review state, never posted straight to the books — the user must click
-// Confirm before anything touches inventory or the journal.
 let RS_PARSED_RECEIPT=null;
-// Shared by both the single-item auto-fill flow and the multi-item review table: creates a
-// brand-new catalog product from a receipt line so an unmatched item never blocks intake.
-// Opening stock is 0 here — receiveStock() adds the real received qty right after — and the
-// sale price defaults to cost×1.2 (or $0.00 if cost is unknown) so it's easy to spot and
-// adjust in the Catalogue tab later.
 async function autoCreateProductFromReceiptLine(name,costPrice,taxTierId,priceInclusive){
   const cost=parseFloat(costPrice)||0;
   const salePrice=cost>0?Math.round(cost*1.2*100)/100:0;
   const r=await dbApi({action:'saveProduct',companyId:SESSION.companyId,name:(name||'Unnamed Item').trim(),category:'General',sale_price:salePrice,cost_price:cost,qty:0,min_qty:0,unit:'unit',tax_tier_id:taxTierId||'',price_inclusive:!!priceInclusive});
   return r.productId;
 }
-// Whatever tax tier / inclusive flag was actually used to receive a product's stock becomes
-// that product's new default going forward — so the Owner never has to open the Catalogue
-// and re-enter the same tax settings a second time after an intake. This ALSO rolls the
-// received qty/cost into cost_price as a running weighted average — the field COGS actually
-// reads on every POS sale — which previously only ever got set once, at product creation,
-// and never updated on later receipts. That's what let a stale, pre-tax cost basis leak into
-// COGS even after tax had been absorbed into inventory on a non-VAT-registered intake.
-// Used by all three intake paths (manual, AI receipt review, PO receipt) identically.
 async function syncProductAfterIntake(productId,taxTierId,priceInclusive,qtyReceived,unitCostReceived){
   const product=RETAIL_PRODUCTS.find(p=>p.id===productId);
   if(!product)return;
@@ -1194,20 +1163,15 @@ async function syncProductAfterIntake(productId,taxTierId,priceInclusive,qtyRece
   const tierChanged=String(product.tax_tier_id||'')!==String(taxTierId||'');
   const inclChanged=!!product.price_inclusive!==!!priceInclusive;
   const costChanged=Math.abs(roundedCost-oldCost)>0.001;
-  if(!tierChanged&&!inclChanged&&!costChanged)return; // nothing to sync — skip the round trip
+  if(!tierChanged&&!inclChanged&&!costChanged)return;
   try{
     await dbApi({action:'saveProduct',companyId:SESSION.companyId,id:product.id,name:product.name,sku:product.sku,barcode:product.barcode,category:product.category,sale_price:product.sale_price,cost_price:roundedCost,qty:newQtyTotal,min_qty:product.min_qty,unit:product.unit,tax_tier_id:taxTierId||'',price_inclusive:!!priceInclusive});
-    // Keep the local cache in sync too, so every view reflects it before any refetch.
     product.tax_tier_id=taxTierId||null;
     product.price_inclusive=!!priceInclusive;
     product.cost_price=roundedCost;
     product.qty=newQtyTotal;
   }catch(e){console.error('syncProductAfterIntake',e);}
 }
-// The one place that builds an intake's journal entry, for all three intake paths — each
-// product gets its OWN clearly-labeled Inventory debit line rather than one lump sum, VAT
-// Receivable stays as a single isolated line covering the whole invoice's recoverable tax,
-// and the credit side always equals the exact grand total so the entry balances.
 function buildIntakeJournalEntry(desc,lines,payMethod){
   const debits=lines.filter(l=>l.base>0.001).map(l=>({acct:`Inventory (${l.productName})`,amt:Math.round(l.base*100)/100,atype:'asset'}));
   const totalTax=lines.reduce((s,l)=>s+(l.tax||0),0);
@@ -1280,8 +1244,6 @@ async function parseReceiptWithAI(rawText){
     setRSReceiptStatus('❌ AI parsing failed: '+e.message,true);
   }
 }
-// Single item → auto-fill the existing Manual Stock Intake fields directly.
-// Multiple items → show an editable review table (still nothing is posted until Confirm).
 function showReceiptReview(parsed){
   RS_PARSED_RECEIPT=parsed;
   if(parsed.items.length===1){
@@ -1293,18 +1255,29 @@ function showReceiptReview(parsed){
   renderReceiptReviewTable(parsed);
   setRSReceiptStatus(`✅ Found ${parsed.items.length} item(s) — review and edit below, then confirm.`);
 }
+// ═══════════════════════════════════════════════════════════════════════
+// *** FIX APPLIED HERE (2026-07-20) ***
+// Previously the tax-tier selection below was wrapped in
+// `if(TAX_SETTINGS.is_vat_registered){ ... }`, so a NON-registered business never got a
+// tax tier auto-selected on the single-item auto-fill row — it silently defaulted to
+// "No tax" (0%), and any tax the supplier charged was dropped instead of being absorbed
+// into Inventory cost. Registration status must NOT gate tier selection: an unregistered
+// business still needs the tier chosen so receiveStock()'s absorption logic (see the
+// "NON-VAT-REGISTERED ABSORPTION LOGIC" block in the project summary) can fold the
+// supplier's tax into the Inventory debit and the weighted-average cost_price. This now
+// matches the already-correct behavior in renderReceiptReviewTable() (multi-item path)
+// and receiveStock() (manual intake) — those two never had this bug.
+// ═══════════════════════════════════════════════════════════════════════
 function populateSingleIntakeForm(supplier,item){
   const supplierEl=document.getElementById('si-supplier');if(supplierEl)supplierEl.value=supplier||'';
   const match=posFindProduct(item.name,true); // reuse the same fuzzy matcher built for POS voice
   // Tax tier: an already-known product's own configured tier wins (the Owner set that on
-  // purpose); otherwise use the AI's own classification of this line item, so the user
-  // never has to touch the dropdown for a brand-new product either.
-  let taxTierId='',priceInclusive=false;
-  if(TAX_SETTINGS.is_vat_registered){
-    const tier=(match&&match.tax_tier_id)?getTaxTierById(match.tax_tier_id):pickTierForCategory(item.taxCategory);
-    taxTierId=tier?tier.id:'';
-    priceInclusive=(match&&match.tax_tier_id)?!!match.price_inclusive:!!item.taxInclusive;
-  }
+  // purpose); otherwise use the AI's own classification of this line item. Computed
+  // regardless of VAT-registration status — a non-registered business still needs the
+  // tier selected so the supplier's tax gets absorbed into Inventory cost.
+  const tier=(match&&match.tax_tier_id)?getTaxTierById(match.tax_tier_id):pickTierForCategory(item.taxCategory);
+  const taxTierId=tier?tier.id:'';
+  const priceInclusive=(match&&match.tax_tier_id)?!!match.price_inclusive:!!item.taxInclusive;
   const wrap=document.getElementById('si-rows');if(wrap){wrap.innerHTML='';_siRowSeq=0;}
   addManualIntakeRow({parsedName:item.name,qty:item.qty,unitCost:item.unitCost,productId:match?match.id:'',taxTierId,priceInclusive});
   const invWrap=document.getElementById('si-invoice-wrap');if(invWrap)invWrap.style.display=TAX_SETTINGS.is_vat_registered?'block':'none';
@@ -1318,12 +1291,6 @@ function renderReceiptReviewTable(parsed){
     const rowId='rsrow-'+(_rsReviewRowSeq++);
     const match=posFindProduct(it.name,true);
     const options='<option value="">— no match, will auto-create on confirm —</option>'+RETAIL_PRODUCTS.map(p=>`<option value="${p.id}" ${match&&match.id===p.id?'selected':''}>${p.name}</option>`).join('');
-    // An already-known product's own configured tier wins; otherwise trust the AI's own
-    // classification of this specific line item rather than a single global default —
-    // that's what lets a genuinely new "Fresh Milk" and a new "Whiskey" land on different
-    // tiers automatically, with zero dropdown-hunting from the user. Tax tier selection
-    // matters whether or not the business is VAT-registered: registered businesses reclaim
-    // it as Input VAT, unregistered ones still need it to absorb the tax into inventory cost.
     const aiTier=pickTierForCategory(it.taxCategory);
     const defaultTier=(match&&match.tax_tier_id)?getTaxTierById(match.tax_tier_id):aiTier;
     const defaultInclusive=(match&&match.tax_tier_id)?!!match.price_inclusive:!!it.taxInclusive;
@@ -1353,11 +1320,6 @@ function renderReceiptReviewTable(parsed){
   `;
 }
 function cancelReceiptReview(){const wrap=document.getElementById('rsReceiptReview');if(wrap){wrap.style.display='none';wrap.innerHTML='';}RS_PARSED_RECEIPT=null;setRSReceiptStatus('');}
-// This is the only place the multi-item receipt review actually posts anything — mirrors
-// the same receiveStock + journal-entry pattern as the manual single-item flow below.
-// Rows with no matched product are no longer skipped: they auto-create a brand-new
-// catalog entry from the receipt's own name right here, then proceed exactly as if that
-// product had always existed.
 async function confirmReceiptIntake(){
   const wrap=document.getElementById('rsReceiptReview');if(!wrap)return;
   const supplier=(document.getElementById('rs-review-supplier')||{}).value||'';
@@ -1376,7 +1338,7 @@ async function confirmReceiptIntake(){
     const taxTierSel=row.querySelector('.rs-review-tax-tier');
     const taxTierId=taxTierSel?taxTierSel.value:'';
     const priceInclusive=row.querySelector('.rs-review-tax-incl')?row.querySelector('.rs-review-tax-incl').checked:false;
-    if(qty<=0||unitCost<=0){skipped++;return;} // still skip rows with no usable qty/cost — that's a data problem, not a matching one
+    if(qty<=0||unitCost<=0){skipped++;return;}
     candidates.push({productId,parsedName,qty,unitCost,taxTierId,priceInclusive});
   });
   if(!candidates.length){setRSReceiptStatus('⚠️ No rows have both a quantity and a unit cost — nothing to receive.',true);return;}
@@ -1390,25 +1352,17 @@ async function confirmReceiptIntake(){
         autoCreated.push(c.parsedName||'Unnamed Item');
       }
       const tier=getTaxTierById(c.taxTierId);
-      const rate=tier?parseFloat(tier.rate):0; // computed regardless of registration — a non-registered business still needs to know what tax the supplier charged, to absorb it correctly
+      const rate=tier?parseFloat(tier.rate):0;
       const split=computeTaxSplit(c.unitCost*c.qty,rate,c.priceInclusive);
-      // Registered: Inventory carries the pre-tax base, tax is separately recoverable.
-      // Not registered: no VAT to reclaim, so the FULL tax-inclusive amount is absorbed
-      // straight into Inventory (and therefore into the stored unit cost that COGS uses).
       const inventoryAmt=isRegistered?split.base:split.grandTotal;
       const recoverableTax=isRegistered?split.tax:0;
       lines.push({productId,qty:c.qty,unitCostForStock:inventoryAmt/c.qty,inventoryAmt,recoverableTax,tierName:tier?tier.name:'',rate,taxTierId:c.taxTierId,priceInclusive:c.priceInclusive});
     }
-    if(autoCreated.length)await loadRetailProducts(); // refresh catalogue/dropdowns before we reference names below
+    if(autoCreated.length)await loadRetailProducts();
     const tierTotals={};
     const journalLines=[];
     for(const line of lines){
       await dbApi({action:'receiveStock',companyId:SESSION.companyId,productId:line.productId,qty:line.qty,unitCost:line.unitCostForStock,supplier,paymentMethod:payMethod});
-      // Whatever tax tier this line actually used becomes the product's new default, and its
-      // cost_price rolls forward as a weighted average — no re-entering tax settings, and
-      // COGS on the next sale reflects the true (possibly tax-absorbed) cost. Synced
-      // regardless of registration status, so it's already in place if the business
-      // registers later.
       await syncProductAfterIntake(line.productId,line.taxTierId,line.priceInclusive,line.qty,line.unitCostForStock);
       const p=RETAIL_PRODUCTS.find(x=>x.id===line.productId);
       journalLines.push({productName:p?p.name:`Product #${line.productId}`,base:line.inventoryAmt,tax:line.recoverableTax});
@@ -1465,7 +1419,7 @@ async function receiveStock(){
     const taxTierSel=row.querySelector('.si-row-tax-tier');
     const taxTierId=taxTierSel?taxTierSel.value:'';
     const priceInclusive=row.querySelector('.si-row-tax-incl')?row.querySelector('.si-row-tax-incl').checked:false;
-    if(qty<=0||unitCost<=0)return; // silently skip incomplete rows, same convention as the AI review table
+    if(qty<=0||unitCost<=0)return;
     candidates.push({productId,parsedName,qty,unitCost,taxTierId,priceInclusive});
   });
   if(!candidates.length){st.innerHTML='<span style="color:var(--red3)">Add at least one item with a quantity and unit cost</span>';return;}
@@ -1482,17 +1436,11 @@ async function receiveStock(){
         autoCreated.push(c.parsedName);
       }
       const tier=getTaxTierById(c.taxTierId);
-      const rate=tier?parseFloat(tier.rate):0; // computed regardless of registration
+      const rate=tier?parseFloat(tier.rate):0;
       const split=computeTaxSplit(c.unitCost*c.qty,rate,c.priceInclusive);
-      // Registered: inventory carries the pre-tax base, tax is separately recoverable.
-      // Not registered: no VAT to reclaim, so the FULL tax-inclusive amount is absorbed
-      // into Inventory (and the stored unit cost), so it flows correctly into COGS later.
       const inventoryAmt=isRegistered?split.base:split.grandTotal;
       const recoverableTax=isRegistered?split.tax:0;
       await dbApi({action:'receiveStock',companyId:SESSION.companyId,productId,qty:c.qty,unitCost:inventoryAmt/c.qty,supplier,paymentMethod:payMethod});
-      // Whatever tax tier this row actually used becomes the product's new default, and its
-      // cost_price rolls forward as a weighted average — synced regardless of registration
-      // status, so it's already in place if the business registers later.
       await syncProductAfterIntake(productId,c.taxTierId,c.priceInclusive,c.qty,inventoryAmt/c.qty);
       const p=RETAIL_PRODUCTS.find(x=>x.id===productId);
       journalLines.push({productName:p?p.name:(c.parsedName||`Product #${productId}`),base:inventoryAmt,tax:recoverableTax});
@@ -1517,7 +1465,7 @@ async function receiveStock(){
     st.innerHTML=`<span style="color:var(--green3)">✅ Received ${journalLines.length} item(s) — ${fc(totalGrand)}${vatMsg}${createdMsg}</span>`;
     document.getElementById('si-supplier').value='';
     const invEl=document.getElementById('si-invoice-no');if(invEl)invEl.value='';
-    renderManualIntakeRows(); // reset the grid to a single blank row for the next entry
+    renderManualIntakeRows();
   }catch(e){
     st.innerHTML=`<span style="color:var(--red3)">❌ ${e.message}</span>`;
   }
@@ -1525,9 +1473,6 @@ async function receiveStock(){
 }
 
 // ── RECEIVE STOCK AGAINST A PURCHASE ORDER ────────────────────────
-// This is the correct trigger point for the journal entry (Dr Inventory / Cr AP),
-// posted using the EXACT quantities the user accepts here — not what was originally
-// ordered. It also updates the source PO's status (pending → partial → completed).
 function renderPOReceiveSelect(){
   const el=document.getElementById('rs-po-select');if(!el)return;
   const prevValue=el.value;
@@ -1580,14 +1525,10 @@ async function confirmPOReceipt(){
   if(!candidates.length){st.innerHTML='<span style="color:var(--red3)">Enter at least one accepted quantity</span>';return;}
   st.innerHTML='<span style="color:var(--text3)">Confirming receipt...</span>';
   try{
-    // Pre-compute the tax split per line. Registered: inventory carries the pre-tax base and
-    // tax is separately recoverable. Not registered: no VAT to reclaim, so the FULL
-    // tax-inclusive amount is absorbed into inventory (and the unit cost sent to the server),
-    // so it flows correctly into COGS whenever this stock is later sold.
     const splitByProduct={};
     const receipts=candidates.map(c=>{
       const tier=getTaxTierById(c.taxTierId);
-      const rate=tier?parseFloat(tier.rate):0; // computed regardless of registration
+      const rate=tier?parseFloat(tier.rate):0;
       const split=computeTaxSplit(c.unitCost*c.qty,rate,c.priceInclusive);
       const inventoryAmt=isRegistered?split.base:split.grandTotal;
       const recoverableTax=isRegistered?split.tax:0;
@@ -1595,16 +1536,11 @@ async function confirmPOReceipt(){
       return{productId:c.productId,qty:c.qty,unitCost:inventoryAmt/c.qty};
     });
     const r=await dbApi({action:'receivePOStock',companyId:SESSION.companyId,poId:parseInt(poId),receipts});
-    // Post the journal entry HERE, using the exact accepted quantities the server confirmed —
-    // this is the only point in the PO workflow where inventory (and now VAT) hits the books.
     const accepted=r.accepted||[];
     const tierTotals={};
     const journalLines=[];
     for(const a of accepted){
       const split=splitByProduct[a.productId]||{inventoryAmt:a.qty*a.unitCost,recoverableTax:0,tierName:'',rate:0};
-      // Whatever tax tier this line actually used becomes the product's new default, and its
-      // cost_price rolls forward as a weighted average — synced regardless of registration
-      // status, so it's already in place if the business registers later.
       const c=candidates.find(x=>x.productId===a.productId);
       if(c)await syncProductAfterIntake(a.productId,c.taxTierId,c.priceInclusive,a.qty,split.inventoryAmt/a.qty);
       journalLines.push({productName:a.name,base:split.inventoryAmt,tax:split.recoverableTax});
@@ -1625,11 +1561,11 @@ async function confirmPOReceipt(){
         }
       }
     }
-    await loadRetailProducts();      // refresh stock levels + every open dropdown, instantly
-    await loadPurchaseOrdersCache(); // refresh PO cache so status/received qty are current
-    renderPOReceiptLines();          // re-render remaining qty for this PO (in case it's still open)
-    renderPOReceiveSelect();         // drop it from the list if now completed
-    await renderPOList();            // update the Purchase Orders table live, no refresh needed
+    await loadRetailProducts();
+    await loadPurchaseOrdersCache();
+    renderPOReceiptLines();
+    renderPOReceiveSelect();
+    await renderPOList();
     renderAll();
     const vatMsg=totalTax>0.001?` (base ${fc(totalBase)} + VAT ${fc(totalTax)})`:'';
     st.innerHTML=`<span style="color:var(--green3)">✅ Receipt confirmed${vatMsg} — PO now ${(PO_STATUS_LABEL[r.status]||r.status).toLowerCase()}</span>`;
@@ -1643,9 +1579,6 @@ function renderStockValPage(){const el=document.getElementById('stockValList');i
 async function renderRetailSalesPage(){const el=document.getElementById('retailSalesList');if(!el)return;try{const r=await dbApi({action:'listPOSSales',companyId:SESSION.companyId,limit:200});const sales=r.sales||[];if(!sales.length){el.innerHTML='<div style="text-align:center;padding:22px;color:var(--text3)">No sales yet</div>';return;}const totalRevenue=sales.reduce((s,x)=>s+(parseFloat(x.total)||0),0);el.innerHTML=`<div class="kgrid" style="grid-template-columns:repeat(3,1fr);margin-bottom:12px"><div class="kpi"><div class="kpi-lbl">Total Sales</div><div class="kpi-val pos">${fc(totalRevenue)}</div></div><div class="kpi"><div class="kpi-lbl">Transactions</div><div class="kpi-val">${sales.length}</div></div></div><table><thead><tr><th>Date</th><th>Items</th><th>Payment</th><th>Discount</th><th>Total</th><th>Cashier</th></tr></thead><tbody>${sales.map(s=>{const items=Array.isArray(s.items)?s.items:(JSON.parse(s.items||'[]'));return`<tr><td style="font-family:'JetBrains Mono',monospace;font-size:11px">${String(s.sale_date).split('T')[0]}</td><td style="font-size:11px">${items.map(i=>i.name+' ×'+i.qty).join(', ').slice(0,50)}</td><td><span class="tag ${s.payment_method==='cash'?'t-green':'t-blue'}" style="font-size:9px">${s.payment_method}</span></td><td>${s.discount>0?'-'+fc(s.discount):''}</td><td style="font-family:'JetBrains Mono',monospace;color:var(--gold3);font-weight:700">${fc(s.total)}</td><td style="font-size:11px;color:var(--text3)">${s.cashier||'—'}</td></tr>`;}).join('')}</tbody></table>`;}catch(e){el.innerHTML=`<span style="color:var(--red3)">${e.message}</span>`;}}
 
 // ── POS CART ──────────────────────────────────────────────────────
-// Single shared matcher used by every input method (typed, camera-scanned, spoken) so
-// they all funnel into the exact same "add to cart" behavior — no separate code paths.
-// allowFuzzy is used by voice only, since spoken product names rarely match exactly.
 function normalizeForMatch(s){return(s||'').toLowerCase().replace(/[^a-z0-9\s]/g,'').replace(/\s+/g,' ').trim();}
 function posFindProduct(raw,allowFuzzy){
   const val=(raw||'').trim();if(!val)return null;
@@ -1653,12 +1586,8 @@ function posFindProduct(raw,allowFuzzy){
   if(exact||!allowFuzzy)return exact||null;
   const normVal=normalizeForMatch(val);
   if(!normVal)return null;
-  // Direct substring match either direction first — cheap and usually right (e.g. "Whiskey"
-  // inside "Classic Malt Whiskey 750ml", or vice versa).
   const substringMatch=RETAIL_PRODUCTS.find(p=>{const np=normalizeForMatch(p.name);return np&&(np.includes(normVal)||normVal.includes(np));});
   if(substringMatch)return substringMatch;
-  // Fallback: token-overlap scoring, tolerant of OCR noise, word order, and minor spelling
-  // differences (e.g. "Malt Whisky Classic" vs "Classic Malt Whiskey 750ml").
   const valTokens=normVal.split(' ').filter(t=>t.length>2);
   if(!valTokens.length)return null;
   let best=null,bestScore=0;
@@ -1673,9 +1602,6 @@ function posFindProduct(raw,allowFuzzy){
 }
 function posLookup(val){val=(val||(document.getElementById('pos-scan')||{}).value||'').trim();if(!val)return;const product=posFindProduct(val,false);if(!product){showToast('⚠️ Not found: '+val,3000);return;}posAddToCart(product);const s=document.getElementById('pos-scan');if(s)s.value='';}
 function posAddToCart(product,qty=1){const existing=POS_CART.find(i=>i.id===product.id);if(existing){existing.qty+=qty;}else{POS_CART.push({id:product.id,name:product.name,sku:product.sku||'',sale_price:parseFloat(product.sale_price)||0,cost_price:parseFloat(product.cost_price)||0,qty,unit:product.unit||'unit',tax_tier_id:product.tax_tier_id||null,price_inclusive:!!product.price_inclusive});}renderPOSCart();}
-// Single source of truth for what a cart line actually costs the customer and how much
-// of that is tax — used identically by the cart display, the totals bar, and the sale
-// journal, so none of them can ever disagree with each other.
 function getCartLineAmounts(item){
   const raw=item.sale_price*item.qty;
   if(!TAX_SETTINGS.is_vat_registered||!item.tax_tier_id)return{base:raw,tax:0,grand:raw};
@@ -1686,13 +1612,11 @@ function getCartLineAmounts(item){
 }
 
 // ── POS VOICE-ACTIVATED ADD ────────────────────────────────────────
-// Say a product name → matched (exact, then fuzzy) → posAddToCart → input cleared →
-// keeps listening for the next item, fire-and-forget for the cashier.
 let _posVoiceRecognizer=null;
 function posToggleVoice(){
   const btn=document.getElementById('pos-voice-btn');
   if(_posVoiceRecognizer){
-    const r=_posVoiceRecognizer;_posVoiceRecognizer=null; // clear first so onend doesn't auto-restart
+    const r=_posVoiceRecognizer;_posVoiceRecognizer=null;
     try{r.stop();}catch(e){}
     if(btn){btn.classList.remove('on');btn.textContent='🎙️';}
     return;
@@ -1709,7 +1633,7 @@ function posToggleVoice(){
     const product=posFindProduct(said,true);
     if(product){posAddToCart(product);}
     else{showToast(`⚠️ Product not recognized: "${said}"`,2500);}
-    if(scanInp)scanInp.value=''; // clear and keep listening either way
+    if(scanInp)scanInp.value='';
   };
   _posVoiceRecognizer.onerror=e=>{
     if(e.error==='no-speech'||e.error==='aborted')return;
@@ -1721,16 +1645,13 @@ function posToggleVoice(){
     }
     showToast('Voice error: '+e.error,3000);
   };
-  _posVoiceRecognizer.onend=()=>{if(_posVoiceRecognizer)_posVoiceRecognizer.start();}; // auto-restart while toggled on
+  _posVoiceRecognizer.onend=()=>{if(_posVoiceRecognizer)_posVoiceRecognizer.start();};
   _posVoiceRecognizer.start();
   if(btn){btn.classList.add('on');btn.textContent='🔴';}
   showToast('🎙️ Listening — say a product name');
 }
 
 // ── POS CAMERA BARCODE SCANNING ────────────────────────────────────
-// Opens a modal with a live rear-camera preview; a decoded barcode is dropped into the
-// search box and run through the exact same posLookup() path as manual typing, then the
-// modal closes itself — no extra click needed.
 let _html5QrScanner=null;
 async function openCameraScanner(){
   const modal=document.getElementById('cameraScanModal');if(!modal)return;
@@ -1749,7 +1670,7 @@ async function openCameraScanner(){
         posLookup(decodedText);
         closeCameraScanner();
       },
-      ()=>{ /* per-frame no-match — ignore and keep scanning */ }
+      ()=>{ }
     );
     if(statusEl)statusEl.textContent='Point camera at a barcode';
   }catch(e){
@@ -1766,11 +1687,9 @@ function getPOSTotals(){
   let subtotal=0,totalBase=0,totalTax=0,totalCogs=0;
   POS_CART.forEach(item=>{const amt=getCartLineAmounts(item);subtotal+=amt.grand;totalBase+=amt.base;totalTax+=amt.tax;totalCogs+=item.cost_price*item.qty;});
   const discountAmt=POS_DISCOUNT>0?subtotal*POS_DISCOUNT/100:0;
-  const discRatio=subtotal>0?(subtotal-discountAmt)/subtotal:1; // spread the discount proportionally so VAT is computed on what the customer actually pays
+  const discRatio=subtotal>0?(subtotal-discountAmt)/subtotal:1;
   return{subtotal,discountAmt,total:subtotal-discountAmt,cogs:totalCogs,taxBase:totalBase*discRatio,taxAmount:totalTax*discRatio};
 }
-// Per-tier split (still after the same discount ratio) so the VAT ledger — and the Tax
-// Report that reads it — can show Output VAT broken down by Standard/Reduced/Zero/Exempt.
 function getPOSTaxBreakdownByTier(){
   if(!TAX_SETTINGS.is_vat_registered)return[];
   const {subtotal,discountAmt}=getPOSTotals();
@@ -1792,9 +1711,9 @@ async function completeSale(){
   const payMethod=document.getElementById('pos-payment').value;
   const {subtotal,discountAmt,total,cogs,taxAmount}=getPOSTotals();
   const payAcct=payMethod==='cash'?'Cash':payMethod==='mobile'?'Mobile Money':'Bank Account';
-  const isVatJournal=TAX_SETTINGS.is_vat_registered&&taxAmount>0.001; // whether the journal needs a separate VAT Payable line
-  const hasTieredItems=TAX_SETTINGS.is_vat_registered&&POS_CART.some(i=>i.tax_tier_id); // whether to log to the VAT ledger at all — includes 0% tiers like Zero-Rated/Exempt, which still belong on a VAT return even though they collect no tax
-  const revenueBase=isVatJournal?total-taxAmount:total; // Dr Cash [total] = Cr Revenue [base] + Cr VAT Payable [tax]
+  const isVatJournal=TAX_SETTINGS.is_vat_registered&&taxAmount>0.001;
+  const hasTieredItems=TAX_SETTINGS.is_vat_registered&&POS_CART.some(i=>i.tax_tier_id);
+  const revenueBase=isVatJournal?total-taxAmount:total;
   const credits=isVatJournal
     ?[{acct:'Retail Sales Revenue',amt:Math.round(revenueBase*100)/100,atype:'revenue'},{acct:'VAT Payable (Output VAT)',amt:Math.round(taxAmount*100)/100,atype:'liability'}]
     :[{acct:'Retail Sales Revenue',amt:total,atype:'revenue'}];
@@ -1804,7 +1723,7 @@ async function completeSale(){
   for(const item of POS_CART){const product=RETAIL_PRODUCTS.find(p=>p.id===item.id);if(product){product.qty=Math.max(0,(parseFloat(product.qty)||0)-item.qty);await dbApi({action:'saveProduct',companyId:SESSION.companyId,id:product.id,name:product.name,sku:product.sku,barcode:product.barcode,category:product.category,sale_price:product.sale_price,cost_price:product.cost_price,qty:product.qty,min_qty:product.min_qty,unit:product.unit,tax_tier_id:product.tax_tier_id,price_inclusive:product.price_inclusive}).catch(()=>{});}}
   try{
     await dbApi({action:'savePOSSale',companyId:SESSION.companyId,items:POS_CART,subtotal,discount:discountAmt,total,paymentMethod:payMethod,cashier:SESSION.username,journalEntryId:saleEntry.id});
-  }catch(e){showToast('❌ '+e.message,5000);return;} // e.g. a closed period would reject here — don't silently lose the sale record
+  }catch(e){showToast('❌ '+e.message,5000);return;}
   if(hasTieredItems){
     const breakdown=getPOSTaxBreakdownByTier();
     for(const g of breakdown){
@@ -1818,9 +1737,6 @@ async function completeSale(){
 function renderPOSProductGrid(){const el=document.getElementById('pos-product-grid');if(!el)return;if(!RETAIL_PRODUCTS.length){el.innerHTML='<div style="color:var(--text3);font-size:12px;text-align:center;padding:14px;grid-column:1/-1">No products — add them in Products page</div>';return;}el.innerHTML=RETAIL_PRODUCTS.map(p=>{const cls=parseFloat(p.qty)<=0?'var(--red3)':parseFloat(p.qty)<=parseFloat(p.min_qty)?'var(--orange3)':'var(--green3)';const obj=JSON.stringify({id:p.id,name:p.name,sku:p.sku||'',sale_price:parseFloat(p.sale_price)||0,cost_price:parseFloat(p.cost_price)||0,qty:1,unit:p.unit||'unit',tax_tier_id:p.tax_tier_id||null,price_inclusive:!!p.price_inclusive}).replace(/'/g,'&apos;');return`<div class="pos-product-btn" onclick='posAddToCart(${obj})'><div style="font-size:11px;font-weight:600;color:var(--text);line-height:1.3;word-break:break-word">${p.name}</div><div style="font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--gold3)">${fc(p.sale_price)}</div><div style="font-size:9px;font-family:'JetBrains Mono',monospace;color:${cls}">${p.qty} ${p.unit}</div></div>`;}).join('');}
 
 // ── PURCHASE ORDERS ───────────────────────────────────────────────
-// Rebuilds every currently-rendered PO line-item <select> from the latest RETAIL_PRODUCTS,
-// preserving whatever was already selected in each row. Called whenever the product
-// catalogue refreshes (tab switch, quick-add, product page edits, etc).
 function refreshPOProductDropdowns(){
   document.querySelectorAll('.po-line-product').forEach(sel=>{
     const prevValue=sel.value;
@@ -1852,9 +1768,6 @@ function addPOLine(){
   `;
   el.appendChild(row);
 }
-// Submitting a PO is a purely administrative action — it records what was ordered
-// but must NOT touch the journal or inventory. Those only happen once goods are
-// actually confirmed received, in confirmPOReceipt() below.
 async function submitPurchaseOrder(){const supplier=document.getElementById('po-supplier').value.trim(),payMethod=document.getElementById('po-pay').value,notes=document.getElementById('po-notes').value.trim(),st=document.getElementById('po-st');if(!supplier){st.innerHTML='<span style="color:var(--red3)">Enter supplier</span>';return;}const rows=document.querySelectorAll('.po-line-row');const items=[];let total=0;rows.forEach(row=>{const productId=row.querySelector('.po-line-product').value,qty=parseFloat(row.querySelector('.po-line-qty').value)||0,unitCost=parseFloat(row.querySelector('.po-line-cost').value)||0;if(!productId||!qty||!unitCost)return;const product=RETAIL_PRODUCTS.find(p=>p.id===parseInt(productId));if(!product)return;const lineTotal=qty*unitCost;total+=lineTotal;items.push({productId:parseInt(productId),name:product.name,qty,unitCost,lineTotal,receivedQty:0});});if(!items.length){st.innerHTML='<span style="color:var(--red3)">Add at least one item</span>';return;}try{await dbApi({action:'savePurchaseOrder',companyId:SESSION.companyId,supplier,po_date:today(),items,total,paymentMethod:payMethod,notes});st.innerHTML=`<span style="color:var(--green3)">✅ PO saved — ${fc(total)} from ${supplier}. No journal entry posted yet; that happens when stock is received.</span>`;document.getElementById('po-supplier').value='';if(document.getElementById('po-notes'))document.getElementById('po-notes').value='';renderPOLines();await loadPurchaseOrdersCache();await renderPOList();}catch(e){st.innerHTML=`<span style="color:var(--red3)">❌ ${e.message}</span>`;}setTimeout(()=>{const s=document.getElementById('po-st');if(s)s.innerHTML='';},6000);}
 
 const PO_STATUS_LABEL={pending:'🕓 Pending',partial:'📦 Partially Received',completed:'✅ Completed'};
@@ -1864,10 +1777,6 @@ async function loadPurchaseOrdersCache(){try{const r=await dbApi({action:'listPu
 async function renderPOList(){const el=document.getElementById('poList');if(!el)return;await loadPurchaseOrdersCache();const orders=PO_ORDERS;if(!orders.length){el.innerHTML='<div style="text-align:center;padding:22px;color:var(--text3)">No purchase orders yet</div>';return;}el.innerHTML=`<table><thead><tr><th>Date</th><th>Supplier</th><th>Items</th><th>Total</th><th>Payment</th><th>Status</th></tr></thead><tbody>${orders.map(o=>{const items=Array.isArray(o.items)?o.items:(JSON.parse(o.items||'[]'));const status=o.status||'pending';return`<tr><td style="font-family:'JetBrains Mono',monospace;font-size:11px">${String(o.po_date).split('T')[0]}</td><td>${o.supplier}</td><td style="font-size:11px">${items.map(i=>`${i.name} ×${i.qty}${(parseFloat(i.receivedQty)||0)>0?` (recv ${i.receivedQty})`:''}`).join(', ').slice(0,60)||'—'}</td><td style="font-family:'JetBrains Mono',monospace">${fc(o.total)}</td><td><span class="tag ${o.payment_method==='cash'?'t-green':'t-orange'}" style="font-size:9px">${o.payment_method}</span></td><td><span class="tag ${PO_STATUS_TAG[status]||'t-blue'}" style="font-size:9px">${PO_STATUS_LABEL[status]||status}</span></td></tr>`;}).join('')}</tbody></table>`;}
 
 // ── QUICK ADD PRODUCT MODAL ───────────────────────────────────────
-// Lets the user create a new product without leaving the Purchase Orders / Receive Stock screen.
-// Opened via a "+ New" button next to a product <select>; on save it writes the product to the DB
-// with opening stock of 0, refreshes the catalogue everywhere (which also refreshes every open
-// dropdown), then auto-selects the new product on the exact select element that triggered it.
 let _quickAddTargetSelectId=null;
 
 function openQuickAddProduct(selectId){
@@ -1895,7 +1804,7 @@ async function saveQuickAddProduct(){
   st.innerHTML='<span style="color:var(--text3)">Saving...</span>';
   try{
     await dbApi({action:'saveProduct',companyId:SESSION.companyId,name,sku,category,sale_price,cost_price,qty:0,min_qty:0,unit:'unit'});
-    await loadRetailProducts();  // refetch from DB — also refreshes every open PO/Receive-Stock dropdown
+    await loadRetailProducts();
 
     const newProduct=RETAIL_PRODUCTS.find(p=>p.name.toLowerCase()===name.toLowerCase());
     const targetSel=_quickAddTargetSelectId?document.getElementById(_quickAddTargetSelectId):null;
