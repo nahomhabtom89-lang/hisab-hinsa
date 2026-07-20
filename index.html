@@ -1130,18 +1130,38 @@ function addManualIntakeRow(prefill){
   row.className='si-intake-row';
   row.dataset.rowId=rowId;
   row.dataset.parsedName=prefill.parsedName||'';
-  row.style.cssText=`display:grid;grid-template-columns:1.6fr auto 1fr 1fr 1.1fr auto auto;gap:7px;align-items:end;margin-bottom:7px;padding-bottom:7px;border-bottom:1px solid var(--border)`;
+  row.style.cssText=`display:grid;grid-template-columns:1.4fr auto 0.8fr 0.9fr 1fr 0.65fr auto auto;gap:7px;align-items:end;margin-bottom:7px;padding-bottom:7px;border-bottom:1px solid var(--border)`;
   const productOptions='<option value="">Select product...</option>'+RETAIL_PRODUCTS.map(p=>`<option value="${p.id}" ${prefill.productId&&String(p.id)===String(prefill.productId)?'selected':''}>${p.name} (stock: ${p.qty} ${p.unit})</option>`).join('');
+  // Default rate shown in the field: prefer whatever the AI actually read off the receipt
+  // (prefill.taxRatePct) over the tier's configured rate — the receipt's own printed number
+  // is the source of truth, especially for a non-VAT-registered business that has never
+  // configured a country/tier rate at all.
+  const initialTier=getTaxTierById(prefill.taxTierId||'');
+  const initialRate=(prefill.taxRatePct!==undefined&&prefill.taxRatePct!==null&&prefill.taxRatePct!=='')?prefill.taxRatePct:(initialTier?parseFloat(initialTier.rate):'');
   row.innerHTML=`
     <div class="fg" style="margin:0"><label>Product</label><select class="si-row-product" id="sel-${rowId}" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:9px 11px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none">${productOptions}</select></div>
     <button type="button" onclick="openQuickAddProduct('sel-${rowId}')" title="Add a new product without leaving this page" style="padding:9px 10px;background:transparent;border:1px dashed var(--gold2);border-radius:5px;color:var(--gold2);cursor:pointer;font-size:11px;white-space:nowrap">+ New</button>
     <div class="fg" style="margin:0"><label>Qty</label><input class="si-row-qty" type="number" value="${prefill.qty||''}" placeholder="50"/></div>
     <div class="fg" style="margin:0"><label>Unit Cost</label><input class="si-row-cost" type="number" step="0.01" value="${prefill.unitCost||''}" placeholder="1.80"/></div>
-    <div class="fg" style="margin:0"><label>Tax Tier</label><select class="si-row-tax-tier" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:9px 11px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text);outline:none">${taxTierSelectOptions(prefill.taxTierId||'')}</select></div><label style="display:flex;align-items:center;gap:4px;font-size:9px;color:var(--text3);padding-bottom:9px;white-space:nowrap"><input type="checkbox" class="si-row-tax-incl" ${prefill.priceInclusive?'checked':''} style="accent-color:var(--gold2)"/> incl.</label>
+    <div class="fg" style="margin:0"><label>Tax Tier</label><select class="si-row-tax-tier" onchange="syncIntakeRateFromTier(this)" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:9px 11px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text);outline:none">${taxTierSelectOptions(prefill.taxTierId||'')}</select></div>
+    <div class="fg" style="margin:0"><label title="Read straight off the receipt when available — edit if needed">Rate %</label><input class="si-row-tax-rate" type="number" step="0.01" value="${initialRate}" placeholder="18"/></div>
+    <label style="display:flex;align-items:center;gap:4px;font-size:9px;color:var(--text3);padding-bottom:9px;white-space:nowrap"><input type="checkbox" class="si-row-tax-incl" ${prefill.priceInclusive?'checked':''} style="accent-color:var(--gold2)"/> incl.</label>
     <button type="button" onclick="this.closest('.si-intake-row').remove()" title="Remove this item" style="padding:9px 11px;background:transparent;border:1px solid rgba(192,48,42,.3);border-radius:5px;color:var(--red3);cursor:pointer;font-size:14px">✕</button>
   `;
   wrap.appendChild(row);
   return rowId;
+}
+// Convenience: if the user manually changes the Tax Tier dropdown (rather than relying on
+// what the AI read off the receipt), pull that tier's configured rate into the Rate % field
+// so they don't have to type it twice. The Rate % field remains the actual number used for
+// the tax split — this just gives it a sensible starting point.
+function syncIntakeRateFromTier(selectEl){
+  const row=selectEl.closest('.si-intake-row')||selectEl.closest('.rs-review-row');
+  if(!row)return;
+  const rateInput=row.querySelector('.si-row-tax-rate')||row.querySelector('.rs-review-tax-rate');
+  if(!rateInput)return;
+  const tier=getTaxTierById(selectEl.value);
+  rateInput.value=tier?parseFloat(tier.rate):'';
 }
 
 // ── AI RECEIPT/INVOICE UPLOAD FOR STOCK INTAKE (retail only) ──────────────
@@ -1206,14 +1226,18 @@ async function handleStockReceiptUpload(file){
 const RECEIPT_PARSE_PROMPT=`You are a data-extraction engine for supplier delivery receipts and invoices.
 Return ONLY valid JSON. No markdown, no commentary, no trailing commas, no text outside the JSON.
 Structure exactly:
-{"supplier":"Supplier name, or empty string if not found","items":[{"name":"Product name exactly as written on the receipt","qty":10,"unitCost":1.5,"taxCategory":"standard","taxInclusive":false}]}
+{"supplier":"Supplier name, or empty string if not found","items":[{"name":"Product name exactly as written on the receipt","qty":10,"unitCost":1.5,"taxCategory":"standard","taxRatePct":18,"taxInclusive":false}]}
 Rules:
 1. qty and unitCost must be plain numbers, never strings or currency symbols.
 2. If unit cost isn't stated directly but a line total and quantity are, compute unitCost = lineTotal / qty.
 3. List every distinct line item separately — never merge different products into one line.
 4. If a field truly cannot be found, use 0 for numbers and "" for the supplier — never fabricate values.
 5. taxCategory: classify EACH item using standard VAT conventions common across East Africa/UK — "standard" for ordinary taxable goods (alcohol, soft drinks, electronics, cosmetics, household goods, processed/packaged foods); "exempt" for goods typically VAT-exempt or zero-rated (fresh unprocessed produce, fresh milk, raw grains/flour, unprocessed agricultural output, basic medicines); "zero" only if the receipt itself explicitly states a 0% rate for that line. Default to "standard" if genuinely unsure — never leave it blank.
-6. taxInclusive: work this out from the receipt's own arithmetic, not just wording.
+6. taxRatePct: the ACTUAL numeric tax/VAT rate printed on the receipt itself (e.g. "VAT @ 18%" → 18, "Tax Tier: Standard Rate (18% VAT)" → 18). Look for this near the item line, near the subtotal/VAT breakdown, or in any tax-tier label on the document.
+   - This is the single most important field for a business that does not have its own tax rates configured — the receipt's own printed rate IS the source of truth here, not any assumption about the country's standard rate.
+   - If a document-level rate applies to the whole invoice (one VAT line covering all items), use that same number for every item's taxRatePct.
+   - If genuinely no percentage appears anywhere on the document, use 0 — never guess or fall back to a "typical" country rate.
+7. taxInclusive: work this out from the receipt's own arithmetic, not just wording.
    - If the receipt shows a Subtotal, a separate VAT/Tax line, and a Grand Total where Subtotal + VAT ≈ Grand Total, then the printed line/unit prices are tax-EXCLUSIVE (taxInclusive:false) — the VAT was added on top as its own line.
    - If the line items already sum directly to the Grand Total with no additional VAT line added on top (any VAT mentioned is only informational, already folded into the prices shown), set taxInclusive:true.
    - Explicit wording like "incl. VAT" or "VAT inclusive" also implies taxInclusive:true; "excl. VAT" or "plus VAT" implies false.
@@ -1278,8 +1302,14 @@ function populateSingleIntakeForm(supplier,item){
   const tier=(match&&match.tax_tier_id)?getTaxTierById(match.tax_tier_id):pickTierForCategory(item.taxCategory);
   const taxTierId=tier?tier.id:'';
   const priceInclusive=(match&&match.tax_tier_id)?!!match.price_inclusive:!!item.taxInclusive;
+  // The Rate % field (not the tier's configured rate) is what actually drives the tax
+  // split — prefer whatever the AI read directly off the receipt's own printed text
+  // (e.g. "VAT @ 18%"), since that's real regardless of whether this company has ever
+  // set up a country/tier rate. Falls back to the tier's rate only if the receipt didn't
+  // print one and a matching known product supplies it.
+  const taxRatePct=(typeof item.taxRatePct==='number'&&item.taxRatePct>0)?item.taxRatePct:(tier?parseFloat(tier.rate):'');
   const wrap=document.getElementById('si-rows');if(wrap){wrap.innerHTML='';_siRowSeq=0;}
-  addManualIntakeRow({parsedName:item.name,qty:item.qty,unitCost:item.unitCost,productId:match?match.id:'',taxTierId,priceInclusive});
+  addManualIntakeRow({parsedName:item.name,qty:item.qty,unitCost:item.unitCost,productId:match?match.id:'',taxTierId,priceInclusive,taxRatePct});
   const invWrap=document.getElementById('si-invoice-wrap');if(invWrap)invWrap.style.display=TAX_SETTINGS.is_vat_registered?'block':'none';
   const reviewWrap=document.getElementById('rsReceiptReview');if(reviewWrap){reviewWrap.style.display='none';reviewWrap.innerHTML='';}
 }
@@ -1294,8 +1324,12 @@ function renderReceiptReviewTable(parsed){
     const aiTier=pickTierForCategory(it.taxCategory);
     const defaultTier=(match&&match.tax_tier_id)?getTaxTierById(match.tax_tier_id):aiTier;
     const defaultInclusive=(match&&match.tax_tier_id)?!!match.price_inclusive:!!it.taxInclusive;
-    const aiHint=(!match&&aiTier)?`<div style="font-size:9px;color:var(--purple3);margin-top:2px">🤖 AI: ${aiTier.name}${it.taxInclusive?' · incl.':''}</div>`:'';
-    return `<div class="rs-review-row" data-row-id="${rowId}" data-parsed-name="${(it.name||'').replace(/"/g,'&quot;')}" style="display:grid;grid-template-columns:1.4fr auto 1fr 1fr 1.2fr auto;gap:7px;align-items:end;padding:8px 0;border-bottom:1px solid var(--border)">
+    // Rate % is what actually drives the split — the receipt's own printed rate wins over
+    // the tier's configured rate, so this works correctly even for a business that has
+    // never set up any country/tier rate at all.
+    const defaultRate=(typeof it.taxRatePct==='number'&&it.taxRatePct>0)?it.taxRatePct:(defaultTier?parseFloat(defaultTier.rate):'');
+    const aiHint=(!match&&aiTier)?`<div style="font-size:9px;color:var(--purple3);margin-top:2px">🤖 AI: ${aiTier.name}${it.taxRatePct?` · ${it.taxRatePct}% (from receipt)`:''}${it.taxInclusive?' · incl.':''}</div>`:'';
+    return `<div class="rs-review-row" data-row-id="${rowId}" data-parsed-name="${(it.name||'').replace(/"/g,'&quot;')}" style="display:grid;grid-template-columns:1.3fr auto 0.7fr 0.8fr 0.9fr 0.6fr auto;gap:7px;align-items:end;padding:8px 0;border-bottom:1px solid var(--border)">
       <div>
         <div style="font-size:10px;color:var(--text3);margin-bottom:3px">Receipt said: "${it.name}"</div>
         <select class="rs-review-product" id="sel-${rowId}" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:7px 9px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none">${options}</select>
@@ -1304,7 +1338,9 @@ function renderReceiptReviewTable(parsed){
       <button type="button" onclick="openQuickAddProduct('sel-${rowId}')" title="Add a new product without leaving this page" style="padding:7px 9px;background:transparent;border:1px dashed var(--gold2);border-radius:5px;color:var(--gold2);cursor:pointer;font-size:11px;white-space:nowrap">+ New</button>
       <div><div style="font-size:10px;color:var(--text3);margin-bottom:3px">Qty</div><input class="rs-review-qty" type="number" value="${it.qty||0}" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:7px 9px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none"/></div>
       <div><div style="font-size:10px;color:var(--text3);margin-bottom:3px">Unit Cost</div><input class="rs-review-cost" type="number" step="0.01" value="${it.unitCost||0}" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:7px 9px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none"/></div>
-      <div><div style="font-size:10px;color:var(--text3);margin-bottom:3px">Tax Tier</div><select class="rs-review-tax-tier" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:7px 9px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text);outline:none">${taxTierSelectOptions(defaultTier?defaultTier.id:'')}</select></div><label style="display:flex;align-items:center;gap:4px;font-size:9px;color:var(--text3);padding-bottom:7px;white-space:nowrap"><input type="checkbox" class="rs-review-tax-incl" ${defaultInclusive?'checked':''} style="accent-color:var(--gold2)"/> incl.</label>
+      <div><div style="font-size:10px;color:var(--text3);margin-bottom:3px">Tax Tier</div><select class="rs-review-tax-tier" onchange="syncIntakeRateFromTier(this)" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:7px 9px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text);outline:none">${taxTierSelectOptions(defaultTier?defaultTier.id:'')}</select></div>
+      <div><div style="font-size:10px;color:var(--text3);margin-bottom:3px" title="Read straight off the receipt when available">Rate %</div><input class="rs-review-tax-rate" type="number" step="0.01" value="${defaultRate}" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:7px 9px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none"/></div>
+      <label style="display:flex;align-items:center;gap:4px;font-size:9px;color:var(--text3);padding-bottom:7px;white-space:nowrap"><input type="checkbox" class="rs-review-tax-incl" ${defaultInclusive?'checked':''} style="accent-color:var(--gold2)"/> incl.</label>
     </div>`;
   }).join('');
   wrap.style.display='block';
@@ -1337,9 +1373,11 @@ async function confirmReceiptIntake(){
     const unitCost=parseFloat(row.querySelector('.rs-review-cost').value)||0;
     const taxTierSel=row.querySelector('.rs-review-tax-tier');
     const taxTierId=taxTierSel?taxTierSel.value:'';
+    const rateInput=row.querySelector('.rs-review-tax-rate');
+    const taxRatePct=rateInput?(parseFloat(rateInput.value)||0):0;
     const priceInclusive=row.querySelector('.rs-review-tax-incl')?row.querySelector('.rs-review-tax-incl').checked:false;
     if(qty<=0||unitCost<=0){skipped++;return;}
-    candidates.push({productId,parsedName,qty,unitCost,taxTierId,priceInclusive});
+    candidates.push({productId,parsedName,qty,unitCost,taxTierId,taxRatePct,priceInclusive});
   });
   if(!candidates.length){setRSReceiptStatus('⚠️ No rows have both a quantity and a unit cost — nothing to receive.',true);return;}
   setRSReceiptStatus('⏳ Recording receipt...');
@@ -1352,7 +1390,11 @@ async function confirmReceiptIntake(){
         autoCreated.push(c.parsedName||'Unnamed Item');
       }
       const tier=getTaxTierById(c.taxTierId);
-      const rate=tier?parseFloat(tier.rate):0;
+      // The Rate % field the user reviewed/confirmed is authoritative — it's what the
+      // receipt actually printed (or what they typed), independent of whatever rate this
+      // company's tier happens to be configured with. Tier is kept only for labeling
+      // (tier_name on the VAT ledger) and for tagging the product going forward.
+      const rate=c.taxRatePct;
       const split=computeTaxSplit(c.unitCost*c.qty,rate,c.priceInclusive);
       const inventoryAmt=isRegistered?split.base:split.grandTotal;
       const recoverableTax=isRegistered?split.tax:0;
@@ -1418,9 +1460,11 @@ async function receiveStock(){
     const unitCost=parseFloat(row.querySelector('.si-row-cost').value)||0;
     const taxTierSel=row.querySelector('.si-row-tax-tier');
     const taxTierId=taxTierSel?taxTierSel.value:'';
+    const rateInput=row.querySelector('.si-row-tax-rate');
+    const taxRatePct=rateInput?(parseFloat(rateInput.value)||0):0;
     const priceInclusive=row.querySelector('.si-row-tax-incl')?row.querySelector('.si-row-tax-incl').checked:false;
     if(qty<=0||unitCost<=0)return;
-    candidates.push({productId,parsedName,qty,unitCost,taxTierId,priceInclusive});
+    candidates.push({productId,parsedName,qty,unitCost,taxTierId,taxRatePct,priceInclusive});
   });
   if(!candidates.length){st.innerHTML='<span style="color:var(--red3)">Add at least one item with a quantity and unit cost</span>';return;}
   for(const c of candidates){
@@ -1436,7 +1480,10 @@ async function receiveStock(){
         autoCreated.push(c.parsedName);
       }
       const tier=getTaxTierById(c.taxTierId);
-      const rate=tier?parseFloat(tier.rate):0;
+      // The Rate % field is authoritative — whatever was printed on the receipt (or typed
+      // manually), independent of this company's tier configuration. Tier is kept only for
+      // labeling (VAT ledger tier_name) and for tagging the product going forward.
+      const rate=c.taxRatePct;
       const split=computeTaxSplit(c.unitCost*c.qty,rate,c.priceInclusive);
       const inventoryAmt=isRegistered?split.base:split.grandTotal;
       const recoverableTax=isRegistered?split.tax:0;
