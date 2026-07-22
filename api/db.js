@@ -91,7 +91,7 @@ const SYSTEM_ACCOUNTS = [
   // Current Assets
   { code:'1000', name:'Cash',                       parent_group:'Current Assets',    account_type:'asset',     is_system:true },
   { code:'1010', name:'Petty Cash',                 parent_group:'Current Assets',    account_type:'asset',     is_system:true },
-  { code:'1020', name:'Mobile Money',               parent_group:'Current Assets',    account_type:'asset',     is_system:true },
+  { code:'1020', name:'Mobile Money',               parent_group:'Current Assets',     account_type:'asset',     is_system:true },
   { code:'1030', name:'Accounts Receivable',        parent_group:'Current Assets',    account_type:'asset',     is_system:true },
   { code:'1040', name:'Retention Receivable',       parent_group:'Current Assets',    account_type:'asset',     is_system:true },
   { code:'1050', name:'Construction Materials',     parent_group:'Current Assets',    account_type:'asset',     is_system:true },
@@ -229,6 +229,37 @@ async function ensureRetailTables() {
   `);
 }
 
+// ── CUSTOMERS & SUPPLIERS (subsidiary ledger master data) ────────────────────
+// These are simple reusable name lists — a "mini Chart of Accounts" for people/companies
+// instead of GL accounts. They do NOT get their own GL account; the control accounts
+// (Accounts Receivable / Accounts Payable) stay singular in the ledger. Instead, every
+// transaction that affects AR/AP/an expense can be TAGGED with a customerId/supplierId,
+// and the AR-by-Customer / AP-by-Supplier reports filter+group by that tag. This keeps the
+// Trial Balance and Balance Sheet totals exactly as they were — nothing about the core
+// ledger math changes, only which specific person/company each entry belongs to.
+async function ensurePartyTables() {
+  await query(`
+    CREATE TABLE IF NOT EXISTS hh_customers (
+      id SERIAL PRIMARY KEY,
+      company_id INTEGER NOT NULL REFERENCES hh_companies(id),
+      name TEXT NOT NULL,
+      contact TEXT DEFAULT '',
+      notes TEXT DEFAULT '',
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(company_id, name)
+    );
+    CREATE TABLE IF NOT EXISTS hh_suppliers (
+      id SERIAL PRIMARY KEY,
+      company_id INTEGER NOT NULL REFERENCES hh_companies(id),
+      name TEXT NOT NULL,
+      contact TEXT DEFAULT '',
+      notes TEXT DEFAULT '',
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(company_id, name)
+    );
+  `);
+}
+
 // ── TAX ENGINE (Multi-country VAT) ───────────────────────────────────────────
 // Available to BOTH construction and retail modes — materials purchases and contract
 // invoices are just as taxable as retail sales, so this isn't gated by app_mode.
@@ -266,15 +297,8 @@ async function ensureTaxTables() {
   `);
 }
 
-// Country presets: standard VAT/GST rates as widely published at time of writing. This
-// covers the large majority of the world so the AI-lookup fallback (frontend calls /api/ai
-// for a country typed by hand) is only needed for the long tail — but rates DO change over
-// time and vary by product/region within a country, so these are defaults to seed from,
-// never a substitute for the Owner confirming their actual current rate. Countries with a
-// known, distinct reduced rate get one modeled; the rest keep Standard/Zero-Rated/Exempt
-// rather than guessing a reduced-rate figure we're not confident of.
+// Country presets: standard VAT/GST rates as widely published at time of writing.
 const COUNTRY_TAX_DEFAULTS = {
-  // East & Central Africa
   UG: { label: 'Uganda',           tiers: [{name:'Standard Rate', code:'standard', rate:18},   {name:'Zero-Rated', code:'zero', rate:0}, {name:'Exempt', code:'exempt', rate:0}] },
   KE: { label: 'Kenya',            tiers: [{name:'Standard Rate', code:'standard', rate:16},   {name:'Zero-Rated', code:'zero', rate:0}, {name:'Exempt', code:'exempt', rate:0}] },
   TZ: { label: 'Tanzania',         tiers: [{name:'Standard Rate', code:'standard', rate:18},   {name:'Zero-Rated', code:'zero', rate:0}, {name:'Exempt', code:'exempt', rate:0}] },
@@ -282,22 +306,18 @@ const COUNTRY_TAX_DEFAULTS = {
   SS: { label: 'South Sudan',      tiers: [{name:'Standard Rate', code:'standard', rate:0},    {name:'Exempt', code:'exempt', rate:0}] },
   ET: { label: 'Ethiopia',         tiers: [{name:'Standard Rate', code:'standard', rate:15},   {name:'Zero-Rated', code:'zero', rate:0}, {name:'Exempt', code:'exempt', rate:0}] },
   ZM: { label: 'Zambia',           tiers: [{name:'Standard Rate', code:'standard', rate:16},   {name:'Zero-Rated', code:'zero', rate:0}, {name:'Exempt', code:'exempt', rate:0}] },
-  // West Africa
   NG: { label: 'Nigeria',          tiers: [{name:'Standard Rate', code:'standard', rate:7.5},  {name:'Zero-Rated', code:'zero', rate:0}, {name:'Exempt', code:'exempt', rate:0}] },
   GH: { label: 'Ghana',            tiers: [{name:'Standard Rate', code:'standard', rate:15},   {name:'Zero-Rated', code:'zero', rate:0}, {name:'Exempt', code:'exempt', rate:0}] },
   CI: { label: "Côte d'Ivoire",    tiers: [{name:'Standard Rate', code:'standard', rate:18},   {name:'Exempt', code:'exempt', rate:0}] },
   SN: { label: 'Senegal',          tiers: [{name:'Standard Rate', code:'standard', rate:18},   {name:'Exempt', code:'exempt', rate:0}] },
-  // Southern Africa
   ZA: { label: 'South Africa',     tiers: [{name:'Standard Rate', code:'standard', rate:15},   {name:'Zero-Rated', code:'zero', rate:0}, {name:'Exempt', code:'exempt', rate:0}] },
   BW: { label: 'Botswana',         tiers: [{name:'Standard Rate', code:'standard', rate:14},   {name:'Zero-Rated', code:'zero', rate:0}, {name:'Exempt', code:'exempt', rate:0}] },
   NA: { label: 'Namibia',          tiers: [{name:'Standard Rate', code:'standard', rate:15},   {name:'Zero-Rated', code:'zero', rate:0}, {name:'Exempt', code:'exempt', rate:0}] },
   ZW: { label: 'Zimbabwe',         tiers: [{name:'Standard Rate', code:'standard', rate:15},   {name:'Zero-Rated', code:'zero', rate:0}, {name:'Exempt', code:'exempt', rate:0}] },
-  // North Africa
   EG: { label: 'Egypt',            tiers: [{name:'Standard Rate', code:'standard', rate:14},   {name:'Exempt', code:'exempt', rate:0}] },
   MA: { label: 'Morocco',          tiers: [{name:'Standard Rate', code:'standard', rate:20},   {name:'Reduced Rate', code:'reduced', rate:10}, {name:'Exempt', code:'exempt', rate:0}] },
   TN: { label: 'Tunisia',          tiers: [{name:'Standard Rate', code:'standard', rate:19},   {name:'Exempt', code:'exempt', rate:0}] },
   DZ: { label: 'Algeria',          tiers: [{name:'Standard Rate', code:'standard', rate:19},   {name:'Exempt', code:'exempt', rate:0}] },
-  // UK & Europe
   GB: { label: 'United Kingdom',   tiers: [{name:'Standard Rate', code:'standard', rate:20},   {name:'Reduced Rate', code:'reduced', rate:5}, {name:'Zero-Rated', code:'zero', rate:0}, {name:'Exempt', code:'exempt', rate:0}] },
   DE: { label: 'Germany',          tiers: [{name:'Standard Rate', code:'standard', rate:19},   {name:'Reduced Rate', code:'reduced', rate:7}, {name:'Exempt', code:'exempt', rate:0}] },
   FR: { label: 'France',           tiers: [{name:'Standard Rate', code:'standard', rate:20},   {name:'Reduced Rate', code:'reduced', rate:5.5}, {name:'Exempt', code:'exempt', rate:0}] },
@@ -319,7 +339,6 @@ const COUNTRY_TAX_DEFAULTS = {
   RO: { label: 'Romania',          tiers: [{name:'Standard Rate', code:'standard', rate:19},   {name:'Reduced Rate', code:'reduced', rate:9}, {name:'Exempt', code:'exempt', rate:0}] },
   HU: { label: 'Hungary',          tiers: [{name:'Standard Rate', code:'standard', rate:27},   {name:'Reduced Rate', code:'reduced', rate:5}, {name:'Exempt', code:'exempt', rate:0}] },
   TR: { label: 'Turkey',           tiers: [{name:'Standard Rate', code:'standard', rate:20},   {name:'Reduced Rate', code:'reduced', rate:10}, {name:'Exempt', code:'exempt', rate:0}] },
-  // Americas
   US: { label: 'United States',    tiers: [{name:'Sales Tax (varies by state)', code:'standard', rate:0}, {name:'Exempt', code:'exempt', rate:0}] },
   CA: { label: 'Canada',           tiers: [{name:'Federal GST', code:'standard', rate:5},      {name:'Zero-Rated', code:'zero', rate:0}, {name:'Exempt', code:'exempt', rate:0}] },
   MX: { label: 'Mexico',           tiers: [{name:'Standard Rate', code:'standard', rate:16},   {name:'Zero-Rated', code:'zero', rate:0}, {name:'Exempt', code:'exempt', rate:0}] },
@@ -328,12 +347,10 @@ const COUNTRY_TAX_DEFAULTS = {
   CL: { label: 'Chile',            tiers: [{name:'Standard Rate', code:'standard', rate:19},   {name:'Exempt', code:'exempt', rate:0}] },
   CO: { label: 'Colombia',         tiers: [{name:'Standard Rate', code:'standard', rate:19},   {name:'Exempt', code:'exempt', rate:0}] },
   PE: { label: 'Peru',             tiers: [{name:'Standard Rate', code:'standard', rate:18},   {name:'Exempt', code:'exempt', rate:0}] },
-  // Middle East
   AE: { label: 'United Arab Emirates', tiers: [{name:'Standard Rate', code:'standard', rate:5}, {name:'Zero-Rated', code:'zero', rate:0}, {name:'Exempt', code:'exempt', rate:0}] },
   SA: { label: 'Saudi Arabia',     tiers: [{name:'Standard Rate', code:'standard', rate:15},   {name:'Zero-Rated', code:'zero', rate:0}, {name:'Exempt', code:'exempt', rate:0}] },
   IL: { label: 'Israel',           tiers: [{name:'Standard Rate', code:'standard', rate:17},   {name:'Exempt', code:'exempt', rate:0}] },
   QA: { label: 'Qatar',            tiers: [{name:'Standard Rate', code:'standard', rate:0},    {name:'Exempt', code:'exempt', rate:0}] },
-  // Asia-Pacific
   JP: { label: 'Japan',            tiers: [{name:'Standard Rate', code:'standard', rate:10},   {name:'Reduced Rate', code:'reduced', rate:8}, {name:'Exempt', code:'exempt', rate:0}] },
   KR: { label: 'South Korea',      tiers: [{name:'Standard Rate', code:'standard', rate:10},   {name:'Zero-Rated', code:'zero', rate:0}, {name:'Exempt', code:'exempt', rate:0}] },
   CN: { label: 'China',            tiers: [{name:'Standard Rate', code:'standard', rate:13},   {name:'Reduced Rate', code:'reduced', rate:9}, {name:'Exempt', code:'exempt', rate:0}] },
@@ -347,8 +364,6 @@ const COUNTRY_TAX_DEFAULTS = {
   TH: { label: 'Thailand',         tiers: [{name:'Standard Rate', code:'standard', rate:7},    {name:'Exempt', code:'exempt', rate:0}] },
   PK: { label: 'Pakistan',         tiers: [{name:'Standard Rate', code:'standard', rate:18},   {name:'Exempt', code:'exempt', rate:0}] },
   BD: { label: 'Bangladesh',       tiers: [{name:'Standard Rate', code:'standard', rate:15},   {name:'Exempt', code:'exempt', rate:0}] },
-  // Fallback for anything not listed above — the frontend offers an AI lookup here, and the
-  // Owner reviews/confirms before it's saved, since this is the one case with no verified figure.
   OTHER: { label: "My country isn't listed", tiers: [{name:'Standard Rate', code:'standard', rate:0}, {name:'Zero-Rated', code:'zero', rate:0}, {name:'Exempt', code:'exempt', rate:0}] },
 };
 async function seedTaxTiers(companyId, country) {
@@ -361,9 +376,6 @@ async function seedTaxTiers(companyId, country) {
   }
 }
 
-// Server-side fraud control: once a period covering this date is closed, nothing that
-// creates a new dated transaction may reference that date — enforced here, not just in
-// the UI, so it can't be bypassed by calling the API directly or editing client JS.
 async function isDateInClosedPeriod(companyId, dateStr) {
   if (!dateStr) return false;
   const r = await query(
@@ -372,16 +384,12 @@ async function isDateInClosedPeriod(companyId, dateStr) {
   );
   return r.rows.length > 0;
 }
-// Order-independent deep JSON comparison, so field-ordering differences never cause a
-// false mismatch when comparing an entry against its previously-saved version.
 function stableStringify(obj) {
   if (obj === null || typeof obj !== 'object') return JSON.stringify(obj);
   if (Array.isArray(obj)) return '[' + obj.map(stableStringify).join(',') + ']';
   const keys = Object.keys(obj).sort();
   return '{' + keys.map(k => JSON.stringify(k) + ':' + stableStringify(obj[k])).join(',') + '}';
 }
-// The ONLY change a closed-period entry may legitimately undergo is being flagged
-// is_locked:true (the act of closing itself) — everything else about it is frozen.
 function entryUnchangedExceptLocking(oldEntry, newEntry) {
   const strip = e => { const c = { ...e }; delete c.is_locked; return c; };
   return stableStringify(strip(oldEntry)) === stableStringify(strip(newEntry));
@@ -396,7 +404,6 @@ module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    // Parse body - handle both Vercel auto-parse and raw stream
     let body = req.body;
     if (!body || typeof body !== 'object') {
       try {
@@ -412,6 +419,7 @@ module.exports = async function handler(req, res) {
     await ensureTables();
     await ensureRetailTables();
     await ensureTaxTables();
+    await ensurePartyTables();
     const { action } = body;
 
     // ── REGISTER ─────────────────────────────────────────────────────────────
@@ -458,7 +466,6 @@ module.exports = async function handler(req, res) {
       const { userId, bizName, appMode } = body;
       if (!userId || !bizName) return res.status(400).json({ error: 'Missing fields' });
       await query("ALTER TABLE hh_companies ADD COLUMN IF NOT EXISTS app_mode TEXT DEFAULT 'construction'").catch(()=>{});
-      // Prevent duplicate — return existing if same user+name
       const existing = await query(
         "SELECT c.id, c.name FROM hh_companies c JOIN hh_user_companies uc ON uc.company_id=c.id WHERE uc.user_id=$1 AND LOWER(c.name)=LOWER($2)",
         [parseInt(userId), bizName]
@@ -510,10 +517,6 @@ module.exports = async function handler(req, res) {
       const { companyId, key, value } = body;
       if (!companyId || !key) return res.status(400).json({ error: 'Missing fields' });
 
-      // Fraud control for the general journal specifically: entries dated inside a closed
-      // period may not be added, deleted, or altered — the ONLY allowed change is flagging
-      // one is_locked:true (the close operation itself). This is enforced here so it can't
-      // be bypassed by editing client JS or calling this endpoint directly.
       if (key === 'entries') {
         const periodsR = await query('SELECT period_start, period_end FROM hh_accounting_periods WHERE company_id=$1 AND is_closed=TRUE', [parseInt(companyId)]);
         if (periodsR.rows.length) {
@@ -605,6 +608,62 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true });
     }
 
+    // ── CUSTOMERS (subsidiary ledger master data) ─────────────────────────────
+    if (action === 'listCustomers') {
+      const { companyId } = body;
+      if (!companyId) return res.status(400).json({ error: 'Missing companyId' });
+      const r = await query('SELECT * FROM hh_customers WHERE company_id=$1 ORDER BY name', [parseInt(companyId)]);
+      return res.status(200).json({ ok: true, customers: r.rows });
+    }
+    if (action === 'saveCustomer') {
+      const { companyId, id, name, contact, notes } = body;
+      if (!companyId || !name) return res.status(400).json({ error: 'Missing fields' });
+      if (id) {
+        await query('UPDATE hh_customers SET name=$1,contact=$2,notes=$3 WHERE id=$4 AND company_id=$5',
+          [name, contact || '', notes || '', parseInt(id), parseInt(companyId)]);
+        return res.status(200).json({ ok: true, customerId: parseInt(id) });
+      }
+      const r = await query(`
+        INSERT INTO hh_customers(company_id,name,contact,notes) VALUES($1,$2,$3,$4)
+        ON CONFLICT(company_id,name) DO UPDATE SET contact=$3,notes=$4 RETURNING id
+      `, [parseInt(companyId), name, contact || '', notes || '']);
+      return res.status(200).json({ ok: true, customerId: r.rows[0]?.id });
+    }
+    if (action === 'deleteCustomer') {
+      const { customerId } = body;
+      if (!customerId) return res.status(400).json({ error: 'Missing customerId' });
+      await query('DELETE FROM hh_customers WHERE id=$1', [parseInt(customerId)]);
+      return res.status(200).json({ ok: true });
+    }
+
+    // ── SUPPLIERS (subsidiary ledger master data — also used as vendors for expenses) ──
+    if (action === 'listSuppliers') {
+      const { companyId } = body;
+      if (!companyId) return res.status(400).json({ error: 'Missing companyId' });
+      const r = await query('SELECT * FROM hh_suppliers WHERE company_id=$1 ORDER BY name', [parseInt(companyId)]);
+      return res.status(200).json({ ok: true, suppliers: r.rows });
+    }
+    if (action === 'saveSupplier') {
+      const { companyId, id, name, contact, notes } = body;
+      if (!companyId || !name) return res.status(400).json({ error: 'Missing fields' });
+      if (id) {
+        await query('UPDATE hh_suppliers SET name=$1,contact=$2,notes=$3 WHERE id=$4 AND company_id=$5',
+          [name, contact || '', notes || '', parseInt(id), parseInt(companyId)]);
+        return res.status(200).json({ ok: true, supplierId: parseInt(id) });
+      }
+      const r = await query(`
+        INSERT INTO hh_suppliers(company_id,name,contact,notes) VALUES($1,$2,$3,$4)
+        ON CONFLICT(company_id,name) DO UPDATE SET contact=$3,notes=$4 RETURNING id
+      `, [parseInt(companyId), name, contact || '', notes || '']);
+      return res.status(200).json({ ok: true, supplierId: r.rows[0]?.id });
+    }
+    if (action === 'deleteSupplier') {
+      const { supplierId } = body;
+      if (!supplierId) return res.status(400).json({ error: 'Missing supplierId' });
+      await query('DELETE FROM hh_suppliers WHERE id=$1', [parseInt(supplierId)]);
+      return res.status(200).json({ ok: true });
+    }
+
     // ── ACCOUNTING PERIODS ────────────────────────────────────────────────────
     if (action === 'listPeriods') {
       const { companyId } = body;
@@ -678,9 +737,6 @@ module.exports = async function handler(req, res) {
     }
 
     // ── RETAIL ACTIONS ────────────────────────────────────────────────────────
-    // (NOTE: previously there was a premature `return res.status(400).json({error:'Unknown action'})`
-    //  right here, before this block. That made every retail action below unreachable — THIS was
-    //  the actual bug. It has been removed; the real "unknown action" catch-all is at the very end.)
     if (action === 'switchMode') {
       const { companyId, appMode } = body;
       if (!companyId || !appMode) return res.status(400).json({ error: 'Missing fields' });
@@ -766,9 +822,6 @@ module.exports = async function handler(req, res) {
     }
 
     // ── PURCHASE ORDERS (RETAIL) ──────────────────────────────────────────────
-    // NOTE: submitting a PO is purely administrative — no journal entry, no inventory
-    // change. Each line item stores qty (ordered) and receivedQty (accumulated from
-    // actual deliveries via 'receivePOStock' below), which is what drives PO status.
     if (action === 'savePurchaseOrder') {
       const { companyId, supplier, po_date, items, total, paymentMethod, notes } = body;
       if (!companyId || !supplier) return res.status(400).json({ error: 'Missing fields' });
@@ -785,12 +838,8 @@ module.exports = async function handler(req, res) {
       const r = await query('SELECT * FROM hh_purchase_orders WHERE company_id=$1 ORDER BY created_at DESC LIMIT 100', [parseInt(companyId)]);
       return res.status(200).json({ ok: true, orders: r.rows });
     }
-    // Confirm a delivery against a specific PO. This is the ONLY place stock received
-    // against a PO increases inventory quantities and the ONLY place the PO's status
-    // moves off 'pending'. The actual journal entry (Dr Inventory / Cr AP) is posted by
-    // the frontend using the exact accepted quantities/costs returned here.
     if (action === 'receivePOStock') {
-      const { companyId, poId, receipts } = body; // receipts: [{productId, qty, unitCost}]
+      const { companyId, poId, receipts } = body;
       if (!companyId || !poId || !Array.isArray(receipts) || !receipts.length) return res.status(400).json({ error: 'Missing fields' });
       if (await isDateInClosedPeriod(companyId, new Date().toISOString().split('T')[0])) return res.status(409).json({ error: 'Today falls in a closed accounting period.' });
       const poR = await query('SELECT * FROM hh_purchase_orders WHERE id=$1 AND company_id=$2', [parseInt(poId), parseInt(companyId)]);
@@ -798,7 +847,7 @@ module.exports = async function handler(req, res) {
       const po = poR.rows[0];
       let items = Array.isArray(po.items) ? po.items : JSON.parse(po.items || '[]');
 
-      const accepted = []; // what we actually posted, for the frontend to journal
+      const accepted = [];
       for (const rcpt of receipts) {
         const pid = parseInt(rcpt.productId), qty = parseFloat(rcpt.qty) || 0;
         if (!pid || qty <= 0) continue;
@@ -827,9 +876,6 @@ module.exports = async function handler(req, res) {
     }
 
     // ── TAX ENGINE (Multi-country VAT) ────────────────────────────────────────
-    // getTaxSettings: returns registration status/country plus the full editable tier list.
-    // If this company has never configured tax before, seeds sensible country defaults
-    // (or the zeroed-out 'OTHER' preset) so the screen never opens completely empty.
     if (action === 'getTaxSettings') {
       const { companyId } = body;
       if (!companyId) return res.status(400).json({ error: 'Missing companyId' });
@@ -842,9 +888,6 @@ module.exports = async function handler(req, res) {
       const tiersR = await query('SELECT * FROM hh_tax_tiers WHERE company_id=$1 ORDER BY is_default DESC, rate DESC', [parseInt(companyId)]);
       return res.status(200).json({ ok: true, settings: settingsR.rows[0], tiers: tiersR.rows, countryOptions: Object.entries(COUNTRY_TAX_DEFAULTS).map(([code, v]) => ({ code, label: v.label })) });
     }
-    // saveTaxSettings: updates registration + country. Changing country only SEEDS any
-    // tiers that don't already exist (by code) — it never overwrites tiers the Owner has
-    // already customized, so switching country by mistake can't clobber real data.
     if (action === 'saveTaxSettings') {
       const { companyId, country, isVatRegistered } = body;
       if (!companyId) return res.status(400).json({ error: 'Missing companyId' });
@@ -875,11 +918,6 @@ module.exports = async function handler(req, res) {
       await query('DELETE FROM hh_tax_tiers WHERE id=$1', [parseInt(tierId)]);
       return res.status(200).json({ ok: true });
     }
-    // recordVatLedger: the compliance-grade audit trail behind the Tax Report — every
-    // input/output VAT line from a sale or a stock receipt lands here with its tier, rate,
-    // base/tax split, and (for purchases) the supplier's tax invoice number. Rejected
-    // outright if entry_date falls inside an already-closed period — the same fraud
-    // control as the general journal, enforced independently for this ledger too.
     if (action === 'recordVatLedger') {
       const { companyId, direction, tierName, rate, baseAmount, taxAmount, sourceType, sourceDesc, supplierInvoiceNo, entryDate } = body;
       if (!companyId || !direction || (direction !== 'input' && direction !== 'output')) return res.status(400).json({ error: 'Missing/invalid fields' });
@@ -902,8 +940,6 @@ module.exports = async function handler(req, res) {
       const r = await query(`SELECT * FROM hh_vat_ledger WHERE ${where} ORDER BY entry_date DESC, id DESC`, params);
       return res.status(200).json({ ok: true, rows: r.rows });
     }
-    // getVatSummary: the numbers behind the Tax Report screen — total output/input VAT,
-    // net payable-or-refundable, and a per-tier breakdown for the chosen date range.
     if (action === 'getVatSummary') {
       const { companyId, dateFrom, dateTo } = body;
       if (!companyId) return res.status(400).json({ error: 'Missing companyId' });
@@ -916,9 +952,6 @@ module.exports = async function handler(req, res) {
       const inputTotal  = r.rows.filter(x => x.direction === 'input').reduce((s, x) => s + x.tax_total, 0);
       return res.status(200).json({ ok: true, breakdown: r.rows, outputTotal, inputTotal, netPayable: outputTotal - inputTotal });
     }
-    // lockTaxPeriod: companion to closePeriod — marks every VAT ledger row in the range as
-    // locked (mirrors the general journal's is_locked flag) so the Tax Report can visibly
-    // show which figures are final versus still-open.
     if (action === 'lockTaxPeriod') {
       const { companyId, periodStart, periodEnd } = body;
       if (!companyId || !periodStart || !periodEnd) return res.status(400).json({ error: 'Missing fields' });
