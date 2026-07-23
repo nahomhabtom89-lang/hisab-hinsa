@@ -651,6 +651,23 @@ function refreshSupplierDropdowns(){document.querySelectorAll('.supplier-select'
 // normalize-and-compare approach as posFindProduct, just against the party lists instead.
 function findSupplierByName(name){if(!name)return null;const norm=(s)=>(s||'').toLowerCase().trim();const n=norm(name);return SUPPLIERS.find(s=>norm(s.name)===n)||SUPPLIERS.find(s=>norm(s.name).includes(n)||n.includes(norm(s.name)))||null;}
 function findCustomerByName(name){if(!name)return null;const norm=(s)=>(s||'').toLowerCase().trim();const n=norm(name);return CUSTOMERS.find(c=>norm(c.name)===n)||CUSTOMERS.find(c=>norm(c.name).includes(n)||n.includes(norm(c.name)))||null;}
+// Auto-registers a new Supplier record from a plain name when no match already exists —
+// mirrors the same "never block a transaction on a missing master record" pattern already
+// used for products (autoCreateProductFromReceiptLine). Called from every purchase-side
+// entry point (manual stock intake, AI receipt review, Purchase Orders, Deliveries) so a
+// supplier name typed once — or read straight off an uploaded receipt — is automatically
+// on file and tagged, with zero extra clicks required.
+async function ensureSupplierExists(name){
+  const trimmed=(name||'').trim();
+  if(!trimmed)return null;
+  const existing=findSupplierByName(trimmed);
+  if(existing)return existing;
+  try{
+    const r=await dbApi({action:'saveSupplier',companyId:SESSION.companyId,name:trimmed});
+    await loadSuppliers();refreshSupplierDropdowns();renderSupplierList();
+    return SUPPLIERS.find(s=>String(s.id)===String(r.supplierId))||{id:r.supplierId,name:trimmed,contact:'',notes:''};
+  }catch(e){console.error('ensureSupplierExists',e);return null;}
+}
 
 async function addCustomer(){
   const name=document.getElementById('custName').value.trim(),st=document.getElementById('custSt');
@@ -1018,7 +1035,7 @@ function onDelSupplierSelChange(){
   const txt=document.getElementById('delSupplier');
   if(supplier&&txt)txt.value=supplier.name;
 }
-function addDelivery(){const supplier=document.getElementById('delSupplier').value.trim(),supplierSel=document.getElementById('delSupplierSel'),supplierObj=supplierSel&&supplierSel.value?SUPPLIERS.find(s=>String(s.id)===String(supplierSel.value)):null,invNo=document.getElementById('delInvNo').value.trim(),items=document.getElementById('delItems').value.trim(),total=safeNum(document.getElementById('delTotal').value),pay=document.getElementById('delPay').value,date=document.getElementById('delDate').value||today(),linkedMatId=document.getElementById('delMaterial')?document.getElementById('delMaterial').value:'',st=document.getElementById('delSt');if(!supplier||!total){st.innerHTML='<span style="color:var(--red3)">Fill required fields</span>';return;}DB.deliveries.push({id:Date.now(),supplier,invNo,items,total,pay,date});let lockMsg='';if(linkedMatId){const mat=DB.materials.find(m=>String(m.id)===String(linkedMatId));if(mat&&mat.pendingQty>0){const unitCost=total/mat.pendingQty;mat.layers=mat.layers||[];mat.layers.push({qty:mat.pendingQty,unitCost,date});mat.qty=(mat.qty||0)+mat.pendingQty;mat.cost=unitCost;lockMsg=` — locked ${mat.pendingQty} ${mat.unit} of ${mat.name}`;mat.pendingQty=0;}}const entry={id:DB.nextId++,date,desc:`Delivery: ${supplier} — ${items||invNo}`,type:'Delivery',amount:total,project:'',debits:[{acct:'Construction Materials',amt:total,atype:'asset'}],credits:pay==='cash'?[{acct:'Cash',amt:total,atype:'asset'}]:[{acct:'Accounts Payable',amt:total,atype:'liability'}]};if(supplierObj)entry.party={type:'supplier',id:supplierObj.id,name:supplierObj.name};DB.entries.push(entry);saveData();renderAll();st.innerHTML=`<span style="color:var(--green3)">✅ ${supplier}${lockMsg}</span>`;setTimeout(()=>st.innerHTML='',5000);}
+async function addDelivery(){const supplier=document.getElementById('delSupplier').value.trim(),supplierSel=document.getElementById('delSupplierSel'),invNo=document.getElementById('delInvNo').value.trim(),items=document.getElementById('delItems').value.trim(),total=safeNum(document.getElementById('delTotal').value),pay=document.getElementById('delPay').value,date=document.getElementById('delDate').value||today(),linkedMatId=document.getElementById('delMaterial')?document.getElementById('delMaterial').value:'',st=document.getElementById('delSt');if(!supplier||!total){st.innerHTML='<span style="color:var(--red3)">Fill required fields</span>';return;}let supplierObj=supplierSel&&supplierSel.value?SUPPLIERS.find(s=>String(s.id)===String(supplierSel.value)):null;if(!supplierObj)supplierObj=await ensureSupplierExists(supplier);DB.deliveries.push({id:Date.now(),supplier,invNo,items,total,pay,date});let lockMsg='';if(linkedMatId){const mat=DB.materials.find(m=>String(m.id)===String(linkedMatId));if(mat&&mat.pendingQty>0){const unitCost=total/mat.pendingQty;mat.layers=mat.layers||[];mat.layers.push({qty:mat.pendingQty,unitCost,date});mat.qty=(mat.qty||0)+mat.pendingQty;mat.cost=unitCost;lockMsg=` — locked ${mat.pendingQty} ${mat.unit} of ${mat.name}`;mat.pendingQty=0;}}const entry={id:DB.nextId++,date,desc:`Delivery: ${supplier} — ${items||invNo}`,type:'Delivery',amount:total,project:'',debits:[{acct:'Construction Materials',amt:total,atype:'asset'}],credits:pay==='cash'?[{acct:'Cash',amt:total,atype:'asset'}]:[{acct:'Accounts Payable',amt:total,atype:'liability'}]};if(supplierObj)entry.party={type:'supplier',id:supplierObj.id,name:supplierObj.name};DB.entries.push(entry);saveData();renderAll();st.innerHTML=`<span style="color:var(--green3)">✅ ${supplier}${lockMsg}</span>`;setTimeout(()=>st.innerHTML='',5000);}
 function renderDelMaterialSelect(){const el=document.getElementById('delMaterial');if(!el)return;const pending=DB.materials.filter(m=>m.pendingQty>0);el.innerHTML='<option value="">— No linked material —</option>'+pending.map(m=>`<option value="${m.id}">${m.name} (${m.pendingQty} ${m.unit})</option>`).join('');}
 function renderDeliveryList(){const el=document.getElementById('deliveryList');if(!el)return;if(!DB.deliveries.length){el.innerHTML='<div style="text-align:center;padding:14px;color:var(--text3)">No deliveries</div>';return;}el.innerHTML=`<table><thead><tr><th>Date</th><th>Supplier</th><th>Items</th><th>Total</th><th>Payment</th></tr></thead><tbody>${DB.deliveries.slice(-30).reverse().map(d=>`<tr><td>${d.date}</td><td>${d.supplier}</td><td>${d.items||d.invNo}</td><td style="font-family:'JetBrains Mono',monospace">${fc(d.total)}</td><td><span class="tag ${d.pay==='cash'?'t-green':'t-orange'}">${d.pay}</span></td></tr>`).join('')}</tbody></table>`;}
 
@@ -1633,7 +1650,7 @@ async function confirmReceiptIntake(){
     const names=lines.map(l=>{const p=RETAIL_PRODUCTS.find(x=>x.id===l.productId);return p?`${p.name} ×${l.qty}`:`#${l.productId} ×${l.qty}`;});
     const totalBase=journalLines.reduce((s,l)=>s+l.base,0),totalTax=journalLines.reduce((s,l)=>s+l.tax,0),totalGrand=totalBase+totalTax;
     const receiptEntry=buildIntakeJournalEntry(`Stock received (from receipt): ${supplier||'supplier'}${invoiceNo?` (Inv# ${invoiceNo})`:''} — ${names.join(', ')}`,journalLines,payMethod);
-    const receiptSupplierMatch=findSupplierByName(supplier);
+    const receiptSupplierMatch=await ensureSupplierExists(supplier);
     if(receiptSupplierMatch)receiptEntry.party={type:'supplier',id:receiptSupplierMatch.id,name:receiptSupplierMatch.name};
     DB.entries.push(receiptEntry);
     if(isRegistered){
@@ -1721,7 +1738,7 @@ async function receiveStock(){
     const names=journalLines.map(l=>l.productName);
     const intakeEntry=buildIntakeJournalEntry(`Stock received: ${supplier||'supplier'}${invoiceNo?` (Inv# ${invoiceNo})`:''} — ${names.join(', ')}`,journalLines,payMethod);
     const siSupplierSel=document.getElementById('si-supplier-sel');
-    const intakeSupplierMatch=(siSupplierSel&&siSupplierSel.value)?SUPPLIERS.find(s=>String(s.id)===String(siSupplierSel.value)):findSupplierByName(supplier);
+    const intakeSupplierMatch=(siSupplierSel&&siSupplierSel.value)?SUPPLIERS.find(s=>String(s.id)===String(siSupplierSel.value)):await ensureSupplierExists(supplier);
     if(intakeSupplierMatch)intakeEntry.party={type:'supplier',id:intakeSupplierMatch.id,name:intakeSupplierMatch.name};
     DB.entries.push(intakeEntry);
     if(isRegistered){
@@ -1824,7 +1841,7 @@ async function confirmPOReceipt(){
     if(totalGrand>0){
       const po=PO_ORDERS.find(o=>String(o.id)===String(poId));
       const poEntry=buildIntakeJournalEntry(`Stock received: PO #${poId} — ${po?po.supplier:'supplier'}${invoiceNo?` (Inv# ${invoiceNo})`:''} (${accepted.map(a=>a.name+' ×'+a.qty).join(', ')})`,journalLines,'credit');
-      const supplierMatch=po?findSupplierByName(po.supplier):null;
+      const supplierMatch=po?await ensureSupplierExists(po.supplier):null;
       if(supplierMatch)poEntry.party={type:'supplier',id:supplierMatch.id,name:supplierMatch.name};
       DB.entries.push(poEntry);
       await saveData();
@@ -2057,7 +2074,7 @@ function addPOLine(){
   `;
   el.appendChild(row);
 }
-async function submitPurchaseOrder(){const supplier=document.getElementById('po-supplier').value.trim(),payMethod=document.getElementById('po-pay').value,notes=document.getElementById('po-notes').value.trim(),st=document.getElementById('po-st');if(!supplier){st.innerHTML='<span style="color:var(--red3)">Enter supplier</span>';return;}const rows=document.querySelectorAll('.po-line-row');const items=[];let total=0;rows.forEach(row=>{const productId=row.querySelector('.po-line-product').value,qty=parseFloat(row.querySelector('.po-line-qty').value)||0,unitCost=parseFloat(row.querySelector('.po-line-cost').value)||0;if(!productId||!qty||!unitCost)return;const product=RETAIL_PRODUCTS.find(p=>p.id===parseInt(productId));if(!product)return;const lineTotal=qty*unitCost;total+=lineTotal;items.push({productId:parseInt(productId),name:product.name,qty,unitCost,lineTotal,receivedQty:0});});if(!items.length){st.innerHTML='<span style="color:var(--red3)">Add at least one item</span>';return;}try{await dbApi({action:'savePurchaseOrder',companyId:SESSION.companyId,supplier,po_date:today(),items,total,paymentMethod:payMethod,notes});st.innerHTML=`<span style="color:var(--green3)">✅ PO saved — ${fc(total)} from ${supplier}. No journal entry posted yet; that happens when stock is received.</span>`;document.getElementById('po-supplier').value='';const poSel=document.getElementById('po-supplier-sel');if(poSel)poSel.value='';if(document.getElementById('po-notes'))document.getElementById('po-notes').value='';renderPOLines();await loadPurchaseOrdersCache();await renderPOList();}catch(e){st.innerHTML=`<span style="color:var(--red3)">❌ ${e.message}</span>`;}setTimeout(()=>{const s=document.getElementById('po-st');if(s)s.innerHTML='';},6000);}
+async function submitPurchaseOrder(){const supplier=document.getElementById('po-supplier').value.trim(),payMethod=document.getElementById('po-pay').value,notes=document.getElementById('po-notes').value.trim(),st=document.getElementById('po-st');if(!supplier){st.innerHTML='<span style="color:var(--red3)">Enter supplier</span>';return;}const rows=document.querySelectorAll('.po-line-row');const items=[];let total=0;rows.forEach(row=>{const productId=row.querySelector('.po-line-product').value,qty=parseFloat(row.querySelector('.po-line-qty').value)||0,unitCost=parseFloat(row.querySelector('.po-line-cost').value)||0;if(!productId||!qty||!unitCost)return;const product=RETAIL_PRODUCTS.find(p=>p.id===parseInt(productId));if(!product)return;const lineTotal=qty*unitCost;total+=lineTotal;items.push({productId:parseInt(productId),name:product.name,qty,unitCost,lineTotal,receivedQty:0});});if(!items.length){st.innerHTML='<span style="color:var(--red3)">Add at least one item</span>';return;}try{const existedBefore=!!findSupplierByName(supplier);const supplierRecord=await ensureSupplierExists(supplier);await dbApi({action:'savePurchaseOrder',companyId:SESSION.companyId,supplier,po_date:today(),items,total,paymentMethod:payMethod,notes});st.innerHTML=`<span style="color:var(--green3)">✅ PO saved — ${fc(total)} from ${supplier}${supplierRecord&&!existedBefore?' (new supplier added)':''}. No journal entry posted yet; that happens when stock is received.</span>`;document.getElementById('po-supplier').value='';const poSel=document.getElementById('po-supplier-sel');if(poSel)poSel.value='';if(document.getElementById('po-notes'))document.getElementById('po-notes').value='';renderPOLines();await loadPurchaseOrdersCache();await renderPOList();}catch(e){st.innerHTML=`<span style="color:var(--red3)">❌ ${e.message}</span>`;}setTimeout(()=>{const s=document.getElementById('po-st');if(s)s.innerHTML='';},6000);}
 function onPoSupplierTextInput(){const txt=document.getElementById('po-supplier').value.trim();const sel=document.getElementById('po-supplier-sel');if(!sel)return;const match=findSupplierByName(txt);sel.value=match?match.id:'';}
 function onPoSupplierSelChange(){const sel=document.getElementById('po-supplier-sel');const supplier=sel?SUPPLIERS.find(s=>String(s.id)===String(sel.value)):null;const txt=document.getElementById('po-supplier');if(supplier&&txt)txt.value=supplier.name;}
 
@@ -2203,4 +2220,3 @@ window.addEventListener('DOMContentLoaded',()=>{
 </script>
 </body>
 </html>
-
