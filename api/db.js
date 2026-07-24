@@ -821,22 +821,40 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true, sales: r.rows });
     }
 
-    // ── PURCHASE ORDERS (RETAIL) ──────────────────────────────────────────────
+    // ── PURCHASE ORDERS (shared by RETAIL products and CONSTRUCTION materials) ─
+    // 'kind' distinguishes the two so each mode's PO picker only shows its own orders —
+    // items still store the same generic {productId/materialId, name, qty, unitCost,
+    // receivedQty} shape either way. Retail POs are received via 'receivePOStock' (which
+    // also updates the hh_products table); construction material POs use the lighter
+    // 'updatePurchaseOrderStatus' below, since materials live in the client-side hh_data
+    // blob, not a server-tracked table.
     if (action === 'savePurchaseOrder') {
-      const { companyId, supplier, po_date, items, total, paymentMethod, notes } = body;
+      const { companyId, supplier, po_date, items, total, paymentMethod, notes, kind } = body;
       if (!companyId || !supplier) return res.status(400).json({ error: 'Missing fields' });
+      await query("ALTER TABLE hh_purchase_orders ADD COLUMN IF NOT EXISTS kind TEXT DEFAULT 'retail'").catch(()=>{});
       const itemsWithReceipt = (items||[]).map(it => ({ ...it, receivedQty: parseFloat(it.receivedQty) || 0 }));
-      const r = await query(`INSERT INTO hh_purchase_orders(company_id,supplier,po_date,items,total,payment_method,notes,status)
-        VALUES($1,$2,$3,$4::jsonb,$5,$6,$7,'pending') RETURNING id`,
+      const r = await query(`INSERT INTO hh_purchase_orders(company_id,supplier,po_date,items,total,payment_method,notes,status,kind)
+        VALUES($1,$2,$3,$4::jsonb,$5,$6,$7,'pending',$8) RETURNING id`,
         [parseInt(companyId), supplier, po_date||new Date().toISOString().split('T')[0],
-         JSON.stringify(itemsWithReceipt), total||0, paymentMethod||'credit', notes||'']);
+         JSON.stringify(itemsWithReceipt), total||0, paymentMethod||'credit', notes||'', kind==='construction_materials'?'construction_materials':'retail']);
       return res.status(200).json({ ok: true, poId: r.rows[0].id });
     }
     if (action === 'listPurchaseOrders') {
       const { companyId } = body;
       if (!companyId) return res.status(400).json({ error: 'Missing companyId' });
+      await query("ALTER TABLE hh_purchase_orders ADD COLUMN IF NOT EXISTS kind TEXT DEFAULT 'retail'").catch(()=>{});
       const r = await query('SELECT * FROM hh_purchase_orders WHERE company_id=$1 ORDER BY created_at DESC LIMIT 100', [parseInt(companyId)]);
       return res.status(200).json({ ok: true, orders: r.rows });
+    }
+    // Generic PO items/status update — used by construction material receiving, which
+    // computes the accepted quantities and new status entirely client-side (materials
+    // aren't a server-tracked table) and just needs the PO record persisted afterward.
+    if (action === 'updatePurchaseOrderStatus') {
+      const { companyId, poId, items, status } = body;
+      if (!companyId || !poId || !Array.isArray(items) || !status) return res.status(400).json({ error: 'Missing fields' });
+      await query('UPDATE hh_purchase_orders SET items=$1::jsonb, status=$2 WHERE id=$3 AND company_id=$4',
+        [JSON.stringify(items), status, parseInt(poId), parseInt(companyId)]);
+      return res.status(200).json({ ok: true });
     }
     if (action === 'receivePOStock') {
       const { companyId, poId, receipts } = body;
