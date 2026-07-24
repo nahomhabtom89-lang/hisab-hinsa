@@ -206,12 +206,45 @@
   <div class="card"><input style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:8px 11px;font-size:12px;color:var(--text);outline:none;margin-bottom:10px" placeholder="Search..." id="matSearch" oninput="renderMaterials()"/><div id="matList"></div></div>
 </div>
 <!-- DELIVERIES -->
-<div class="page" id="pg-deliveries"><div class="ph"><h1>🚚 Deliveries</h1></div>
-  <div class="card"><div class="card-hdr">➕ New Delivery</div>
-    <div class="fgrid"><div class="fg"><label>Supplier</label><input id="delSupplier" type="text" placeholder="Supplier name" oninput="onDelSupplierTextInput()"/></div><div class="fg"><label>Supplier Account (for AP tagging)</label><div style="display:flex;gap:6px"><select id="delSupplierSel" class="supplier-select" style="flex:1" onchange="onDelSupplierSelChange()"></select><button type="button" class="btn btn-outline" style="padding:9px 11px;white-space:nowrap" onclick="openQuickAddParty('supplier','delSupplierSel')">+ New</button></div></div><div class="fg"><label>Invoice #</label><input id="delInvNo" type="text" placeholder="INV-001"/></div><div class="fg"><label>Items</label><input id="delItems" type="text" placeholder="Cement 100 bags"/></div><div class="fg"><label>Total Value</label><input id="delTotal" type="number" step="0.01" placeholder="5000"/></div><div class="fg"><label>Payment</label><select id="delPay"><option value="cash">Cash</option><option value="credit">Credit</option></select></div><div class="fg"><label>Date</label><input id="delDate" type="date"/></div><div class="fg"><label>Link to Material</label><select id="delMaterial"></select></div></div>
-    <div class="btn-row"><button class="btn btn-gold" onclick="addDelivery()">✅ Record</button></div><div id="delSt" style="font-size:11px;margin-top:7px"></div>
+<div class="page" id="pg-deliveries"><div class="ph"><h1>🚚 Deliveries — Receive Materials</h1><p>Confirming a receipt here posts the journal entry (Materials debit / Accounts Payable or Cash) for the exact quantities received — submitting a Purchase Order by itself does not.</p></div>
+<div class="card">
+  <div class="card-hdr">📥 Receive Against Purchase Order</div>
+  <div class="fg"><label>Purchase Order</label><select id="del-po-select" onchange="renderMaterialPOReceiptLines()" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:9px 11px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none"></select></div>
+  <div id="del-po-lines"></div>
+  <div class="btn-row"><button class="btn btn-gold" onclick="confirmMaterialPOReceipt()">✅ Confirm Receipt</button></div>
+  <div id="del-po-st" style="font-size:11px;margin-top:7px"></div>
+</div>
+<div class="card"><div class="card-hdr">➕ Manual / Receipt-Based Delivery (no Purchase Order)</div>
+  <div class="fg">
+    <label>📄 Upload Supplier Receipt (Photo / PDF) — auto-fills the rows below</label>
+    <div id="delReceiptDropzone" onclick="document.getElementById('delReceiptFile').click()" ondragover="event.preventDefault();this.style.borderColor='var(--gold2)'" ondragleave="this.style.borderColor='var(--border2)'" ondrop="handleDelReceiptDrop(event)" style="border:2px dashed var(--border2);border-radius:8px;padding:16px;text-align:center;cursor:pointer;transition:border-color .15s">
+      <input type="file" id="delReceiptFile" accept="image/*,.pdf" style="display:none" onchange="handleMaterialsReceiptUpload(this.files[0])"/>
+      <div style="font-size:22px;margin-bottom:4px">📎</div>
+      <div style="font-size:12px;color:var(--text2)">Click or drag a receipt photo / PDF here</div>
+    </div>
+    <div id="delReceiptStatus" style="font-size:11px;color:var(--text3);margin-top:6px"></div>
   </div>
+  <div class="fgrid"><div class="fg"><label>Supplier</label><input id="delSupplier" type="text" placeholder="Supplier name" oninput="onDelSupplierTextInput()"/></div><div class="fg"><label>Supplier Account (for AP tagging)</label><div style="display:flex;gap:6px"><select id="delSupplierSel" class="supplier-select" style="flex:1" onchange="onDelSupplierSelChange()"></select><button type="button" class="btn btn-outline" style="padding:9px 11px;white-space:nowrap" onclick="openQuickAddParty('supplier','delSupplierSel')">+ New</button></div></div></div>
+  <div class="fgrid"><div class="fg"><label>Invoice #</label><input id="delInvNo" type="text" placeholder="INV-001"/></div><div class="fg"><label>Payment</label><select id="delPay"><option value="credit">Credit (AP)</option><option value="cash">Cash</option></select></div><div class="fg"><label>Date</label><input id="delDate" type="date"/></div></div>
+  <div style="font-size:10px;color:var(--text2);margin-bottom:7px">Line Items</div>
+  <div id="del-rows"></div>
+  <div class="btn-row"><button class="btn btn-outline" onclick="addMaterialIntakeRow()">➕ Add Item</button></div>
+  <div class="btn-row"><button class="btn btn-gold" onclick="confirmMaterialsDelivery()">✅ Confirm Receive All</button></div>
+  <div id="delSt" style="font-size:11px;margin-top:7px"></div>
+</div>
   <div class="card"><div class="card-hdr">📋 Received</div><div id="deliveryList"></div></div>
+</div>
+<!-- MATERIAL PURCHASE ORDERS -->
+<div class="page" id="pg-materialpo"><div class="ph"><h1>🚚 Purchase Orders (Materials)</h1></div>
+<div class="card"><div class="card-hdr">➕ Create Purchase Order</div>
+  <div class="fgrid"><div class="fg"><label>Supplier</label><input id="mpo-supplier" type="text" placeholder="Supplier name" oninput="onMpoSupplierTextInput()"/></div><div class="fg"><label>Supplier Account</label><div style="display:flex;gap:6px"><select id="mpo-supplier-sel" class="supplier-select" style="flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:9px 11px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none" onchange="onMpoSupplierSelChange()"></select><button type="button" class="btn btn-outline" style="padding:9px 11px;white-space:nowrap" onclick="openQuickAddParty('supplier','mpo-supplier-sel')">+ New</button></div></div><div class="fg"><label>Payment</label><select id="mpo-pay"><option value="credit">Credit (AP)</option><option value="cash">Cash</option></select></div></div>
+  <div class="fg"><label>Notes</label><input id="mpo-notes" type="text" placeholder="Optional notes"/></div>
+  <div style="font-size:10px;color:var(--text2);margin-bottom:7px">Line Items</div>
+  <div id="mpo-lines"></div>
+  <div class="btn-row"><button class="btn btn-gold" onclick="submitMaterialPurchaseOrder()">✅ Submit PO</button><button class="btn btn-outline" onclick="addMaterialPOLine()">+ Add Line</button></div>
+  <div id="mpo-st" style="font-size:11px;margin-top:7px"></div>
+</div>
+<div class="card"><div id="mpoList"></div></div>
 </div>
 <!-- WORKERS -->
 <div class="page" id="pg-workers"><div class="ph"><h1>👷 Workers &amp; Payroll</h1><p>Uganda PAYE + NSSF statutory</p></div>
@@ -432,6 +465,19 @@
     </div>
   </div>
 </div>
+<div id="quickAddMaterialModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:5000;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:20px;width:100%;max-width:380px;box-shadow:var(--shadow)">
+    <div style="font-family:'Noto Sans Ethiopic',sans-serif;font-size:15px;font-weight:700;color:var(--text);margin-bottom:14px">➕ Add Material</div>
+    <div class="fg"><label>Material Name</label><input id="qam-name" type="text" placeholder="Cement"/></div>
+    <div class="fgrid"><div class="fg"><label>Category</label><select id="qam-cat"><option>Cement</option><option>Steel</option><option>Sand</option><option>Gravel</option><option>Timber</option><option>Fuel Stock</option><option>Paint</option><option selected>Other</option></select></div><div class="fg"><label>Unit</label><select id="qam-unit"><option>bags</option><option>kg</option><option>tons</option><option>liters</option><option>m³</option><option>pieces</option><option>meters</option></select></div></div>
+    <div class="fg"><label>Min Stock Alert</label><input id="qam-min" type="number" placeholder="20"/></div>
+    <div id="qam-st" style="font-size:11px;margin:4px 0 8px"></div>
+    <div class="btn-row" style="margin-top:0">
+      <button class="btn btn-gold" onclick="saveQuickAddMaterial()">✅ Save &amp; Select</button>
+      <button class="btn btn-outline" onclick="closeQuickAddMaterialModal()">Cancel</button>
+    </div>
+  </div>
+</div>
 <div id="editProductModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:5000;align-items:center;justify-content:center;padding:20px">
   <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:20px;width:100%;max-width:380px;box-shadow:var(--shadow)">
     <div style="font-family:'Noto Sans Ethiopic',sans-serif;font-size:15px;font-weight:700;color:var(--text);margin-bottom:14px">✏️ Edit <span id="ep-name-label"></span></div>
@@ -583,7 +629,7 @@ function switchCompany(){document.getElementById('mainApp').style.display='none'
 function doLogout(){SESSION={userId:null,username:'',companyId:null,role:'owner',projectScope:null,companies:[]};DB=freshDB();APP_MODE='construction';BIZ_NAME='My Company';SSP_RATE=1300;RETAIL_PRODUCTS=[];POS_CART=[];document.getElementById('mainApp').style.display='none';document.getElementById('companyScreen').style.display='none';document.getElementById('loginScreen').style.display='flex';document.getElementById('lu').value='';document.getElementById('lp').value='';document.getElementById('lerr').style.display='none';_isReg=false;document.getElementById('regFields').style.display='none';document.getElementById('loginTitle').textContent='ኣቱ — Login';document.getElementById('loginBtn').textContent='🔓 ኣቱ — Login';const rmp=document.getElementById('regModePicker');if(rmp)rmp.remove();}
 
 // ── MODE SWITCHER ─────────────────────────────────────────────────
-const CONSTRUCTION_NAV=[{section:'ዕለታዊ',items:[{ico:'🎙️',ti:'ሓድሽ ምዝጋብ',en:'Record',page:'home'},{ico:'💵',ti:'ንዋት ጥረ',en:'Petty Cash',page:'petty'},{ico:'📱',ti:'ሞባይል ገንዘብ',en:'Mobile',page:'mobilemoney'},{ico:'🧱',ti:'ሸቀጥ',en:'Materials',page:'materials'},{ico:'🚚',ti:'ምብጻሕ',en:'Deliveries',page:'deliveries'},{ico:'👷',ti:'ሰራሕተኛ',en:'Workers',page:'workers'}]},{section:'ፕሮጀክት',items:[{ico:'🏗️',ti:'ፕሮጀክታት',en:'Projects',page:'projects',badge:'projBadge'},{ico:'🧾',ti:'ኢንቮይስ',en:'Invoice',page:'invoice'},{ico:'🔒',ti:'ሪቴንሽን',en:'Retention',page:'retention'}]},{section:'ሓላፍ ሒሳቢ',items:[{ico:'📋',ti:'Chart of Accounts',en:'COA',page:'coa'},{ico:'👤',ti:'ዓማዊል',en:'Customers',page:'customers'},{ico:'🚚',ti:'ኣቕረብቲ',en:'Suppliers',page:'suppliers'},{ico:'📒',ti:'ደፍተር',en:'Journal',page:'journal',badge:'jBadge'},{ico:'📗',ti:'ሌጀር',en:'Ledger',page:'ledger'},{ico:'⚖️',ti:'Trial Balance',en:'Trial',page:'trial'},{ico:'💰',ti:'Income Statement',en:'Income',page:'income'},{ico:'🏛️',ti:'Balance Sheet',en:'Balance',page:'balance'},{ico:'📈',ti:'Cash Forecast',en:'Forecast',page:'cashflow'},{ico:'🔢',ti:'Job Costing',en:'Job Cost',page:'jobcost'}]},{section:'ምቹ',items:[{ico:'📅',ti:'Periods',en:'Close',page:'periods'},{ico:'🧾',ti:'Tax Report',en:'VAT',page:'taxreport'},{ico:'🤖',ti:'AI ሓጋዚ',en:'Advisor',page:'advisor'},{ico:'🔍',ti:'ምርመራ',en:'Audit',page:'audit',badge:'auditBadge'},{ico:'📉',ti:'ምምካን',en:'Dep',page:'depreciation'},{ico:'⚙️',ti:'ቅጥዒ',en:'Settings',page:'settings'}]}];
+const CONSTRUCTION_NAV=[{section:'ዕለታዊ',items:[{ico:'🎙️',ti:'ሓድሽ ምዝጋብ',en:'Record',page:'home'},{ico:'💵',ti:'ንዋት ጥረ',en:'Petty Cash',page:'petty'},{ico:'📱',ti:'ሞባይል ገንዘብ',en:'Mobile',page:'mobilemoney'},{ico:'🧱',ti:'ሸቀጥ',en:'Materials',page:'materials'},{ico:'🚚',ti:'ምብጻሕ',en:'Deliveries',page:'deliveries'},{ico:'📑',ti:'Purchase Orders',en:'PO',page:'materialpo'},{ico:'👷',ti:'ሰራሕተኛ',en:'Workers',page:'workers'}]},{section:'ፕሮጀክት',items:[{ico:'🏗️',ti:'ፕሮጀክታት',en:'Projects',page:'projects',badge:'projBadge'},{ico:'🧾',ti:'ኢንቮይስ',en:'Invoice',page:'invoice'},{ico:'🔒',ti:'ሪቴንሽን',en:'Retention',page:'retention'}]},{section:'ሓላፍ ሒሳቢ',items:[{ico:'📋',ti:'Chart of Accounts',en:'COA',page:'coa'},{ico:'👤',ti:'ዓማዊል',en:'Customers',page:'customers'},{ico:'🚚',ti:'ኣቕረብቲ',en:'Suppliers',page:'suppliers'},{ico:'📒',ti:'ደፍተር',en:'Journal',page:'journal',badge:'jBadge'},{ico:'📗',ti:'ሌጀር',en:'Ledger',page:'ledger'},{ico:'⚖️',ti:'Trial Balance',en:'Trial',page:'trial'},{ico:'💰',ti:'Income Statement',en:'Income',page:'income'},{ico:'🏛️',ti:'Balance Sheet',en:'Balance',page:'balance'},{ico:'📈',ti:'Cash Forecast',en:'Forecast',page:'cashflow'},{ico:'🔢',ti:'Job Costing',en:'Job Cost',page:'jobcost'}]},{section:'ምቹ',items:[{ico:'📅',ti:'Periods',en:'Close',page:'periods'},{ico:'🧾',ti:'Tax Report',en:'VAT',page:'taxreport'},{ico:'🤖',ti:'AI ሓጋዚ',en:'Advisor',page:'advisor'},{ico:'🔍',ti:'ምርመራ',en:'Audit',page:'audit',badge:'auditBadge'},{ico:'📉',ti:'ምምካን',en:'Dep',page:'depreciation'},{ico:'⚙️',ti:'ቅጥዒ',en:'Settings',page:'settings'}]}];
 const RETAIL_NAV=[{section:'ዕለታዊ',items:[{ico:'🎙️',ti:'ሓድሽ ምዝጋብ',en:'Record',page:'home'}]},{section:'🛒 Retail',items:[{ico:'🖥️',ti:'POS Register',en:'POS',page:'pos'},{ico:'📦',ti:'Products',en:'Catalogue',page:'products'},{ico:'📲',ti:'Receive Stock',en:'Stock In',page:'stockin'},{ico:'🚚',ti:'Purchase Orders',en:'PO',page:'purchaseorders'},{ico:'👷',ti:'ሰራሕተኛ',en:'Workers',page:'workers'}]},{section:'📊 Reports',items:[{ico:'💰',ti:'Sales Report',en:'Sales',page:'retailsales'},{ico:'📦',ti:'Stock Valuation',en:'Inventory',page:'stockval'},{ico:'📒',ti:'Journal',en:'Journal',page:'journal',badge:'jBadge'},{ico:'⚖️',ti:'Trial Balance',en:'Trial',page:'trial'},{ico:'💰',ti:'Income Statement',en:'Income',page:'income'},{ico:'🏛️',ti:'Balance Sheet',en:'Balance',page:'balance'}]},{section:'ምቹ',items:[{ico:'📋',ti:'Chart of Accounts',en:'COA',page:'coa'},{ico:'👤',ti:'Customers',en:'Customers',page:'customers'},{ico:'🚚',ti:'Suppliers',en:'Suppliers',page:'suppliers'},{ico:'📅',ti:'Periods',en:'Close',page:'periods'},{ico:'🧾',ti:'Tax Report',en:'VAT',page:'taxreport'},{ico:'🤖',ti:'AI ሓጋዚ',en:'Advisor',page:'advisor'},{ico:'🔍',ti:'Audit',en:'Audit',page:'audit',badge:'auditBadge'},{ico:'📉',ti:'Depreciation',en:'Dep',page:'depreciation'},{ico:'⚙️',ti:'Settings',en:'Settings',page:'settings'}]}];
 
 function renderSidebar(mode){const sidebar=document.querySelector('.sidebar');if(!sidebar)return;const navDef=mode==='retail'?RETAIL_NAV:CONSTRUCTION_NAV;sidebar.innerHTML=navDef.map(section=>`<div class="sb-section"><div class="sb-label">${section.section}</div>${section.items.map(item=>`<div class="sb-item" id="sb-${item.page}" onclick="nav('${item.page}',this)"><span class="sb-ico">${item.ico}</span>${item.ti}<span class="en">${item.en}</span>${item.badge?`<span class="sb-badge gold" id="${item.badge}">0</span>`:''}</div>`).join('')}</div>`).join('');}
@@ -591,7 +637,7 @@ function renderModeBadge(){const b=document.getElementById('modeBadge');if(!b)re
 function injectModeSwitcher(){if(document.getElementById('modeBadge'))return;const tbCur=document.querySelector('.tb-cur');if(!tbCur)return;const sw=document.createElement('div');sw.style.cssText='display:flex;align-items:center;gap:6px;position:relative';sw.innerHTML=`<span id="modeBadge" style="font-size:10px;padding:3px 9px;border-radius:4px;font-family:'JetBrains Mono',monospace;cursor:pointer;white-space:nowrap" onclick="toggleModeMenu()">🏗️ Construction</span><div id="modeMenu" style="display:none;position:absolute;top:32px;left:0;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:6px;z-index:999;min-width:200px;box-shadow:var(--shadow)"><div onclick="switchAppMode('construction')" style="padding:9px 12px;cursor:pointer;border-radius:5px;font-size:12px;color:var(--text)" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='transparent'">🏗️ Construction Company</div><div onclick="switchAppMode('retail')" style="padding:9px 12px;cursor:pointer;border-radius:5px;font-size:12px;color:var(--text)" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='transparent'">🛒 Retail / Supermarket</div></div>`;tbCur.parentNode.insertBefore(sw,tbCur);}
 function toggleModeMenu(){const m=document.getElementById('modeMenu');if(m)m.style.display=m.style.display==='none'?'block':'none';}
 document.addEventListener('click',e=>{const m=document.getElementById('modeMenu');if(m&&!e.target.closest('#modeBadge')&&!m.contains(e.target))m.style.display='none';});
-async function switchAppMode(newMode){if(newMode===APP_MODE){const m=document.getElementById('modeMenu');if(m)m.style.display='none';return;}try{await dbApi({action:'switchMode',companyId:SESSION.companyId,appMode:newMode});APP_MODE=newMode;renderSidebar(newMode);renderModeBadge();const m=document.getElementById('modeMenu');if(m)m.style.display='none';await loadChartOfAccounts();if(newMode==='retail'){await loadRetailProducts();injectRetailPages();setTimeout(()=>{renderPOSProductGrid();renderPOLines();},200);}const constructionOnly=['projects','invoice','retention','materials','deliveries','jobcost'];const retailOnly=['pos','products','stockin','purchaseorders','retailsales','stockval'];const guard=newMode==='retail'?constructionOnly:retailOnly;const active=document.querySelector('.page.on');if(active&&guard.some(p=>active.id==='pg-'+p))nav('home');renderAll();injectModeSettingsCard();showToast(`✅ Switched to ${newMode==='retail'?'🛒 Retail':'🏗️ Construction'} mode`);}catch(e){showToast('❌ '+e.message);}}
+async function switchAppMode(newMode){if(newMode===APP_MODE){const m=document.getElementById('modeMenu');if(m)m.style.display='none';return;}try{await dbApi({action:'switchMode',companyId:SESSION.companyId,appMode:newMode});APP_MODE=newMode;renderSidebar(newMode);renderModeBadge();const m=document.getElementById('modeMenu');if(m)m.style.display='none';await loadChartOfAccounts();if(newMode==='retail'){await loadRetailProducts();injectRetailPages();setTimeout(()=>{renderPOSProductGrid();renderPOLines();},200);}const constructionOnly=['projects','invoice','retention','materials','deliveries','jobcost','materialpo'];const retailOnly=['pos','products','stockin','purchaseorders','retailsales','stockval'];const guard=newMode==='retail'?constructionOnly:retailOnly;const active=document.querySelector('.page.on');if(active&&guard.some(p=>active.id==='pg-'+p))nav('home');renderAll();injectModeSettingsCard();showToast(`✅ Switched to ${newMode==='retail'?'🛒 Retail':'🏗️ Construction'} mode`);}catch(e){showToast('❌ '+e.message);}}
 
 // ── NAVIGATION ────────────────────────────────────────────────────
 async function nav(page,el){
@@ -616,7 +662,8 @@ async function nav(page,el){
   if(page==='customers'){await loadCustomers();renderCustomerList();}
   if(page==='suppliers'){await loadSuppliers();renderSupplierList();}
   if(page==='invoice'){refreshCustomerDropdowns();}
-  if(page==='deliveries'){refreshSupplierDropdowns();}
+  if(page==='deliveries'){refreshSupplierDropdowns();refreshMaterialDropdowns();renderMaterialIntakeRows();await loadPurchaseOrdersCache();renderMaterialPOReceiveSelect();}
+  if(page==='materialpo'){refreshSupplierDropdowns();refreshMaterialDropdowns();renderMaterialPOLines();await loadPurchaseOrdersCache();renderMaterialPOList();}
   if(page==='petty'){refreshSupplierDropdowns();}
 }
 function setCur(c){CUR=c;document.getElementById('cur-usd').classList.toggle('on',c==='USD');document.getElementById('cur-ssp').classList.toggle('on',c==='SSP');renderAll();}
@@ -1039,6 +1086,339 @@ async function addDelivery(){const supplier=document.getElementById('delSupplier
 function renderDelMaterialSelect(){const el=document.getElementById('delMaterial');if(!el)return;const pending=DB.materials.filter(m=>m.pendingQty>0);el.innerHTML='<option value="">— No linked material —</option>'+pending.map(m=>`<option value="${m.id}">${m.name} (${m.pendingQty} ${m.unit})</option>`).join('');}
 function renderDeliveryList(){const el=document.getElementById('deliveryList');if(!el)return;if(!DB.deliveries.length){el.innerHTML='<div style="text-align:center;padding:14px;color:var(--text3)">No deliveries</div>';return;}el.innerHTML=`<table><thead><tr><th>Date</th><th>Supplier</th><th>Items</th><th>Total</th><th>Payment</th></tr></thead><tbody>${DB.deliveries.slice(-30).reverse().map(d=>`<tr><td>${d.date}</td><td>${d.supplier}</td><td>${d.items||d.invNo}</td><td style="font-family:'JetBrains Mono',monospace">${fc(d.total)}</td><td><span class="tag ${d.pay==='cash'?'t-green':'t-orange'}">${d.pay}</span></td></tr>`).join('')}</tbody></table>`;}
 
+// ── CONSTRUCTION MATERIALS INTAKE ENGINE (parity with retail's receipt/PO intake) ──
+// Materials live in the client-side DB.materials blob (not a server table like retail's
+// hh_products), so "matching" and "creating" a material never needs its own network round
+// trip beyond the eventual saveData() that already persists the whole blob.
+function findMaterialByName(name){
+  if(!name)return null;
+  const norm=(s)=>(s||'').toLowerCase().trim();
+  const n=norm(name);
+  return DB.materials.find(m=>norm(m.name)===n)||DB.materials.find(m=>norm(m.name).includes(n)||n.includes(norm(m.name)))||null;
+}
+function materialSelectOptions(selectedId){
+  return '<option value="">Select material...</option>'+DB.materials.map(m=>`<option value="${m.id}" ${String(m.id)===String(selectedId)?'selected':''}>${m.name} (stock: ${m.qty} ${m.unit})</option>`).join('');
+}
+function refreshMaterialDropdowns(){
+  document.querySelectorAll('.material-select').forEach(sel=>{
+    const prev=sel.value;
+    sel.innerHTML=materialSelectOptions('');
+    if(prev&&DB.materials.some(m=>String(m.id)===String(prev)))sel.value=prev;
+  });
+}
+// Auto-registers a brand-new Material spec (0 opening stock) from a plain name when no
+// match exists — same "never block on a missing master record" pattern as products and
+// suppliers. Persisted immediately via saveData() so it survives even if the current
+// intake is abandoned before confirming.
+async function ensureMaterialExists(name){
+  const trimmed=(name||'').trim();
+  if(!trimmed)return null;
+  const existing=findMaterialByName(trimmed);
+  if(existing)return existing;
+  const mat={id:Date.now()+Math.floor(Math.random()*1000),name:trimmed,cat:'Other',qty:0,unit:'unit',cost:0,min:0,layers:[]};
+  DB.materials.push(mat);
+  await saveData();
+  refreshMaterialDropdowns();renderMaterials();
+  return mat;
+}
+// Rolls received qty/cost into the material's WAC layers, so its stored cost stays a true
+// weighted average across every receipt — mirrors syncProductAfterIntake for retail.
+function syncMaterialAfterIntake(materialId,qtyReceived,unitCostReceived,date){
+  const mat=DB.materials.find(m=>String(m.id)===String(materialId));
+  if(!mat)return;
+  mat.layers=mat.layers||[];
+  mat.layers.push({qty:parseFloat(qtyReceived)||0,unitCost:parseFloat(unitCostReceived)||0,date:date||today()});
+  mat.qty=(parseFloat(mat.qty)||0)+(parseFloat(qtyReceived)||0);
+  mat.cost=getMaterialAvgCost(mat);
+}
+
+// ── QUICK-ADD MATERIAL (from any row's "+ New") ─────────────────────────────
+let _quickAddMaterialTargetSelectId=null;
+function openQuickAddMaterial(selectId){
+  _quickAddMaterialTargetSelectId=selectId;
+  ['qam-name','qam-min'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  const cat=document.getElementById('qam-cat');if(cat)cat.value='Other';
+  const unit=document.getElementById('qam-unit');if(unit)unit.value='bags';
+  const st=document.getElementById('qam-st');if(st)st.innerHTML='';
+  document.getElementById('quickAddMaterialModal').style.display='flex';
+  setTimeout(()=>{const n=document.getElementById('qam-name');if(n)n.focus();},50);
+}
+function closeQuickAddMaterialModal(){document.getElementById('quickAddMaterialModal').style.display='none';_quickAddMaterialTargetSelectId=null;}
+async function saveQuickAddMaterial(){
+  const name=document.getElementById('qam-name').value.trim(),st=document.getElementById('qam-st');
+  if(!name){st.innerHTML='<span style="color:var(--red3)">Enter a material name</span>';return;}
+  const cat=document.getElementById('qam-cat').value,unit=document.getElementById('qam-unit').value,min=parseFloat(document.getElementById('qam-min').value)||0;
+  st.innerHTML='<span style="color:var(--text3)">Saving...</span>';
+  let mat=findMaterialByName(name);
+  if(!mat){mat={id:Date.now()+Math.floor(Math.random()*1000),name,cat,qty:0,unit,cost:0,min,layers:[]};DB.materials.push(mat);await saveData();}
+  refreshMaterialDropdowns();renderMaterials();
+  const target=_quickAddMaterialTargetSelectId?document.getElementById(_quickAddMaterialTargetSelectId):null;
+  if(target)target.value=mat.id;
+  closeQuickAddMaterialModal();
+  showToast(`✅ "${name}" added and selected`);
+}
+
+// ── MANUAL / RECEIPT-BASED DELIVERY GRID ────────────────────────────────────
+let _delRowSeq=0;
+function renderMaterialIntakeRows(){
+  const wrap=document.getElementById('del-rows');if(!wrap)return;
+  wrap.innerHTML='';_delRowSeq=0;
+  addMaterialIntakeRow();
+  const invEl=document.getElementById('delInvNo');if(invEl)invEl.value='';
+}
+function addMaterialIntakeRow(prefill){
+  const wrap=document.getElementById('del-rows');if(!wrap)return;
+  prefill=prefill||{};
+  const rowId='del-row-'+(_delRowSeq++);
+  const row=document.createElement('div');
+  row.className='del-intake-row';
+  row.dataset.rowId=rowId;
+  row.dataset.parsedName=prefill.parsedName||'';
+  row.style.cssText='display:grid;grid-template-columns:1.6fr auto 1fr 1fr auto;gap:7px;align-items:end;margin-bottom:7px;padding-bottom:7px;border-bottom:1px solid var(--border)';
+  row.innerHTML=`
+    <div class="fg" style="margin:0"><label>Material</label><select class="material-select" id="sel-${rowId}" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:9px 11px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none">${materialSelectOptions(prefill.materialId||'')}</select></div>
+    <button type="button" onclick="openQuickAddMaterial('sel-${rowId}')" title="Add a new material without leaving this page" style="padding:9px 10px;background:transparent;border:1px dashed var(--gold2);border-radius:5px;color:var(--gold2);cursor:pointer;font-size:11px;white-space:nowrap">+ New</button>
+    <div class="fg" style="margin:0"><label>Qty</label><input class="del-row-qty" type="number" value="${prefill.qty||''}" placeholder="50"/></div>
+    <div class="fg" style="margin:0"><label>Unit Cost</label><input class="del-row-cost" type="number" step="0.01" value="${prefill.unitCost||''}" placeholder="25.00"/></div>
+    <button type="button" onclick="this.closest('.del-intake-row').remove()" title="Remove this item" style="padding:9px 11px;background:transparent;border:1px solid rgba(192,48,42,.3);border-radius:5px;color:var(--red3);cursor:pointer;font-size:14px">✕</button>
+  `;
+  wrap.appendChild(row);
+  return rowId;
+}
+async function confirmMaterialsDelivery(){
+  const supplier=document.getElementById('delSupplier').value.trim();
+  const supplierSel=document.getElementById('delSupplierSel');
+  const invNo=document.getElementById('delInvNo').value.trim();
+  const payMethod=document.getElementById('delPay').value;
+  const date=document.getElementById('delDate').value||today();
+  const st=document.getElementById('delSt');
+  if(!supplier){st.innerHTML='<span style="color:var(--red3)">Enter a supplier</span>';return;}
+  const rowEls=Array.from(document.querySelectorAll('#del-rows .del-intake-row'));
+  const candidates=[];
+  rowEls.forEach(row=>{
+    const sel=row.querySelector('.material-select');
+    const materialId=sel?sel.value:'';
+    const parsedName=row.dataset.parsedName||'';
+    const qty=parseFloat(row.querySelector('.del-row-qty').value)||0;
+    const unitCost=parseFloat(row.querySelector('.del-row-cost').value)||0;
+    if(qty<=0||unitCost<=0)return;
+    candidates.push({materialId,parsedName,qty,unitCost});
+  });
+  if(!candidates.length){st.innerHTML='<span style="color:var(--red3)">Add at least one item with a quantity and unit cost</span>';return;}
+  for(const c of candidates){if(!c.materialId&&!c.parsedName){st.innerHTML='<span style="color:var(--red3)">Select a material (or use + New) on every row</span>';return;}}
+  st.innerHTML='<span style="color:var(--text3)">Recording delivery...</span>';
+  try{
+    let supplierObj=supplierSel&&supplierSel.value?SUPPLIERS.find(s=>String(s.id)===String(supplierSel.value)):null;
+    if(!supplierObj)supplierObj=await ensureSupplierExists(supplier);
+    const journalLines=[];const namesForHistory=[];
+    for(const c of candidates){
+      let mat=c.materialId?DB.materials.find(m=>String(m.id)===String(c.materialId)):null;
+      if(!mat)mat=await ensureMaterialExists(c.parsedName);
+      if(!mat)continue;
+      syncMaterialAfterIntake(mat.id,c.qty,c.unitCost,date);
+      journalLines.push({productName:mat.name,base:c.qty*c.unitCost,tax:0});
+      namesForHistory.push(`${mat.name} ×${c.qty}`);
+    }
+    const total=journalLines.reduce((s,l)=>s+l.base,0);
+    const entry=buildIntakeJournalEntry(`Delivery: ${supplier}${invNo?` (Inv# ${invNo})`:''} — ${namesForHistory.join(', ')}`,journalLines,payMethod,'Construction Materials','Delivery');
+    if(supplierObj)entry.party={type:'supplier',id:supplierObj.id,name:supplierObj.name};
+    DB.entries.push(entry);
+    DB.deliveries.push({id:Date.now(),supplier,invNo,items:namesForHistory.join(', '),total,pay:payMethod,date});
+    await saveData();renderAll();
+    st.innerHTML=`<span style="color:var(--green3)">✅ Received ${journalLines.length} item(s) — ${fc(total)}</span>`;
+    document.getElementById('delSupplier').value='';
+    if(supplierSel)supplierSel.value='';
+    document.getElementById('delInvNo').value='';
+    renderMaterialIntakeRows();
+  }catch(e){
+    st.innerHTML=`<span style="color:var(--red3)">❌ ${e.message}</span>`;
+  }
+  setTimeout(()=>{const s=document.getElementById('delSt');if(s)s.innerHTML='';},6000);
+}
+
+// ── AI RECEIPT UPLOAD FOR DELIVERIES (construction materials) ──────────────
+// Reuses the exact same OCR/PDF extraction and RECEIPT_PARSE_PROMPT already built for
+// retail — the JSON shape (supplier + items[{name,qty,unitCost,taxRatePct,taxInclusive}])
+// is generic, and construction simply ignores the tax fields since materials purchases
+// aren't currently tax-tiered. Populates the SAME grid used for manual entry either way
+// (single or multi-item), so there's one form to review/edit before confirming.
+function setDelReceiptStatus(msg,isError){const el=document.getElementById('delReceiptStatus');if(!el)return;el.textContent=msg;el.style.color=isError?'var(--red3)':'var(--text3)';}
+function handleDelReceiptDrop(event){event.preventDefault();event.currentTarget.style.borderColor='var(--border2)';const file=event.dataTransfer.files[0];if(file)handleMaterialsReceiptUpload(file);}
+async function handleMaterialsReceiptUpload(file){
+  if(!file)return;
+  const dz=document.getElementById('delReceiptDropzone');
+  try{
+    if(dz)dz.style.opacity='0.6';
+    setDelReceiptStatus('⏳ Reading document...');
+    let text='';
+    if(file.type==='application/pdf'||file.name.toLowerCase().endsWith('.pdf'))text=await extractTextFromPDF(file,setDelReceiptStatus);
+    else if(file.type.startsWith('image/'))text=await extractTextFromImage(file,setDelReceiptStatus);
+    else{setDelReceiptStatus('⚠️ Unsupported file type — use an image or PDF',true);return;}
+    text=(text||'').trim();
+    if(!text){setDelReceiptStatus('⚠️ No text found in that document',true);return;}
+    setDelReceiptStatus('🤖 Extracting supplier, items, quantities...');
+    const res=await fetch('/api/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:text,systemPrompt:RECEIPT_PARSE_PROMPT})});
+    const data=await res.json();
+    const parsed=safeParseReceiptJson(data.result||'');
+    if(!parsed||!Array.isArray(parsed.items)||!parsed.items.length){
+      setDelReceiptStatus('⚠️ Could not find line items in that document — try manual entry instead.',true);
+      return;
+    }
+    const supplierEl=document.getElementById('delSupplier');if(supplierEl)supplierEl.value=parsed.supplier||'';
+    onDelSupplierTextInput();
+    const wrap=document.getElementById('del-rows');if(wrap){wrap.innerHTML='';_delRowSeq=0;}
+    parsed.items.forEach(it=>{
+      const match=findMaterialByName(it.name);
+      addMaterialIntakeRow({parsedName:it.name,qty:it.qty,unitCost:it.unitCost,materialId:match?match.id:''});
+    });
+    setDelReceiptStatus(`✅ Found ${parsed.items.length} item(s) — review the rows below, then confirm.`);
+  }catch(err){
+    setDelReceiptStatus('❌ '+err.message,true);
+  }finally{
+    if(dz)dz.style.opacity='1';
+    const f=document.getElementById('delReceiptFile');if(f)f.value='';
+  }
+}
+
+// ── PURCHASE ORDERS (construction materials) ────────────────────────────────
+// Submitting a PO is purely administrative — no journal entry, no stock change — exactly
+// like retail's Purchase Orders. Only "Receive Against Purchase Order" (in Deliveries,
+// above) posts the journal entry and updates material stock, using the exact accepted
+// quantities. Shares the same hh_purchase_orders table as retail, distinguished by
+// kind='construction_materials' so the two never mix in each other's picker.
+function onMpoSupplierTextInput(){const txt=document.getElementById('mpo-supplier').value.trim();const sel=document.getElementById('mpo-supplier-sel');if(!sel)return;const match=findSupplierByName(txt);sel.value=match?match.id:'';}
+function onMpoSupplierSelChange(){const sel=document.getElementById('mpo-supplier-sel');const supplier=sel?SUPPLIERS.find(s=>String(s.id)===String(sel.value)):null;const txt=document.getElementById('mpo-supplier');if(supplier&&txt)txt.value=supplier.name;}
+let _mpoLineSeq=0;
+function renderMaterialPOLines(){const el=document.getElementById('mpo-lines');if(!el)return;el.innerHTML='';addMaterialPOLine();}
+function addMaterialPOLine(){
+  const el=document.getElementById('mpo-lines');if(!el)return;
+  const lineId='mpo-line-'+(_mpoLineSeq++);
+  const row=document.createElement('div');
+  row.className='mpo-line-row';
+  row.dataset.lineId=lineId;
+  row.style.cssText='display:grid;grid-template-columns:2fr auto 1fr 1fr auto;gap:7px;margin-bottom:7px;align-items:end';
+  row.innerHTML=`
+    <div class="fg" style="margin:0"><select class="material-select" id="sel-${lineId}" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:9px 11px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none">${materialSelectOptions('')}</select></div>
+    <button type="button" onclick="openQuickAddMaterial('sel-${lineId}')" title="Add a new material without leaving this page" style="padding:9px 10px;background:transparent;border:1px dashed var(--gold2);border-radius:5px;color:var(--gold2);cursor:pointer;font-size:11px;white-space:nowrap">+ New</button>
+    <div class="fg" style="margin:0"><input class="mpo-line-qty" type="number" placeholder="10" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:9px 11px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none"/></div>
+    <div class="fg" style="margin:0"><input class="mpo-line-cost" type="number" step="0.01" placeholder="25.00" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:9px 11px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none"/></div>
+    <button type="button" onclick="this.closest('.mpo-line-row').remove()" style="padding:9px 11px;background:transparent;border:1px solid rgba(192,48,42,.3);border-radius:5px;color:var(--red3);cursor:pointer;font-size:14px">✕</button>
+  `;
+  el.appendChild(row);
+}
+async function submitMaterialPurchaseOrder(){
+  const supplier=document.getElementById('mpo-supplier').value.trim(),payMethod=document.getElementById('mpo-pay').value,notes=document.getElementById('mpo-notes').value.trim(),st=document.getElementById('mpo-st');
+  if(!supplier){st.innerHTML='<span style="color:var(--red3)">Enter supplier</span>';return;}
+  const rows=document.querySelectorAll('.mpo-line-row');const items=[];let total=0;
+  rows.forEach(row=>{
+    const materialId=row.querySelector('.material-select').value,qty=parseFloat(row.querySelector('.mpo-line-qty').value)||0,unitCost=parseFloat(row.querySelector('.mpo-line-cost').value)||0;
+    if(!materialId||!qty||!unitCost)return;
+    const mat=DB.materials.find(m=>String(m.id)===String(materialId));if(!mat)return;
+    const lineTotal=qty*unitCost;total+=lineTotal;
+    items.push({productId:mat.id,name:mat.name,qty,unitCost,lineTotal,receivedQty:0});
+  });
+  if(!items.length){st.innerHTML='<span style="color:var(--red3)">Add at least one item</span>';return;}
+  try{
+    const existedBefore=!!findSupplierByName(supplier);
+    const supplierRecord=await ensureSupplierExists(supplier);
+    await dbApi({action:'savePurchaseOrder',companyId:SESSION.companyId,supplier,po_date:today(),items,total,paymentMethod:payMethod,notes,kind:'construction_materials'});
+    st.innerHTML=`<span style="color:var(--green3)">✅ PO saved — ${fc(total)} from ${supplier}${supplierRecord&&!existedBefore?' (new supplier added)':''}. No journal entry posted yet; that happens when materials are received.</span>`;
+    document.getElementById('mpo-supplier').value='';
+    const mpoSel=document.getElementById('mpo-supplier-sel');if(mpoSel)mpoSel.value='';
+    if(document.getElementById('mpo-notes'))document.getElementById('mpo-notes').value='';
+    renderMaterialPOLines();await loadPurchaseOrdersCache();await renderMaterialPOList();
+  }catch(e){st.innerHTML=`<span style="color:var(--red3)">❌ ${e.message}</span>`;}
+  setTimeout(()=>{const s=document.getElementById('mpo-st');if(s)s.innerHTML='';},6000);
+}
+async function renderMaterialPOList(){
+  const el=document.getElementById('mpoList');if(!el)return;
+  await loadPurchaseOrdersCache();
+  const orders=PO_ORDERS.filter(o=>o.kind==='construction_materials');
+  if(!orders.length){el.innerHTML='<div style="text-align:center;padding:22px;color:var(--text3)">No purchase orders yet</div>';return;}
+  el.innerHTML=`<table><thead><tr><th>Date</th><th>Supplier</th><th>Items</th><th>Total</th><th>Payment</th><th>Status</th></tr></thead><tbody>${orders.map(o=>{const items=Array.isArray(o.items)?o.items:(JSON.parse(o.items||'[]'));const status=o.status||'pending';return`<tr><td style="font-family:'JetBrains Mono',monospace;font-size:11px">${String(o.po_date).split('T')[0]}</td><td>${o.supplier}</td><td style="font-size:11px">${items.map(i=>`${i.name} ×${i.qty}${(parseFloat(i.receivedQty)||0)>0?` (recv ${i.receivedQty})`:''}`).join(', ').slice(0,60)||'—'}</td><td style="font-family:'JetBrains Mono',monospace">${fc(o.total)}</td><td><span class="tag ${o.payment_method==='cash'?'t-green':'t-orange'}" style="font-size:9px">${o.payment_method}</span></td><td><span class="tag ${PO_STATUS_TAG[status]||'t-blue'}" style="font-size:9px">${PO_STATUS_LABEL[status]||status}</span></td></tr>`;}).join('')}</tbody></table>`;
+}
+
+// ── RECEIVE AGAINST A MATERIALS PURCHASE ORDER (in Deliveries) ─────────────
+function renderMaterialPOReceiveSelect(){
+  const el=document.getElementById('del-po-select');if(!el)return;
+  const prevValue=el.value;
+  const open=PO_ORDERS.filter(o=>o.kind==='construction_materials'&&(o.status||'pending')!=='completed');
+  el.innerHTML='<option value="">— Select a Purchase Order —</option>'+
+    open.map(o=>`<option value="${o.id}">#${o.id} · ${o.supplier} · ${String(o.po_date).split('T')[0]} · ${PO_STATUS_LABEL[o.status||'pending']||o.status}</option>`).join('');
+  if(prevValue&&open.some(o=>String(o.id)===String(prevValue)))el.value=prevValue;
+  renderMaterialPOReceiptLines();
+}
+function renderMaterialPOReceiptLines(){
+  const wrap=document.getElementById('del-po-lines');if(!wrap)return;
+  const poId=document.getElementById('del-po-select').value;
+  if(!poId){wrap.innerHTML='<div style="color:var(--text3);font-size:12px;padding:10px 0">Select a purchase order above to see its remaining items.</div>';return;}
+  const po=PO_ORDERS.find(o=>String(o.id)===String(poId));
+  if(!po){wrap.innerHTML='';return;}
+  const items=Array.isArray(po.items)?po.items:JSON.parse(po.items||'[]');
+  const rows=items.map(it=>{
+    const ordered=parseFloat(it.qty)||0,received=parseFloat(it.receivedQty)||0,remaining=Math.max(0,ordered-received);
+    return `<div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr;gap:7px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)" data-po-material-id="${it.productId}">
+      <div style="font-size:12px">${it.name}</div>
+      <div style="font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace">Ordered: ${ordered}</div>
+      <div style="font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace">Received: ${received}</div>
+      <input class="del-po-accept-qty" type="number" min="0" max="${remaining}" value="${remaining}" placeholder="Accept qty" style="background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:7px 9px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none"/>
+      <input class="del-po-accept-cost" type="number" step="0.01" value="${it.unitCost||0}" placeholder="Unit cost" style="background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:7px 9px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none"/>
+    </div>`;
+  }).join('');
+  wrap.innerHTML=`<div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr;gap:7px;font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);padding-bottom:5px;border-bottom:1px solid var(--border2)"><div>Material</div><div>Ordered</div><div>Received</div><div>Accept Qty</div><div>Unit Cost</div></div>${rows}`;
+}
+async function confirmMaterialPOReceipt(){
+  const poId=document.getElementById('del-po-select').value,st=document.getElementById('del-po-st');
+  if(!poId){st.innerHTML='<span style="color:var(--red3)">Select a purchase order</span>';return;}
+  const lineEls=document.querySelectorAll('#del-po-lines [data-po-material-id]');
+  const candidates=[];
+  lineEls.forEach(row=>{
+    const materialId=row.dataset.poMaterialId;
+    const qty=parseFloat(row.querySelector('.del-po-accept-qty').value)||0;
+    const unitCost=parseFloat(row.querySelector('.del-po-accept-cost').value)||0;
+    if(qty>0)candidates.push({materialId,qty,unitCost});
+  });
+  if(!candidates.length){st.innerHTML='<span style="color:var(--red3)">Enter at least one accepted quantity</span>';return;}
+  st.innerHTML='<span style="color:var(--text3)">Confirming receipt...</span>';
+  try{
+    const po=PO_ORDERS.find(o=>String(o.id)===String(poId));
+    if(!po)throw new Error('Purchase order not found');
+    const items=Array.isArray(po.items)?po.items:JSON.parse(po.items||'[]');
+    const journalLines=[];const namesForHistory=[];
+    for(const c of candidates){
+      const mat=DB.materials.find(m=>String(m.id)===String(c.materialId));
+      if(!mat)continue;
+      syncMaterialAfterIntake(mat.id,c.qty,c.unitCost,today());
+      journalLines.push({productName:mat.name,base:c.qty*c.unitCost,tax:0});
+      namesForHistory.push(`${mat.name} ×${c.qty}`);
+      const line=items.find(it=>String(it.productId)===String(c.materialId));
+      if(line)line.receivedQty=(parseFloat(line.receivedQty)||0)+c.qty;
+    }
+    const allFull=items.length>0&&items.every(it=>(parseFloat(it.receivedQty)||0)>=(parseFloat(it.qty)||0)-0.0001);
+    const anyReceived=items.some(it=>(parseFloat(it.receivedQty)||0)>0);
+    const newStatus=allFull?'completed':(anyReceived?'partial':'pending');
+    await dbApi({action:'updatePurchaseOrderStatus',companyId:SESSION.companyId,poId:parseInt(poId),items,status:newStatus});
+    const total=journalLines.reduce((s,l)=>s+l.base,0);
+    if(total>0){
+      const entry=buildIntakeJournalEntry(`Delivery: PO #${poId} — ${po.supplier} (${namesForHistory.join(', ')})`,journalLines,'credit','Construction Materials','Delivery');
+      const supplierMatch=await ensureSupplierExists(po.supplier);
+      if(supplierMatch)entry.party={type:'supplier',id:supplierMatch.id,name:supplierMatch.name};
+      DB.entries.push(entry);
+      DB.deliveries.push({id:Date.now(),supplier:po.supplier,invNo:`PO #${poId}`,items:namesForHistory.join(', '),total,pay:'credit',date:today()});
+      await saveData();
+    }
+    await loadPurchaseOrdersCache();
+    renderMaterialPOReceiptLines();
+    renderMaterialPOReceiveSelect();
+    renderAll();
+    st.innerHTML=`<span style="color:var(--green3)">✅ Receipt confirmed — PO now ${(PO_STATUS_LABEL[newStatus]||newStatus).toLowerCase()}</span>`;
+    showToast(`✅ Materials received — PO #${poId} is now ${PO_STATUS_LABEL[newStatus]||newStatus}`);
+  }catch(e){
+    st.innerHTML=`<span style="color:var(--red3)">❌ ${e.message}</span>`;
+  }
+  setTimeout(()=>{const s=document.getElementById('del-po-st');if(s)s.innerHTML='';},6000);
+}
+
 // ── WORKERS & PAYROLL ─────────────────────────────────────────────
 function calcPAYE(gross){const bands=[{upTo:235,rate:0},{upTo:335,rate:.10},{upTo:410,rate:.20},{upTo:Infinity,rate:.30}];let tax=0,prev=0;for(const b of bands){if(gross>prev){tax+=(Math.min(gross,b.upTo)-prev)*b.rate;prev=b.upTo;}else break;}return Math.round(tax*100)/100;}
 function calcNSSF(gross){return{employee:Math.round(gross*.05*100)/100,employer:Math.round(gross*.10*100)/100};}
@@ -1425,13 +1805,14 @@ async function syncProductAfterIntake(productId,taxTierId,priceInclusive,qtyRece
     product.qty=newQtyTotal;
   }catch(e){console.error('syncProductAfterIntake',e);}
 }
-function buildIntakeJournalEntry(desc,lines,payMethod){
-  const debits=lines.filter(l=>l.base>0.001).map(l=>({acct:`Inventory (${l.productName})`,amt:Math.round(l.base*100)/100,atype:'asset'}));
+function buildIntakeJournalEntry(desc,lines,payMethod,acctPrefix,entryType){
+  acctPrefix=acctPrefix||'Inventory';entryType=entryType||'Stock Receipt';
+  const debits=lines.filter(l=>l.base>0.001).map(l=>({acct:`${acctPrefix} (${l.productName})`,amt:Math.round(l.base*100)/100,atype:'asset'}));
   const totalTax=lines.reduce((s,l)=>s+(l.tax||0),0);
   if(totalTax>0.001)debits.push({acct:'VAT Receivable (Input VAT)',amt:Math.round(totalTax*100)/100,atype:'asset'});
   const grandTotal=lines.reduce((s,l)=>s+l.base+(l.tax||0),0);
   const credits=payMethod==='cash'?[{acct:'Cash',amt:Math.round(grandTotal*100)/100,atype:'asset'}]:[{acct:'Accounts Payable',amt:Math.round(grandTotal*100)/100,atype:'liability'}];
-  return{id:DB.nextId++,date:today(),desc,type:'Stock Receipt',amount:Math.round(grandTotal*100)/100,project:'',debits,credits};
+  return{id:DB.nextId++,date:today(),desc,type:entryType,amount:Math.round(grandTotal*100)/100,project:'',debits,credits};
 }
 function setRSReceiptStatus(msg,isError){const el=document.getElementById('rsReceiptStatus');if(!el)return;el.textContent=msg;el.style.color=isError?'var(--red3)':'var(--text3)';}
 function handleReceiptDrop(event){event.preventDefault();event.currentTarget.style.borderColor='var(--border2)';const file=event.dataTransfer.files[0];if(file)handleStockReceiptUpload(file);}
