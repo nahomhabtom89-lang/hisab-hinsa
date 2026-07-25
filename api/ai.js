@@ -69,7 +69,30 @@ module.exports = async function handler(req, res) {
         "- \"INVENTORY_COUNT_SHEET\": Stock adjustment or physical tally sheet.\n" +
         "- \"JOURNAL_VOUCHER\": Manual accounting adjustments or transfers.\n\n" +
         "--------------------------------------------------\n" +
-        "2. DYNAMIC TAX & VAT ABSORPTION RULES\n" +
+        "2. DOCUMENT-TYPE POSTING DIRECTION (CRITICAL — FOLLOW EXACTLY)\n" +
+        "--------------------------------------------------\n" +
+        "Each document type has ONE correct debit/credit direction. A return or note REVERSES the original transaction it corrects — it must NEVER repeat the same direction as a normal purchase or sale. Getting a return backwards (e.g. increasing stock and increasing what you owe, instead of decreasing both) is a critical error.\n\n" +
+        "- SALES_INVOICE: Dr Accounts Receivable (or Cash if paid immediately) for the full amount; Cr Revenue for the net amount. If isVatRegistered, also Cr VAT Payable (Output VAT) for the tax portion.\n" +
+        "- PURCHASE_INVOICE: Dr Inventory/Materials/Expense (whichever fits the goods) for the net amount; Cr Accounts Payable (or Cash if paid immediately) for the full amount. If isVatRegistered, also Dr VAT Receivable (Input VAT) for the tax portion. If NOT isVatRegistered, the tax is absorbed — Dr Inventory for the FULL tax-inclusive amount instead, and never touch any VAT account.\n" +
+        "- CREDIT_NOTE (a SALES return — a customer is sending goods back to THIS company, reversing a prior sale): this is the MIRROR IMAGE of a SALES_INVOICE, with every line flipped. Dr Revenue (reduce revenue that was overstated) for the net amount; Cr Accounts Receivable (reduce what that customer owes) for the full amount — never debit Accounts Receivable on a credit note. If isVatRegistered, also Dr VAT Payable (reduce Output VAT that was over-charged) — never touch VAT Receivable here, since that account belongs only to purchases.\n" +
+        "- DEBIT_NOTE (a PURCHASE return — THIS company is sending goods back to a supplier, e.g. damaged, wrong, or excess goods, reversing a prior purchase): this is the MIRROR IMAGE of a PURCHASE_INVOICE, with every line flipped. Dr Accounts Payable (reduce what THIS company owes that supplier) for the full amount — never credit Accounts Payable on a debit note; Cr Inventory/Materials (reduce stock, since the goods are LEAVING) for the net amount — never debit Inventory on a debit note, since a return can only decrease stock, not increase it. If isVatRegistered, also Cr VAT Receivable (reduce Input VAT that is no longer claimable on the returned units) — never touch VAT Payable here, since that account belongs only to sales. If NOT isVatRegistered, the original absorbed tax leaves with the goods too — Cr Inventory for the FULL tax-inclusive amount instead, and never touch any VAT account.\n" +
+        "- CASH_RECEIPT: Dr Cash/Bank for the full amount; Cr Accounts Receivable if this settles an existing invoice, or Cr Revenue if this is a brand-new cash sale with no prior invoice.\n" +
+        "- PAYMENT_VOUCHER: Dr Accounts Payable if this settles an existing bill, or Dr the matching Expense account if this is a direct unbilled payment; Cr Cash/Bank for the full amount.\n" +
+        "- EXPENSE_RECEIPT: Dr the single best-matching Expense account; Cr Cash/Bank (or Accounts Payable if explicitly marked unpaid/on credit).\n" +
+        "- ASSET_PURCHASE: Dr the specific Fixed Asset account (never a generic Expense account) for the net amount; Cr Accounts Payable/Cash for the full amount. Tax follows the exact same isVatRegistered rule as PURCHASE_INVOICE (split to VAT Receivable if registered, absorbed into the asset cost if not).\n" +
+        "- PAYROLL_SLIP: Dr Salary Expense for the gross amount; Cr each specific statutory payable shown (PAYE Payable, NSSF Payable, etc.) and Cr Salaries Payable for the net pay — the sum of all credits must equal the gross debit.\n" +
+        "- LOAN_AGREEMENT: if THIS company is RECEIVING the loan: Dr Cash, Cr Loan Payable. If THIS company is REPAYING a loan installment: Dr Loan Payable (plus Dr Interest Expense if a rate/interest amount is shown), Cr Cash.\n" +
+        "- JOURNAL_VOUCHER: post exactly the debit and credit lines stated on the document itself — there is no default direction; follow what is written verbatim.\n" +
+        "- PURCHASE_ORDER / SALES_ORDER: these are commitments, NOT completed accounting transactions. Return recommended_debits and recommended_credits as EMPTY ARRAYS, and explain in tax_handling_note that this document does not post until the goods/invoice are actually received.\n" +
+        "- DELIVERY_NOTE: only produce postings if a monetary value is clearly shown on the document; otherwise treat it like PURCHASE_ORDER/SALES_ORDER above (empty arrays, note that it is a non-monetary goods-movement record).\n" +
+        "- INVENTORY_COUNT_SHEET: if the sheet shows a shortage (physical count below book quantity), Dr Stock Write-off, Cr Inventory. If it shows a surplus, Dr Inventory, Cr Stock Write-off (or Other Income). Never invent a supplier name or an Accounts Payable line for a count sheet — it involves no third party.\n" +
+        "- BANK_STATEMENT: this lists MULTIPLE separate transactions, not a single event. Return recommended_debits and recommended_credits as EMPTY ARRAYS, and explain in tax_handling_note that a bank statement should be reconciled line-by-line through Mobile Money/Bank reconciliation, not posted as one journal entry.\n\n" +
+        "SELF-CHECK before responding (re-read this every time you produce a CREDIT_NOTE or DEBIT_NOTE, since these are the easiest to get backwards):\n" +
+        "- A DEBIT_NOTE must never debit Inventory (goods are leaving, not arriving) and must never reference VAT Payable.\n" +
+        "- A CREDIT_NOTE must never credit Revenue (revenue is being reduced, not earned) and must never reference VAT Receivable.\n" +
+        "- A DEBIT_NOTE debits Accounts Payable (owe less); a CREDIT_NOTE credits Accounts Receivable (owed less) — each return shrinks the SAME control account that the original invoice grew, never the opposite one.\n\n" +
+        "--------------------------------------------------\n" +
+        "3. DYNAMIC TAX & VAT ABSORPTION RULES\n" +
         "--------------------------------------------------\n" +
         "- Identify the Supplier/Vendor Country (e.g., Uganda, Kenya, South Sudan, Ethiopia) and extract the exact tax rate printed (e.g., 18%, 16%, 0%).\n" +
         "- This company's VAT-registration status (isVatRegistered) is: " + isVatRegistered + ".\n" +
@@ -79,26 +102,27 @@ module.exports = async function handler(req, res) {
         "    - Set tax_receivable_amount = 0.\n" +
         "  * IF isVatRegistered IS TRUE (VAT Business):\n" +
         "    - Split tax out into a separate VAT Receivable or VAT Payable account.\n" +
-        "    - Keep Inventory / Asset cost at the net raw value.\n\n" +
+        "    - Keep Inventory / Asset cost at the net raw value.\n" +
+        "  * The specific account (VAT Receivable vs VAT Payable) and direction (debit vs credit) for the CURRENT document type is governed by section 2 above — always defer to section 2's rule for that type rather than re-deriving it here.\n\n" +
         "--------------------------------------------------\n" +
-        "3. MULTI-CURRENCY EXTRACTION RULES\n" +
+        "4. MULTI-CURRENCY EXTRACTION RULES\n" +
         "--------------------------------------------------\n" +
         "- Detect the document currency symbol or code (USD, UGX, KES, SSP, ETB, EUR).\n" +
         "- Extract subtotal, tax total, and grand total in the DOCUMENT currency.\n" +
         "- This company's base currency is: " + baseCurrency + ". If the document currency differs, provide your best-estimate exchange_rate and compute grand_total_in_base_currency; if you cannot estimate a reliable rate, set exchange_rate to 1.0 and note this in tax_handling_note.\n\n" +
         "--------------------------------------------------\n" +
-        "4. CHART OF ACCOUNTS CONSTRAINT (CRITICAL)\n" +
+        "5. CHART OF ACCOUNTS CONSTRAINT (CRITICAL)\n" +
         "--------------------------------------------------\n" +
         "recommended_debits and recommended_credits MUST use account names EXACTLY as they appear in this company's Chart of Accounts below. Do not invent new account names. Pick the closest existing match for every line:\n" +
         coaText + "\n\n" +
         "--------------------------------------------------\n" +
-        "5. PARTY MATCHING\n" +
+        "6. PARTY MATCHING\n" +
         "--------------------------------------------------\n" +
         "Known customers on file: " + (customersList.length ? customersList.map(c => c.name).join(", ") : "(none yet)") + "\n" +
         "Known suppliers on file: " + (suppliersList.length ? suppliersList.map(s => s.name).join(", ") : "(none yet)") + "\n" +
         "If party_name matches one of these (even loosely), use that exact name so the app can link it automatically. Otherwise extract the name as printed on the document.\n\n" +
         "--------------------------------------------------\n" +
-        "6. STRICT OUTPUT FORMAT (JSON ONLY)\n" +
+        "7. STRICT OUTPUT FORMAT (JSON ONLY)\n" +
         "--------------------------------------------------\n" +
         "Return ONLY a valid JSON response, no markdown, no commentary, no text outside the JSON, using this exact schema:\n\n" +
         "{\n" +
