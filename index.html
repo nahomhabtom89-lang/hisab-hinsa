@@ -145,6 +145,31 @@
     <div class="hero-row" style="margin-top:-4px"><label class="mic-btn" style="display:flex;align-items:center;justify-content:center;cursor:pointer"><input type="file" accept="image/*,.pdf" style="display:none" id="receiptFile" onchange="handleReceiptUpload(this.files[0])"/>📎</label><div style="flex:1;display:flex;align-items:center;font-size:11px;color:var(--text3)" id="receiptStatus">Upload receipt photo / PDF</div></div>
     <div class="chips"><div class="chip" onclick="useChip(this)">ደሞዝ ከፈልና</div><div class="chip" onclick="useChip(this)">ሲሚንቶ ዓደግና</div><div class="chip" onclick="useChip(this)">ነዳዲ ሸቀጥ</div><div class="chip" onclick="useChip(this)">ዓሚል ቅድሚ ከፈለ</div><div class="chip" onclick="useChip(this)">Paid rent 6 months advance</div></div>
   </div>
+  <div class="card">
+    <div class="card-hdr">🧠 Smart Document Import <span class="tag t-purple" style="font-size:9px;margin-left:6px">any document type</span></div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:10px">Upload ANY document — sales/purchase invoice, credit note, payslip, bank statement, loan agreement, asset purchase, delivery note — and the AI will classify it, extract everything, and prep a full posting against your real Chart of Accounts. You always review before it touches the ledger.</div>
+    <div id="udocDropzone" onclick="document.getElementById('udocFile').click()" ondragover="event.preventDefault();this.style.borderColor='var(--gold2)'" ondragleave="this.style.borderColor='var(--border2)'" ondrop="handleUdocDrop(event)" style="border:2px dashed var(--border2);border-radius:8px;padding:18px;text-align:center;cursor:pointer;transition:border-color .15s">
+      <input type="file" id="udocFile" accept="image/*,.pdf" style="display:none" onchange="handleUniversalDocUpload(this.files[0])"/>
+      <div style="font-size:24px;margin-bottom:4px">🧠📄</div>
+      <div style="font-size:12px;color:var(--text2)">Click or drag any document photo / PDF here</div>
+    </div>
+    <div id="udocStatus" style="font-size:11px;color:var(--text3);margin-top:8px"></div>
+  </div>
+  <div class="result-card" id="udocResultCard" style="border-color:var(--purple2)">
+    <div class="result-hdr"><h3 id="udocTitle">📄 Document Analysis</h3><span class="result-type" id="udocTypeBadge" style="border-color:rgba(124,63,212,.4);color:var(--purple3)">—</span></div>
+    <div class="meta-grid" id="udocMeta"></div>
+    <div id="udocPartyWrap" style="margin-bottom:10px"></div>
+    <div class="fs-section">Line Items</div>
+    <div class="tw" id="udocLineItems" style="margin-bottom:9px"></div>
+    <div class="fs-section">Totals</div>
+    <div id="udocTotals" style="margin-bottom:10px"></div>
+    <div class="fs-section">Recommended Posting <span style="color:var(--text3);font-weight:400;text-transform:none;letter-spacing:0">— every account below must match your Chart of Accounts; adjust any row before posting</span></div>
+    <div id="udocPostingRows" style="margin-bottom:9px"></div>
+    <div class="btn-row" style="margin-top:0"><button class="btn btn-outline" onclick="addUdocPostingRow('debit')">+ Debit Line</button><button class="btn btn-outline" onclick="addUdocPostingRow('credit')">+ Credit Line</button></div>
+    <div id="udocTaxNote" class="alert al-purple" style="margin-top:10px"></div>
+    <div id="udocBalanceWarning" style="display:none" class="alert al-warn"><span class="alert-ico">⚠️</span><div class="alert-body">Debits and credits don't match yet — adjust the amounts above before posting.</div></div>
+    <button class="post-btn" id="udocPostBtn" onclick="postUniversalDocument()">✅ Post to Journal</button>
+  </div>
   <div class="result-card" id="resultCard">
     <div class="result-hdr"><h3 id="resultTitle">ትንታነ AI</h3><span class="result-type" id="resultType">—</span></div>
     <div class="meta-grid" id="resultMeta"></div>
@@ -715,6 +740,21 @@ async function ensureSupplierExists(name){
     return SUPPLIERS.find(s=>String(s.id)===String(r.supplierId))||{id:r.supplierId,name:trimmed,contact:'',notes:''};
   }catch(e){console.error('ensureSupplierExists',e);return null;}
 }
+// Sales-side mirror of ensureSupplierExists — auto-registers a new Customer record from a
+// plain name when no match exists. Used by Smart Document Import when a document's party
+// is a customer, so a sales invoice/credit note can always be tagged, even the first time
+// that customer appears in any document.
+async function ensureCustomerExists(name){
+  const trimmed=(name||'').trim();
+  if(!trimmed)return null;
+  const existing=findCustomerByName(trimmed);
+  if(existing)return existing;
+  try{
+    const r=await dbApi({action:'saveCustomer',companyId:SESSION.companyId,name:trimmed});
+    await loadCustomers();refreshCustomerDropdowns();renderCustomerList();
+    return CUSTOMERS.find(c=>String(c.id)===String(r.customerId))||{id:r.customerId,name:trimmed,contact:'',notes:''};
+  }catch(e){console.error('ensureCustomerExists',e);return null;}
+}
 
 async function addCustomer(){
   const name=document.getElementById('custName').value.trim(),st=document.getElementById('custSt');
@@ -1046,6 +1086,171 @@ function safeParseAIJson(raw){
 async function doRecord(overrideText){const inp=document.getElementById('mainInp'),q=(overrideText!==undefined?overrideText:inp.value).trim();if(!q)return;const btn=document.querySelector('.hero-send');if(btn){btn.textContent='⏳';btn.disabled=true;}try{const res=await fetch('/api/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:q,materials:DB.materials,projects:DB.projects,products:RETAIL_PRODUCTS,appMode:APP_MODE})});const data=await res.json();_pending=safeParseAIJson(data.result||'');showResult(_pending);}catch(err){showToast('❌ '+err.message,5000);}if(btn){btn.textContent='↗';btn.disabled=false;}}
 function showResult(p){const rc=document.getElementById('resultCard');rc.style.display='block';document.getElementById('resultTitle').textContent=p.description||'Transaction';document.getElementById('resultType').textContent=p.type||'Entry';const realAmount=p.amount||0;document.getElementById('resultDesc').textContent=p.prepaidMonths?'Prepaid: '+p.prepaidMonths+' months':'';document.getElementById('resultMeta').innerHTML=`<div class="meta-box"><div class="meta-lbl">Amount</div><div class="meta-val">${fc(realAmount)}</div></div><div class="meta-box"><div class="meta-lbl">Date</div><div class="meta-val">${p.date||today()}</div></div><div class="meta-box"><div class="meta-lbl">Currency</div><div class="meta-val">${p.currency||'USD'}</div></div><div class="meta-box"><div class="meta-lbl">Type</div><div class="meta-val">${p.type||'—'}</div></div>`;const disp=p.entries||[];document.getElementById('resultEntries').innerHTML=disp.length?`<table><thead><tr><th>Account</th><th>Type</th><th>Debit</th><th>Credit</th></tr></thead><tbody>${disp.map(r=>`<tr><td>${r.account}</td><td><span class="tag t-blue">${r.type||''}</span></td><td style="color:var(--green3);font-family:'JetBrains Mono',monospace">${r.debit?fc(r.debit):''}</td><td style="color:var(--red3);font-family:'JetBrains Mono',monospace">${r.credit?fc(r.credit):''}</td></tr>`).join('')}</tbody></table>`:'';document.getElementById('postBtn').disabled=false;}
 function postEntry(){if(!_pending)return;const p=_pending;const debits=(p.entries||[]).filter(r=>(+r.debit)>0).map(r=>({acct:r.account,amt:+(+r.debit).toFixed(2),atype:(r.type||'asset').toLowerCase()})),credits=(p.entries||[]).filter(r=>(+r.credit)>0).map(r=>({acct:r.account,amt:+(+r.credit).toFixed(2),atype:(r.type||'asset').toLowerCase()}));if(p.project&&!isProjectAllowed(p.project)){showToast('⛔ Not allowed');return;}DB.entries.push({id:DB.nextId++,date:p.date||today(),desc:p.description||'Entry',type:p.type||'General',amount:p.amount||0,project:p.project||'',debits,credits});if(p.prepaidMonths&&p.prepaidMonths>1){const mo=(p.amount||0)/p.prepaidMonths;for(let i=1;i<p.prepaidMonths;i++){const d=new Date(p.date||today());d.setMonth(d.getMonth()+i);DB.entries.push({id:DB.nextId++,date:d.toISOString().split('T')[0],desc:'Amortize: '+p.description,type:'Prepaid Amortization',amount:mo,project:'',debits:[{acct:'Rent Expense',amt:mo,atype:'expense'}],credits:[{acct:'Prepaid Rent',amt:mo,atype:'asset'}]});}}saveData();renderAll();runAudit();document.getElementById('resultCard').style.display='none';document.getElementById('mainInp').value='';showToast('✅ Posted to Journal!');_pending=null;}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SMART DOCUMENT IMPORT — universal document classifier + poster (Home page)
+// Handles ANY document type (sales/purchase invoices, credit/debit notes, payroll
+// slips, bank statements, loan agreements, asset purchases, delivery notes, journal
+// vouchers...) via /api/ai mode:'universalDocument'. Recommended debits/credits are
+// constrained to this company's real Chart of Accounts. Always reviewed here before
+// anything touches the ledger — nothing in this flow auto-posts.
+// ═══════════════════════════════════════════════════════════════════════════
+let UDOC_PARSED=null;
+function setUdocStatus(msg,isError){const el=document.getElementById('udocStatus');if(!el)return;el.textContent=msg;el.style.color=isError?'var(--red3)':'var(--text3)';}
+function handleUdocDrop(event){event.preventDefault();event.currentTarget.style.borderColor='var(--border2)';const file=event.dataTransfer.files[0];if(file)handleUniversalDocUpload(file);}
+async function handleUniversalDocUpload(file){
+  if(!file)return;
+  const dz=document.getElementById('udocDropzone');
+  try{
+    if(dz)dz.style.opacity='0.6';
+    setUdocStatus('⏳ Reading document...');
+    let text='';
+    if(file.type==='application/pdf'||file.name.toLowerCase().endsWith('.pdf'))text=await extractTextFromPDF(file,setUdocStatus);
+    else if(file.type.startsWith('image/'))text=await extractTextFromImage(file,setUdocStatus);
+    else{setUdocStatus('⚠️ Unsupported file type — use an image or PDF',true);return;}
+    text=(text||'').trim();
+    if(!text){setUdocStatus('⚠️ No text found in that document',true);return;}
+    setUdocStatus('🧠 Classifying document and preparing postings...');
+    await parseUniversalDocumentWithAI(text);
+  }catch(err){
+    setUdocStatus('❌ '+err.message,true);
+  }finally{
+    if(dz)dz.style.opacity='1';
+    const f=document.getElementById('udocFile');if(f)f.value='';
+  }
+}
+async function parseUniversalDocumentWithAI(rawText){
+  try{
+    const docContext={
+      chartOfAccounts:CHART_OF_ACCOUNTS.map(a=>({name:a.name,account_type:a.account_type})),
+      isVatRegistered:!!TAX_SETTINGS.is_vat_registered,
+      baseCurrency:'USD',
+      customers:CUSTOMERS.map(c=>({name:c.name})),
+      suppliers:SUPPLIERS.map(s=>({name:s.name}))
+    };
+    const res=await fetch('/api/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:rawText,mode:'universalDocument',docContext})});
+    const data=await res.json();
+    const parsed=safeParseReceiptJson(data.result||''); // same lenient JSON extractor used for receipts
+    if(!parsed||!parsed.document_type){
+      setUdocStatus('⚠️ Could not analyze that document — try again or use Quick Record instead.',true);
+      return;
+    }
+    UDOC_PARSED=parsed;
+    showUniversalDocReview(parsed);
+    setUdocStatus(`✅ Detected: ${parsed.document_type.replace(/_/g,' ')} — review the posting below, then confirm.`);
+  }catch(e){
+    setUdocStatus('❌ Analysis failed: '+e.message,true);
+  }
+}
+// Builds <option> list from the REAL Chart of Accounts, defaulting to the AI's suggested
+// account if it matches (exactly or closely) an existing one — never inventing new accounts.
+function accountSelectOptions(selectedName){
+  const norm=(s)=>(s||'').toLowerCase().trim();
+  const n=norm(selectedName);
+  let matchedName='';
+  if(n){
+    const exact=CHART_OF_ACCOUNTS.find(a=>norm(a.name)===n);
+    const fuzzy=exact||CHART_OF_ACCOUNTS.find(a=>norm(a.name).includes(n)||n.includes(norm(a.name)));
+    if(fuzzy)matchedName=fuzzy.name;
+  }
+  return '<option value="">— Select account —</option>'+CHART_OF_ACCOUNTS.map(a=>`<option value="${a.name}" data-atype="${a.account_type}" ${a.name===matchedName?'selected':''}>${a.name} (${a.account_type})</option>`).join('');
+}
+function showUniversalDocReview(p){
+  const rc=document.getElementById('udocResultCard');rc.style.display='block';
+  document.getElementById('udocTitle').textContent=`📄 ${p.party_name||'Document'}${p.document_number?' — '+p.document_number:''}`;
+  document.getElementById('udocTypeBadge').textContent=(p.document_type||'—').replace(/_/g,' ');
+  const t=p.totals||{};
+  document.getElementById('udocMeta').innerHTML=`<div class="meta-box"><div class="meta-lbl">Date</div><div class="meta-val">${p.document_date||today()}</div></div><div class="meta-box"><div class="meta-lbl">Currency</div><div class="meta-val">${p.currency||'USD'}${p.exchange_rate&&p.exchange_rate!==1?' @ '+p.exchange_rate:''}</div></div><div class="meta-box"><div class="meta-lbl">Tax Rate</div><div class="meta-val">${p.detected_tax_rate?(p.detected_tax_rate<=1?(p.detected_tax_rate*100).toFixed(1):p.detected_tax_rate)+'%':'—'}${p.is_tax_inclusive?' incl.':''}</div></div><div class="meta-box"><div class="meta-lbl">Country</div><div class="meta-val">${p.country_of_origin||'—'}</div></div>`;
+  const partyWrap=document.getElementById('udocPartyWrap');
+  if(p.party_name){
+    const isCustomer=p.party_type==='customer';
+    const isVendor=p.party_type==='vendor';
+    const existingMatch=isCustomer?findCustomerByName(p.party_name):isVendor?findSupplierByName(p.party_name):null;
+    partyWrap.innerHTML=`<div class="alert al-purple"><span class="alert-ico">${isCustomer?'👤':isVendor?'🚚':'ℹ️'}</span><div class="alert-body"><div class="alert-title">${p.party_name} <span class="tag t-purple" style="font-size:9px">${p.party_type||'other'}</span></div>${(isCustomer||isVendor)?(existingMatch?'Matched to an existing '+(isCustomer?'customer':'supplier')+' — will be tagged automatically.':'New '+(isCustomer?'customer':'supplier')+' — will be added automatically when you post.'):"This party type isn't auto-tracked in Customers/Suppliers."}</div></div>`;
+  }else{
+    partyWrap.innerHTML='';
+  }
+  const items=p.line_items||[];
+  document.getElementById('udocLineItems').innerHTML=items.length?`<table><thead><tr><th>Description</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead><tbody>${items.map(it=>`<tr><td>${it.description||''}</td><td style="font-family:'JetBrains Mono',monospace">${it.quantity||''}</td><td style="font-family:'JetBrains Mono',monospace">${it.unit_price?fc(it.unit_price):''}</td><td style="font-family:'JetBrains Mono',monospace">${it.total_price?fc(it.total_price):''}</td></tr>`).join('')}</tbody></table>`:'<div style="color:var(--text3);font-size:12px;padding:7px 0">No line items extracted</div>';
+  document.getElementById('udocTotals').innerHTML=`<div class="fs-row"><span>Subtotal</span><span class="fs-val">${fc(t.subtotal||0)}</span></div><div class="fs-row"><span>Tax</span><span class="fs-val">${fc(t.tax_amount||0)}</span></div><div class="fs-row sub"><span>Grand Total (${p.currency||'USD'})</span><span class="fs-val">${fc(t.grand_total||0)}</span></div>${(p.currency&&p.currency!=='USD')?`<div class="fs-row total"><span>Grand Total (Base — USD)</span><span class="fs-val" style="color:var(--gold3)">${fc(t.grand_total_in_base_currency||t.grand_total||0)}</span></div>`:''}`;
+  const rowsWrap=document.getElementById('udocPostingRows');
+  rowsWrap.innerHTML='';
+  const action=p.accounting_action||{};
+  (action.recommended_debits||[]).forEach(d=>addUdocPostingRow('debit',d.account,d.amount));
+  (action.recommended_credits||[]).forEach(c=>addUdocPostingRow('credit',c.account,c.amount));
+  if(!(action.recommended_debits||[]).length&&!(action.recommended_credits||[]).length){addUdocPostingRow('debit');addUdocPostingRow('credit');}
+  const noteEl=document.getElementById('udocTaxNote');
+  noteEl.innerHTML=action.tax_handling_note?`<span class="alert-ico">🧾</span><div class="alert-body">${action.tax_handling_note}</div>`:'';
+  noteEl.style.display=action.tax_handling_note?'flex':'none';
+  recalcUdocBalance();
+}
+let _udocRowSeq=0;
+function addUdocPostingRow(kind,accountName,amount){
+  const wrap=document.getElementById('udocPostingRows');if(!wrap)return;
+  const rowId='udoc-row-'+(_udocRowSeq++);
+  const row=document.createElement('div');
+  row.className='udoc-posting-row';
+  row.dataset.kind=kind;
+  row.style.cssText='display:grid;grid-template-columns:auto 2fr 1fr auto;gap:7px;align-items:center;margin-bottom:6px';
+  row.innerHTML=`
+    <span class="tag ${kind==='debit'?'t-green':'t-red'}" style="width:52px;text-align:center">${kind==='debit'?'Dr':'Cr'}</span>
+    <select class="udoc-row-acct" onchange="recalcUdocBalance()" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:8px 10px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none">${accountSelectOptions(accountName||'')}</select>
+    <input class="udoc-row-amt" type="number" step="0.01" value="${amount||''}" oninput="recalcUdocBalance()" placeholder="0.00" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:8px 10px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none"/>
+    <button type="button" onclick="this.closest('.udoc-posting-row').remove();recalcUdocBalance()" style="padding:8px 10px;background:transparent;border:1px solid rgba(192,48,42,.3);border-radius:5px;color:var(--red3);cursor:pointer;font-size:13px">✕</button>
+  `;
+  wrap.appendChild(row);
+  recalcUdocBalance();
+}
+function recalcUdocBalance(){
+  const rows=Array.from(document.querySelectorAll('#udocPostingRows .udoc-posting-row'));
+  let dr=0,cr=0;
+  rows.forEach(row=>{
+    const amt=parseFloat(row.querySelector('.udoc-row-amt').value)||0;
+    if(row.dataset.kind==='debit')dr+=amt;else cr+=amt;
+  });
+  const balanced=Math.abs(dr-cr)<0.01&&dr>0;
+  const warn=document.getElementById('udocBalanceWarning');
+  if(warn)warn.style.display=balanced?'none':'block';
+  const btn=document.getElementById('udocPostBtn');
+  if(btn)btn.disabled=!balanced;
+  return{dr,cr,balanced};
+}
+async function postUniversalDocument(){
+  if(!UDOC_PARSED)return;
+  const {dr,cr,balanced}=recalcUdocBalance();
+  if(!balanced){showToast('⚠️ Debits and credits must match before posting');return;}
+  const rows=Array.from(document.querySelectorAll('#udocPostingRows .udoc-posting-row'));
+  const debits=[],credits=[];
+  for(const row of rows){
+    const sel=row.querySelector('.udoc-row-acct');
+    const acctName=sel.value;
+    const amt=parseFloat(row.querySelector('.udoc-row-amt').value)||0;
+    if(!acctName||amt<=0)continue;
+    const acct=CHART_OF_ACCOUNTS.find(a=>a.name===acctName);
+    const atype=acct?acct.account_type:'asset';
+    (row.dataset.kind==='debit'?debits:credits).push({acct:acctName,amt:Math.round(amt*100)/100,atype});
+  }
+  if(!debits.length||!credits.length){showToast('⚠️ Pick a real account on every row');return;}
+  const p=UDOC_PARSED;
+  const entry={
+    id:DB.nextId++,
+    date:p.document_date||today(),
+    desc:`${(p.document_type||'Document').replace(/_/g,' ')}${p.document_number?' '+p.document_number:''}: ${p.party_name||''}`.trim(),
+    type:(p.document_type||'General').replace(/_/g,' '),
+    amount:Math.round(dr*100)/100,
+    project:'',
+    debits,credits
+  };
+  if(p.party_name&&(p.party_type==='customer'||p.party_type==='vendor')){
+    const party=p.party_type==='customer'?await ensureCustomerExists(p.party_name):await ensureSupplierExists(p.party_name);
+    if(party)entry.party={type:p.party_type==='customer'?'customer':'supplier',id:party.id,name:party.name};
+  }
+  DB.entries.push(entry);
+  await saveData();renderAll();runAudit();
+  document.getElementById('udocResultCard').style.display='none';
+  UDOC_PARSED=null;
+  showToast(`✅ Posted — ${fc(entry.amount)} (${entry.type})`);
+}
 
 // ── PETTY CASH ────────────────────────────────────────────────────
 function renderPettyBalance(){const el=document.getElementById('pettyCashBalance');if(!el)return;const b=getBal();el.textContent=fc(b['Petty Cash']?b['Petty Cash'].net:0);}
