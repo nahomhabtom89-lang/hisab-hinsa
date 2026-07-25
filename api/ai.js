@@ -9,7 +9,7 @@ module.exports = async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   try {
-    const { prompt, mode, context, systemPrompt, materials, projects, products, appMode } = req.body;
+    const { prompt, mode, context, systemPrompt, materials, projects, products, appMode, docContext } = req.body;
     if (!prompt) return res.status(400).json({ error: "prompt is required" });
     const GROQ_KEY = process.env.GROQ_KEY;
     if (!GROQ_KEY) return res.status(500).json({ error: "GROQ_KEY not set" });
@@ -23,6 +23,110 @@ module.exports = async function handler(req, res) {
         "Key words: use 'hisab' not 'hisabi' for account, 'srah' for work, 'kifliti' for payment, 'genzeb' for money. " +
         "Never use Tigray/Ethiopian dialect. If English, reply English.\n\n" +
         "Company data:\n" + (context || "") + "\n\nGive clear practical advice.";
+
+    } else if (mode === "universalDocument") {
+      // ── UNIVERSAL DOCUMENT PARSER ──────────────────────────────────────────
+      // A general-purpose classifier + poster for ANY uploaded document (sales/purchase
+      // invoices, credit/debit notes, payroll slips, bank statements, loan agreements,
+      // asset purchases, inventory sheets, journal vouchers, etc.) — not just receipts for
+      // stock intake. Recommended debits/credits are constrained to this company's ACTUAL
+      // Chart of Accounts (injected below) so the review screen can offer real, selectable
+      // accounts instead of the AI inventing new ones.
+      const coaList = (docContext && docContext.chartOfAccounts) || [];
+      const coaText = coaList.length
+        ? coaList.map(a => `- ${a.name} (${a.account_type})`).join("\n")
+        : "(no accounts on file — use standard account names)";
+      const isVatRegistered = !!(docContext && docContext.isVatRegistered);
+      const baseCurrency = (docContext && docContext.baseCurrency) || "USD";
+      const customersList = (docContext && docContext.customers) || [];
+      const suppliersList = (docContext && docContext.suppliers) || [];
+
+      systemText =
+        "You are an autonomous AI Accountant and Document Parser for an advanced ERP application.\n\n" +
+        "YOUR OBJECTIVE:\n" +
+        "Analyze the provided document (image scan, receipt photo, or raw text input) from the app's \"Record\" page. " +
+        "Auto-detect the exact transaction type, extract line items and parties, apply local/foreign currency logic, " +
+        "determine dynamic tax handling, and output structured JSON ready for automatic ledger posting.\n\n" +
+        "--------------------------------------------------\n" +
+        "1. DOCUMENT CLASSIFICATION & TRANSACTION MATCHING\n" +
+        "--------------------------------------------------\n" +
+        "Identify the document type from this specific list:\n" +
+        "- \"SALES_INVOICE\": Billed sales to clients/customers.\n" +
+        "- \"PURCHASE_INVOICE\": Inbound vendor bills for goods/materials.\n" +
+        "- \"TAX_INVOICE\": Official VAT invoice containing tax breakdown.\n" +
+        "- \"CREDIT_NOTE\": Sales returns from customers (Contra-revenue).\n" +
+        "- \"DEBIT_NOTE\": Purchase returns to vendors (Inventory reduction).\n" +
+        "- \"CASH_RECEIPT\": Proof of cash received.\n" +
+        "- \"PAYMENT_VOUCHER\": Cash/Bank disbursement or payment out.\n" +
+        "- \"PURCHASE_ORDER\": Operational stock request (Non-posting until fulfilled).\n" +
+        "- \"SALES_ORDER\": Customer sales commitment (Non-posting).\n" +
+        "- \"DELIVERY_NOTE\": Goods movement / dispatch slip.\n" +
+        "- \"EXPENSE_RECEIPT\": General operating expenses or petty cash receipts.\n" +
+        "- \"PAYROLL_SLIP\": Employee wages, PAYE tax, NSSF, or allowances.\n" +
+        "- \"BANK_STATEMENT\": Bank transaction summaries for reconciliation.\n" +
+        "- \"LOAN_AGREEMENT\": Financing, interest, or loan repayment schedule.\n" +
+        "- \"ASSET_PURCHASE\": Fixed asset purchases (Capitalized equipment/machinery).\n" +
+        "- \"INVENTORY_COUNT_SHEET\": Stock adjustment or physical tally sheet.\n" +
+        "- \"JOURNAL_VOUCHER\": Manual accounting adjustments or transfers.\n\n" +
+        "--------------------------------------------------\n" +
+        "2. DYNAMIC TAX & VAT ABSORPTION RULES\n" +
+        "--------------------------------------------------\n" +
+        "- Identify the Supplier/Vendor Country (e.g., Uganda, Kenya, South Sudan, Ethiopia) and extract the exact tax rate printed (e.g., 18%, 16%, 0%).\n" +
+        "- This company's VAT-registration status (isVatRegistered) is: " + isVatRegistered + ".\n" +
+        "  * IF isVatRegistered IS FALSE (Non-VAT Business):\n" +
+        "    - The VAT amount CANNOT be reclaimed.\n" +
+        "    - Absorb the tax directly into the Inventory or Fixed Asset base cost.\n" +
+        "    - Set tax_receivable_amount = 0.\n" +
+        "  * IF isVatRegistered IS TRUE (VAT Business):\n" +
+        "    - Split tax out into a separate VAT Receivable or VAT Payable account.\n" +
+        "    - Keep Inventory / Asset cost at the net raw value.\n\n" +
+        "--------------------------------------------------\n" +
+        "3. MULTI-CURRENCY EXTRACTION RULES\n" +
+        "--------------------------------------------------\n" +
+        "- Detect the document currency symbol or code (USD, UGX, KES, SSP, ETB, EUR).\n" +
+        "- Extract subtotal, tax total, and grand total in the DOCUMENT currency.\n" +
+        "- This company's base currency is: " + baseCurrency + ". If the document currency differs, provide your best-estimate exchange_rate and compute grand_total_in_base_currency; if you cannot estimate a reliable rate, set exchange_rate to 1.0 and note this in tax_handling_note.\n\n" +
+        "--------------------------------------------------\n" +
+        "4. CHART OF ACCOUNTS CONSTRAINT (CRITICAL)\n" +
+        "--------------------------------------------------\n" +
+        "recommended_debits and recommended_credits MUST use account names EXACTLY as they appear in this company's Chart of Accounts below. Do not invent new account names. Pick the closest existing match for every line:\n" +
+        coaText + "\n\n" +
+        "--------------------------------------------------\n" +
+        "5. PARTY MATCHING\n" +
+        "--------------------------------------------------\n" +
+        "Known customers on file: " + (customersList.length ? customersList.map(c => c.name).join(", ") : "(none yet)") + "\n" +
+        "Known suppliers on file: " + (suppliersList.length ? suppliersList.map(s => s.name).join(", ") : "(none yet)") + "\n" +
+        "If party_name matches one of these (even loosely), use that exact name so the app can link it automatically. Otherwise extract the name as printed on the document.\n\n" +
+        "--------------------------------------------------\n" +
+        "6. STRICT OUTPUT FORMAT (JSON ONLY)\n" +
+        "--------------------------------------------------\n" +
+        "Return ONLY a valid JSON response, no markdown, no commentary, no text outside the JSON, using this exact schema:\n\n" +
+        "{\n" +
+        "  \"document_type\": \"STRING\",\n" +
+        "  \"document_number\": \"STRING or null\",\n" +
+        "  \"document_date\": \"YYYY-MM-DD or null\",\n" +
+        "  \"party_name\": \"STRING (Supplier, Customer, or Employee Name)\",\n" +
+        "  \"party_type\": \"vendor | customer | employee | bank | other\",\n" +
+        "  \"country_of_origin\": \"STRING\",\n" +
+        "  \"currency\": \"STRING (e.g. USD, KES, UGX, SSP)\",\n" +
+        "  \"exchange_rate\": 1.0,\n" +
+        "  \"detected_tax_rate\": 0.18,\n" +
+        "  \"is_tax_inclusive\": false,\n" +
+        "  \"line_items\": [\n" +
+        "    { \"description\": \"STRING\", \"quantity\": 0.0, \"unit_price\": 0.0, \"total_price\": 0.0 }\n" +
+        "  ],\n" +
+        "  \"totals\": {\n" +
+        "    \"subtotal\": 0.0,\n" +
+        "    \"tax_amount\": 0.0,\n" +
+        "    \"grand_total\": 0.0,\n" +
+        "    \"grand_total_in_base_currency\": 0.0\n" +
+        "  },\n" +
+        "  \"accounting_action\": {\n" +
+        "    \"recommended_debits\": [ { \"account\": \"STRING\", \"amount\": 0.0 } ],\n" +
+        "    \"recommended_credits\": [ { \"account\": \"STRING\", \"amount\": 0.0 } ],\n" +
+        "    \"tax_handling_note\": \"STRING (e.g., 'Tax absorbed into asset cost' or 'Tax split to VAT Receivable')\"\n" +
+        "  }\n" +
+        "}";
 
     } else if (systemPrompt) {
       systemText = systemPrompt;
@@ -134,7 +238,7 @@ module.exports = async function handler(req, res) {
           { role: "user", content: prompt }
         ],
         temperature: 0.05,
-        max_tokens: 1024
+        max_tokens: 1536
       })
     });
 
@@ -147,7 +251,11 @@ module.exports = async function handler(req, res) {
     const data = await response.json();
     let text = data?.choices?.[0]?.message?.content || "";
 
-    if (mode !== "advisor") {
+    // The universal document parser and any systemPrompt-override caller manage their own
+    // JSON shape and validation on the client side — only the default construction/retail
+    // quick-entry flow uses this repair pass, since validateAndFixEntry assumes that flow's
+    // specific {type,amount,entries[...]} schema.
+    if (mode !== "advisor" && mode !== "universalDocument" && !systemPrompt) {
       text = validateAndFixEntry(text);
     }
 
