@@ -163,6 +163,10 @@
     <div class="tw" id="udocLineItems" style="margin-bottom:9px"></div>
     <div class="fs-section">Totals</div>
     <div id="udocTotals" style="margin-bottom:10px"></div>
+    <div id="udocStockSection" style="display:none">
+      <div class="fs-section">📦 Stock Impact <span style="color:var(--text3);font-weight:400;text-transform:none;letter-spacing:0">— the journal entry above does NOT move physical stock by itself; confirm each line below to actually adjust quantities on hand</span></div>
+      <div id="udocStockRows" style="margin-bottom:9px"></div>
+    </div>
     <div class="fs-section">Recommended Posting <span style="color:var(--text3);font-weight:400;text-transform:none;letter-spacing:0">— every account below must match your Chart of Accounts; adjust any row before posting</span></div>
     <div id="udocPostingRows" style="margin-bottom:9px"></div>
     <div class="btn-row" style="margin-top:0"><button class="btn btn-outline" onclick="addUdocPostingRow('debit')">+ Debit Line</button><button class="btn btn-outline" onclick="addUdocPostingRow('credit')">+ Credit Line</button></div>
@@ -1173,6 +1177,7 @@ function showUniversalDocReview(p){
   const items=p.line_items||[];
   document.getElementById('udocLineItems').innerHTML=items.length?`<table><thead><tr><th>Description</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead><tbody>${items.map(it=>`<tr><td>${it.description||''}</td><td style="font-family:'JetBrains Mono',monospace">${it.quantity||''}</td><td style="font-family:'JetBrains Mono',monospace">${it.unit_price?fc(it.unit_price):''}</td><td style="font-family:'JetBrains Mono',monospace">${it.total_price?fc(it.total_price):''}</td></tr>`).join('')}</tbody></table>`:'<div style="color:var(--text3);font-size:12px;padding:7px 0">No line items extracted</div>';
   document.getElementById('udocTotals').innerHTML=`<div class="fs-row"><span>Subtotal</span><span class="fs-val">${fc(t.subtotal||0)}</span></div><div class="fs-row"><span>Tax</span><span class="fs-val">${fc(t.tax_amount||0)}</span></div><div class="fs-row sub"><span>Grand Total (${p.currency||'USD'})</span><span class="fs-val">${fc(t.grand_total||0)}</span></div>${(p.currency&&p.currency!=='USD')?`<div class="fs-row total"><span>Grand Total (Base — USD)</span><span class="fs-val" style="color:var(--gold3)">${fc(t.grand_total_in_base_currency||t.grand_total||0)}</span></div>`:''}`;
+  renderUdocStockRows(p);
   const rowsWrap=document.getElementById('udocPostingRows');
   rowsWrap.innerHTML='';
   const action=p.accounting_action||{};
@@ -1185,6 +1190,79 @@ function showUniversalDocReview(p){
   recalcUdocBalance();
 }
 let _udocRowSeq=0;
+// Document types where the line items plausibly represent physical goods moving in or out,
+// with the DEFAULT direction that movement takes — user can always flip it per-row, since a
+// DELIVERY_NOTE or INVENTORY_COUNT_SHEET's direction isn't always predictable from type alone.
+const UDOC_STOCK_TYPE_DEFAULTS={
+  PURCHASE_INVOICE:'increase',
+  DEBIT_NOTE:'decrease',     // returning goods TO a supplier — stock leaves
+  CREDIT_NOTE:'increase',    // a customer returning goods TO us — stock arrives back
+  SALES_INVOICE:'decrease',
+  DELIVERY_NOTE:'increase',
+  INVENTORY_COUNT_SHEET:'decrease'
+};
+function renderUdocStockRows(p){
+  const section=document.getElementById('udocStockSection');
+  const wrap=document.getElementById('udocStockRows');
+  if(!section||!wrap)return;
+  wrap.innerHTML='';
+  const items=p.line_items||[];
+  const defaultDir=UDOC_STOCK_TYPE_DEFAULTS[p.document_type];
+  if(!items.length||!defaultDir){section.style.display='none';return;}
+  section.style.display='block';
+  items.forEach(it=>addUdocStockRow(it,defaultDir));
+}
+function addUdocStockRow(item,direction){
+  const wrap=document.getElementById('udocStockRows');if(!wrap)return;
+  const rowId='udoc-stock-'+(_udocRowSeq++);
+  const row=document.createElement('div');
+  row.className='udoc-stock-row';
+  row.dataset.rowId=rowId;
+  row.dataset.parsedName=item.description||'';
+  row.dataset.unitPrice=item.unit_price||0;
+  const isRetail=APP_MODE==='retail';
+  const match=isRetail?posFindProduct(item.description,true):findMaterialByName(item.description);
+  const pickerOptions=isRetail
+    ?'<option value="">Select product...</option>'+RETAIL_PRODUCTS.map(pr=>`<option value="${pr.id}" ${match&&match.id===pr.id?'selected':''}>${pr.name} (stock: ${pr.qty} ${pr.unit})</option>`).join('')
+    :materialSelectOptions(match?match.id:'');
+  row.style.cssText='display:grid;grid-template-columns:1.6fr auto 0.8fr 0.9fr auto;gap:7px;align-items:end;margin-bottom:7px;padding-bottom:7px;border-bottom:1px solid var(--border)';
+  row.innerHTML=`
+    <div class="fg" style="margin:0"><label style="font-size:9px;color:var(--text3)">Receipt said: "${item.description||''}"</label><select class="udoc-stock-item ${isRetail?'product-select':'material-select'}" id="sel-${rowId}" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:8px 10px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none">${pickerOptions}</select></div>
+    <button type="button" onclick="${isRetail?`openQuickAddProduct('sel-${rowId}')`:`openQuickAddMaterial('sel-${rowId}')`}" title="Add a new ${isRetail?'product':'material'} without leaving this page" style="padding:8px 9px;background:transparent;border:1px dashed var(--gold2);border-radius:5px;color:var(--gold2);cursor:pointer;font-size:11px;white-space:nowrap">+ New</button>
+    <div class="fg" style="margin:0"><label style="font-size:9px;color:var(--text3)">Qty</label><input class="udoc-stock-qty" type="number" value="${item.quantity||0}" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:8px 10px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none"/></div>
+    <div class="fg" style="margin:0"><label style="font-size:9px;color:var(--text3)">Direction</label><select class="udoc-stock-dir" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:8px 10px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text);outline:none"><option value="increase" ${direction==='increase'?'selected':''}>▲ Increase stock</option><option value="decrease" ${direction==='decrease'?'selected':''}>▼ Decrease stock</option><option value="skip">— Don't adjust stock —</option></select></div>
+    <button type="button" onclick="this.closest('.udoc-stock-row').remove()" style="padding:8px 10px;background:transparent;border:1px solid rgba(192,48,42,.3);border-radius:5px;color:var(--red3);cursor:pointer;font-size:13px">✕</button>
+  `;
+  wrap.appendChild(row);
+}
+// Applies a stock-quantity change alongside a Universal Document posting. An increase with a
+// known unit cost extends the WAC layers properly (equivalent to a real receipt); a decrease
+// (return, write-off, or a sale recorded this way) simply reduces qty at the existing average
+// cost, since no new cost layer is being established by goods leaving.
+async function applyMaterialStockAdjustment(materialId,parsedName,qty,unitPrice,direction){
+  if(qty<=0||direction==='skip')return;
+  let mat=materialId?DB.materials.find(m=>String(m.id)===String(materialId)):null;
+  if(!mat)mat=await ensureMaterialExists(parsedName);
+  if(!mat)return;
+  if(direction==='increase'&&unitPrice>0){
+    syncMaterialAfterIntake(mat.id,qty,unitPrice,today());
+  }else{
+    mat.qty=Math.max(0,(parseFloat(mat.qty)||0)+(direction==='increase'?qty:-qty));
+  }
+}
+async function applyProductStockAdjustment(productId,parsedName,qty,unitPrice,direction){
+  if(qty<=0||direction==='skip')return;
+  let product=productId?RETAIL_PRODUCTS.find(pr=>String(pr.id)===String(productId)):null;
+  if(!product&&parsedName)product=posFindProduct(parsedName,true);
+  if(!product)return;
+  if(direction==='increase'&&unitPrice>0){
+    await dbApi({action:'receiveStock',companyId:SESSION.companyId,productId:product.id,qty,unitCost:unitPrice,supplier:'',paymentMethod:'credit'}).catch(e=>console.error('applyProductStockAdjustment',e));
+    product.qty=(parseFloat(product.qty)||0)+qty;
+  }else{
+    product.qty=Math.max(0,(parseFloat(product.qty)||0)+(direction==='increase'?qty:-qty));
+    await dbApi({action:'saveProduct',companyId:SESSION.companyId,id:product.id,name:product.name,sku:product.sku,barcode:product.barcode,category:product.category,sale_price:product.sale_price,cost_price:product.cost_price,qty:product.qty,min_qty:product.min_qty,unit:product.unit,tax_tier_id:product.tax_tier_id,price_inclusive:product.price_inclusive}).catch(e=>console.error('applyProductStockAdjustment',e));
+  }
+}
 function addUdocPostingRow(kind,accountName,amount){
   const wrap=document.getElementById('udocPostingRows');if(!wrap)return;
   const rowId='udoc-row-'+(_udocRowSeq++);
@@ -1241,11 +1319,30 @@ async function postUniversalDocument(){
     project:'',
     debits,credits
   };
-  if(p.party_name&&(p.party_type==='customer'||p.party_type==='vendor')){
-    const party=p.party_type==='customer'?await ensureCustomerExists(p.party_name):await ensureSupplierExists(p.party_name);
-    if(party)entry.party={type:p.party_type==='customer'?'customer':'supplier',id:party.id,name:party.name};
+  if(p.party_name){
+    const ptype=(p.party_type||'').toLowerCase();
+    const isCustomerParty=ptype==='customer';
+    const isSupplierParty=ptype==='vendor'||ptype==='supplier';
+    if(isCustomerParty||isSupplierParty){
+      const party=isCustomerParty?await ensureCustomerExists(p.party_name):await ensureSupplierExists(p.party_name);
+      if(party)entry.party={type:isCustomerParty?'customer':'supplier',id:party.id,name:party.name};
+    }
   }
   DB.entries.push(entry);
+  // Apply any confirmed Stock Impact rows — the journal entry above only affects the ledger
+  // total; this is what actually moves the physical quantity on hand for each real material
+  // or product the user matched/created above.
+  const stockRows=Array.from(document.querySelectorAll('#udocStockRows .udoc-stock-row'));
+  for(const row of stockRows){
+    const sel=row.querySelector('.udoc-stock-item');
+    const itemId=sel?sel.value:'';
+    const parsedName=row.dataset.parsedName||'';
+    const qty=parseFloat(row.querySelector('.udoc-stock-qty').value)||0;
+    const unitPrice=parseFloat(row.dataset.unitPrice)||0;
+    const direction=row.querySelector('.udoc-stock-dir').value;
+    if(APP_MODE==='retail')await applyProductStockAdjustment(itemId,parsedName,qty,unitPrice,direction);
+    else await applyMaterialStockAdjustment(itemId,parsedName,qty,unitPrice,direction);
+  }
   await saveData();renderAll();runAudit();
   document.getElementById('udocResultCard').style.display='none';
   UDOC_PARSED=null;
@@ -1837,7 +1934,18 @@ async function loadRetailProducts(){
     renderPOSProductGrid();
     refreshPOProductDropdowns();   // keep any open PO line-item selects in sync
     refreshManualIntakeProductDropdowns();
+    refreshUdocProductDropdowns();
   }catch(e){console.error('loadRetailProducts',e);}
+}
+// Rebuilds the product <option> list inside any open Universal Document review's Stock
+// Impact rows, preserving whatever was already selected — same pattern as the other
+// dropdown refreshers, needed so a "+ New" product quick-add can actually select itself.
+function refreshUdocProductDropdowns(){
+  document.querySelectorAll('.udoc-stock-item.product-select').forEach(sel=>{
+    const prev=sel.value;
+    sel.innerHTML='<option value="">Select product...</option>'+RETAIL_PRODUCTS.map(pr=>`<option value="${pr.id}">${pr.name} (stock: ${pr.qty} ${pr.unit})</option>`).join('');
+    if(prev&&RETAIL_PRODUCTS.some(pr=>String(pr.id)===String(prev)))sel.value=prev;
+  });
 }
 function renderProductsPage(){const el=document.getElementById('retailProductList');if(!el)return;populateProductTaxTierSelect();if(!RETAIL_PRODUCTS.length){el.innerHTML='<div style="text-align:center;padding:22px;color:var(--text3)">No products yet</div>';return;}const q=(document.getElementById('productSearch')||{}).value||'';const items=RETAIL_PRODUCTS.filter(p=>!q||p.name.toLowerCase().includes(q.toLowerCase())||(p.sku||'').includes(q)||(p.barcode||'').includes(q));const canEditPrice=SESSION.role==='owner';el.innerHTML=`<table><thead><tr><th>SKU</th><th>Barcode</th><th>Product</th><th>Category</th><th>Sale Price</th><th>Cost</th><th>Tax</th><th>Stock</th><th>Min</th><th></th></tr></thead><tbody>${items.map(p=>{const cls=parseFloat(p.qty)<=0?'var(--red3)':parseFloat(p.qty)<=parseFloat(p.min_qty)?'var(--orange3)':'var(--green3)';const priceCell=canEditPrice?`<td data-price-cell="${p.id}" style="font-family:'JetBrains Mono',monospace;cursor:pointer;border-bottom:1px dashed var(--gold2)" title="Click to edit price" onclick="startInlineEditPrice(this,${p.id},${parseFloat(p.sale_price)||0})">${fc(p.sale_price)}</td>`:`<td style="font-family:'JetBrains Mono',monospace">${fc(p.sale_price)}</td>`;const tier=getTaxTierById(p.tax_tier_id);const taxCell=tier?`<span class="tag t-purple" style="font-size:9px">${tier.name} ${parseFloat(tier.rate)}%${p.price_inclusive?' incl.':' excl.'}</span>`:`<span class="tag t-blue" style="font-size:9px">No tax</span>`;return`<tr><td style="font-family:'JetBrains Mono',monospace;font-size:10px">${p.sku||'—'}</td><td style="font-family:'JetBrains Mono',monospace;font-size:10px">${p.barcode||'—'}</td><td style="font-weight:500">${p.name}</td><td><span class="tag t-blue" style="font-size:9px">${p.category}</span></td>${priceCell}<td style="font-family:'JetBrains Mono',monospace;color:var(--text3)">${fc(p.cost_price)}</td><td>${taxCell}</td><td style="font-family:'JetBrains Mono',monospace;font-weight:700;color:${cls}">${p.qty} ${p.unit}</td><td style="font-family:'JetBrains Mono',monospace;color:var(--text3)">${p.min_qty}</td><td style="white-space:nowrap">${canEditPrice?`<button style="padding:2px 6px;background:transparent;border:1px solid rgba(196,154,42,.4);border-radius:3px;color:var(--gold2);font-size:10px;cursor:pointer;margin-right:4px" title="Edit price, cost, and tax settings" onclick="openEditProduct(${p.id})">✏️</button>`:''}<button style="padding:2px 6px;background:transparent;border:1px solid rgba(192,48,42,.3);border-radius:3px;color:var(--red3);font-size:10px;cursor:pointer" onclick="deleteProduct(${p.id})">✕</button></td></tr>`;}).join('')}</tbody></table>`;}
 // ── INLINE SALE PRICE EDITING (Owner only) ─────────────────────────
