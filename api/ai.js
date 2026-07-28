@@ -108,8 +108,9 @@ module.exports = async function handler(req, res) {
         "4. MULTI-CURRENCY EXTRACTION RULES\n" +
         "--------------------------------------------------\n" +
         "- Detect the document currency symbol or code (USD, UGX, KES, SSP, ETB, EUR).\n" +
-        "- Extract subtotal, tax total, and grand total in the DOCUMENT currency.\n" +
-        "- This company's base currency is: " + baseCurrency + ". If the document currency differs, provide your best-estimate exchange_rate and compute grand_total_in_base_currency; if you cannot estimate a reliable rate, set exchange_rate to 1.0 and note this in tax_handling_note.\n\n" +
+        "- Extract subtotal, tax total, and grand total in the DOCUMENT currency (totals.subtotal, totals.tax_amount, totals.grand_total stay in that original currency, unconverted).\n" +
+        "- This company's base currency is: " + baseCurrency + ". If the document currency differs, provide your best-estimate exchange_rate (units of document currency per 1 unit of base currency) and compute totals.grand_total_in_base_currency = grand_total / exchange_rate; if you cannot estimate a reliable rate, set exchange_rate to 1.0 and clearly say so in tax_handling_note.\n" +
+        "- CRITICAL: every amount inside recommended_debits and recommended_credits MUST be expressed in the BASE currency (" + baseCurrency + "), never the document's original currency. If the document currency differs from base currency, convert every single line amount using the same exchange_rate before placing it into recommended_debits/recommended_credits — never post the raw document-currency numbers directly into the journal.\n\n" +
         "--------------------------------------------------\n" +
         "5. CHART OF ACCOUNTS CONSTRAINT (CRITICAL)\n" +
         "--------------------------------------------------\n" +
