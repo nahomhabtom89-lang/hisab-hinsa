@@ -95,7 +95,7 @@
   <span class="role-badge" id="roleBadge"></span>
   <select id="tbProjectSel" class="cur-btn" style="cursor:pointer;max-width:155px" onchange="setActiveProject(this.value)"><option value="">All Projects</option></select>
   <div class="tb-spacer"></div>
-  <div class="tb-cur"><button class="cur-btn on" id="cur-usd" onclick="setCur('USD')">USD $</button><button class="cur-btn" id="cur-ssp" onclick="setCur('SSP')">SSP £</button></div>
+  <div class="tb-cur"><button class="cur-btn on" id="cur-usd" onclick="setCur('USD')">USD $</button><select id="curOtherSelect" class="cur-btn" onchange="setCur(this.value)" style="cursor:pointer"></select></div>
   <div class="tb-alert" id="tbAlert" onclick="nav('audit',null)">⚠️ <span id="tbAlertTxt">0</span></div>
   <button class="tb-btn no-print" onclick="window.print()">🖨️</button>
   <button class="tb-btn no-print" onclick="switchCompany()" style="color:var(--gold2)">🔀</button>
@@ -158,6 +158,7 @@
   <div class="result-card" id="udocResultCard" style="border-color:var(--purple2)">
     <div class="result-hdr"><h3 id="udocTitle">📄 Document Analysis</h3><span class="result-type" id="udocTypeBadge" style="border-color:rgba(124,63,212,.4);color:var(--purple3)">—</span></div>
     <div class="meta-grid" id="udocMeta"></div>
+    <div id="udocFxWarning" style="display:none;margin-bottom:9px"></div>
     <div id="udocPartyWrap" style="margin-bottom:10px"></div>
     <div class="fs-section">Line Items</div>
     <div class="tw" id="udocLineItems" style="margin-bottom:9px"></div>
@@ -205,7 +206,7 @@
     <div class="card"><div class="card-hdr">➕ Add</div>
       <div class="fg"><label>Network</label><select id="mmNet"><option value="mtn">MTN</option><option value="airtel">Airtel</option></select></div>
       <div class="fg"><label>Type</label><select id="mmType"><option value="in">Received</option><option value="out">Sent</option></select></div>
-      <div class="fgrid"><div class="fg"><label>Amount</label><input id="mmAmt" type="number" placeholder="500"/></div><div class="fg"><label>Currency</label><select id="mmCur"><option>USD</option><option>SSP</option></select></div></div>
+      <div class="fgrid"><div class="fg"><label>Amount</label><input id="mmAmt" type="number" placeholder="500"/></div><div class="fg"><label>Currency</label><select id="mmCur" class="entry-currency-select"></select></div></div>
       <div class="fg"><label>Reference</label><input id="mmRef" placeholder="JOHN / TXN123"/></div>
       <div class="btn-row"><button class="btn btn-gold" onclick="addMobileMoney()">📱 Record</button></div>
       <div id="mmSt" style="font-size:11px;margin-top:7px"></div>
@@ -254,7 +255,8 @@
     <div id="delReceiptStatus" style="font-size:11px;color:var(--text3);margin-top:6px"></div>
   </div>
   <div class="fgrid"><div class="fg"><label>Supplier</label><input id="delSupplier" type="text" placeholder="Supplier name" oninput="onDelSupplierTextInput()"/></div><div class="fg"><label>Supplier Account (for AP tagging)</label><div style="display:flex;gap:6px"><select id="delSupplierSel" class="supplier-select" style="flex:1" onchange="onDelSupplierSelChange()"></select><button type="button" class="btn btn-outline" style="padding:9px 11px;white-space:nowrap" onclick="openQuickAddParty('supplier','delSupplierSel')">+ New</button></div></div></div>
-  <div class="fgrid"><div class="fg"><label>Invoice #</label><input id="delInvNo" type="text" placeholder="INV-001"/></div><div class="fg"><label>Payment</label><select id="delPay"><option value="credit">Credit (AP)</option><option value="cash">Cash</option></select></div><div class="fg"><label>Date</label><input id="delDate" type="date"/></div></div>
+  <div class="fgrid"><div class="fg"><label>Invoice #</label><input id="delInvNo" type="text" placeholder="INV-001"/></div><div class="fg"><label>Invoice Currency</label><select id="del-currency" class="entry-currency-select" onchange="onIntakeCurrencyChange('del-currency','del-currency-hint')"></select></div><div class="fg"><label>Payment</label><select id="delPay"><option value="credit">Credit (AP)</option><option value="cash">Cash</option></select></div><div class="fg"><label>Date</label><input id="delDate" type="date"/></div></div>
+  <div id="del-currency-hint" style="font-size:10px;color:var(--text3);margin:-4px 0 8px"></div>
   <div style="font-size:10px;color:var(--text2);margin-bottom:7px">Line Items</div>
   <div id="del-rows"></div>
   <div class="btn-row"><button class="btn btn-outline" onclick="addMaterialIntakeRow()">➕ Add Item</button></div>
@@ -266,7 +268,8 @@
 <!-- MATERIAL PURCHASE ORDERS -->
 <div class="page" id="pg-materialpo"><div class="ph"><h1>🚚 Purchase Orders (Materials)</h1></div>
 <div class="card"><div class="card-hdr">➕ Create Purchase Order</div>
-  <div class="fgrid"><div class="fg"><label>Supplier</label><input id="mpo-supplier" type="text" placeholder="Supplier name" oninput="onMpoSupplierTextInput()"/></div><div class="fg"><label>Supplier Account</label><div style="display:flex;gap:6px"><select id="mpo-supplier-sel" class="supplier-select" style="flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:9px 11px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none" onchange="onMpoSupplierSelChange()"></select><button type="button" class="btn btn-outline" style="padding:9px 11px;white-space:nowrap" onclick="openQuickAddParty('supplier','mpo-supplier-sel')">+ New</button></div></div><div class="fg"><label>Payment</label><select id="mpo-pay"><option value="credit">Credit (AP)</option><option value="cash">Cash</option></select></div></div>
+  <div class="fgrid"><div class="fg"><label>Supplier</label><input id="mpo-supplier" type="text" placeholder="Supplier name" oninput="onMpoSupplierTextInput()"/></div><div class="fg"><label>Supplier Account</label><div style="display:flex;gap:6px"><select id="mpo-supplier-sel" class="supplier-select" style="flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:9px 11px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none" onchange="onMpoSupplierSelChange()"></select><button type="button" class="btn btn-outline" style="padding:9px 11px;white-space:nowrap" onclick="openQuickAddParty('supplier','mpo-supplier-sel')">+ New</button></div></div><div class="fg"><label>Invoice Currency</label><select id="mpo-currency" class="entry-currency-select" onchange="onIntakeCurrencyChange('mpo-currency','mpo-currency-hint')"></select></div><div class="fg"><label>Payment</label><select id="mpo-pay"><option value="credit">Credit (AP)</option><option value="cash">Cash</option></select></div></div>
+  <div id="mpo-currency-hint" style="font-size:10px;color:var(--text3);margin:-4px 0 8px"></div>
   <div class="fg"><label>Notes</label><input id="mpo-notes" type="text" placeholder="Optional notes"/></div>
   <div style="font-size:10px;color:var(--text2);margin-bottom:7px">Line Items</div>
   <div id="mpo-lines"></div>
@@ -278,7 +281,7 @@
 <!-- WORKERS -->
 <div class="page" id="pg-workers"><div class="ph"><h1>👷 Workers &amp; Payroll</h1><p>Uganda PAYE + NSSF statutory</p></div>
   <div class="card"><div class="card-hdr">➕ Add Worker</div>
-    <div class="fgrid"><div class="fg"><label>Name</label><input id="wkName" type="text" placeholder="Worker name"/></div><div class="fg"><label>Role</label><select id="wkRole"><option>Mason</option><option>Carpenter</option><option>Electrician</option><option>Plumber</option><option>Labourer</option><option>Driver</option><option>Site Supervisor</option><option>Engineer</option><option>Other</option></select></div><div class="fg"><label>Classification</label><select id="wkClass" onchange="toggleWorkerClassFields()"><option value="Permanent">Permanent</option><option value="Casual">Casual</option></select></div><div class="fg"><label>Currency</label><select id="wkCur"><option>USD</option><option>SSP</option></select></div></div>
+    <div class="fgrid"><div class="fg"><label>Name</label><input id="wkName" type="text" placeholder="Worker name"/></div><div class="fg"><label>Role</label><select id="wkRole"><option>Mason</option><option>Carpenter</option><option>Electrician</option><option>Plumber</option><option>Labourer</option><option>Driver</option><option>Site Supervisor</option><option>Engineer</option><option>Other</option></select></div><div class="fg"><label>Classification</label><select id="wkClass" onchange="toggleWorkerClassFields()"><option value="Permanent">Permanent</option><option value="Casual">Casual</option></select></div><div class="fg"><label>Currency</label><select id="wkCur" class="entry-currency-select"></select></div></div>
     <div class="fgrid" id="wkPermanentFields"><div class="fg"><label>Monthly Salary</label><input id="wkSalary" type="number" placeholder="500"/></div></div>
     <div class="fgrid" id="wkCasualFields" style="display:none"><div class="fg"><label>Daily Wage Rate</label><input id="wkDailyRate" type="number" placeholder="15"/></div></div>
     <div class="btn-row"><button class="btn btn-gold" onclick="addWorker()">➕ Add</button></div><div id="wkAddSt" style="font-size:11px;margin-top:7px"></div>
@@ -301,7 +304,7 @@
 <!-- PROJECTS -->
 <div class="page" id="pg-projects"><div class="ph"><h1>🏗️ Projects</h1></div>
   <div class="card"><div class="card-hdr">➕ New Project</div>
-    <div class="fgrid"><div class="fg"><label>Project Name</label><input id="pjName" type="text" placeholder="Juba Clinic"/></div><div class="fg"><label>Client</label><input id="pjClient" type="text" placeholder="Client name"/></div><div class="fg"><label>Contract Value</label><input id="pjValue" type="number" placeholder="500000"/></div><div class="fg"><label>Currency</label><select id="pjCur"><option>USD</option><option>SSP</option></select></div><div class="fg"><label>Location</label><input id="pjLocation" type="text" placeholder="Juba, South Sudan"/></div><div class="fg"><label>Retention %</label><input id="pjRetention" type="number" placeholder="10" value="10"/></div><div class="fg"><label>Start</label><input id="pjStart" type="date"/></div><div class="fg"><label>End</label><input id="pjEnd" type="date"/></div></div>
+    <div class="fgrid"><div class="fg"><label>Project Name</label><input id="pjName" type="text" placeholder="Juba Clinic"/></div><div class="fg"><label>Client</label><input id="pjClient" type="text" placeholder="Client name"/></div><div class="fg"><label>Contract Value</label><input id="pjValue" type="number" placeholder="500000"/></div><div class="fg"><label>Currency</label><select id="pjCur" class="entry-currency-select"></select></div><div class="fg"><label>Location</label><input id="pjLocation" type="text" placeholder="Juba, South Sudan"/></div><div class="fg"><label>Retention %</label><input id="pjRetention" type="number" placeholder="10" value="10"/></div><div class="fg"><label>Start</label><input id="pjStart" type="date"/></div><div class="fg"><label>End</label><input id="pjEnd" type="date"/></div></div>
     <div class="btn-row"><button class="btn btn-gold" onclick="addProject()">➕ Add Project</button></div><div id="projAddSt" style="font-size:11px;margin-top:7px"></div>
   </div>
   <div id="projectCards"></div>
@@ -446,8 +449,20 @@
 <div class="page" id="pg-settings"><div class="ph"><h1>⚙️ Settings</h1></div>
   <div class="card"><div class="card-hdr">🏢 Company</div>
     <div class="fg"><label>Company Name</label><input id="bizName" type="text"/></div>
-    <div class="fg"><label>SSP/USD Rate</label><input id="sspRate" type="number" placeholder="1300" value="1300"/></div>
     <div class="btn-row"><button class="btn btn-gold" onclick="saveSettings()">💾 Save</button></div><div id="settingsSt" style="font-size:11px;margin-top:7px"></div>
+  </div>
+  <div class="card"><div class="card-hdr">💱 Multi-Currency</div>
+    <div class="fgrid">
+      <div class="fg"><label>Local Display Currency</label><select id="localCurrencySelect" onchange="onLocalCurrencyChange()"></select></div>
+      <div class="fg"><label>Rate (1 USD = ? local currency)</label><input id="sspRate" type="number" step="0.0001" placeholder="1300"/></div>
+    </div>
+    <div class="btn-row" style="margin-top:0"><button class="btn btn-outline" onclick="useLiveRateForLocalCurrency()">🌐 Use Live Rate</button></div>
+    <div id="liveRateHint" style="font-size:10px;color:var(--text3);margin-top:6px"></div>
+    <div class="alert al-info" style="margin-top:10px"><span class="alert-ico">ℹ️</span><div class="alert-body">This is your currency for VIEWING totals in the topbar and for entering amounts elsewhere in your local currency (salaries, project values, etc.) — everything is still stored and posted in USD internally. Some currencies (notably SSP, and others that trade informally) aren't tracked by any live forex feed — for those, enter the rate manually and it will always be used instead of a live lookup.</div></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+      <div id="fxStatusLine" style="font-size:10px;color:var(--text3)"></div>
+      <button class="btn btn-outline" style="font-size:11px" onclick="refreshLiveRatesNow()">🔄 Refresh Live Rates</button>
+    </div>
   </div>
   <div class="card"><div class="card-hdr">🧮 Inventory Costing</div>
     <div class="btn-row" style="margin-top:0"><button class="btn" id="costing-wac" onclick="setCostingMethod('WAC')">WAC</button><button class="btn" id="costing-fifo" onclick="setCostingMethod('FIFO')">FIFO</button></div>
@@ -543,6 +558,34 @@
 // ── STATE ────────────────────────────────────────────────────────
 let DB={entries:[],projects:[],workers:[],materials:[],assets:[],mobileMoney:[],deliveries:[],pettyCash:[],nextId:1};
 let CUR='USD',SSP_RATE=1300,BIZ_NAME='My Company',ACTIVE_PROJECT='',INV_COSTING_METHOD='WAC';
+// SSP_RATE keeps its original name for minimal risk to existing code, but now means
+// "rate of 1 USD in LOCAL_CURRENCY" generally — LOCAL_CURRENCY defaults to SSP for existing
+// companies (unchanged behavior) but can be set to any currency in Settings.
+let LOCAL_CURRENCY='SSP';
+let FX_RATES={},FX_FETCHED_AT=null,FX_SOURCE=null;
+// Common world + regional currencies. Not exhaustive, but covers virtually every currency a
+// small business in this app's target regions would actually transact in.
+const CURRENCIES=[
+  {code:'USD',name:'US Dollar',symbol:'$'},{code:'EUR',name:'Euro',symbol:'€'},{code:'GBP',name:'British Pound',symbol:'£'},
+  {code:'UGX',name:'Ugandan Shilling',symbol:'USh'},{code:'KES',name:'Kenyan Shilling',symbol:'KSh'},{code:'TZS',name:'Tanzanian Shilling',symbol:'TSh'},
+  {code:'SSP',name:'South Sudanese Pound',symbol:'SSP£'},{code:'ETB',name:'Ethiopian Birr',symbol:'Br'},{code:'RWF',name:'Rwandan Franc',symbol:'FRw'},
+  {code:'NGN',name:'Nigerian Naira',symbol:'₦'},{code:'GHS',name:'Ghanaian Cedi',symbol:'GH₵'},{code:'ZAR',name:'South African Rand',symbol:'R'},
+  {code:'EGP',name:'Egyptian Pound',symbol:'E£'},{code:'XOF',name:'West African CFA Franc',symbol:'CFA'},{code:'XAF',name:'Central African CFA Franc',symbol:'FCFA'},
+  {code:'ZMW',name:'Zambian Kwacha',symbol:'ZK'},{code:'ZWL',name:'Zimbabwean Dollar',symbol:'Z$'},{code:'BWP',name:'Botswana Pula',symbol:'P'},
+  {code:'NAD',name:'Namibian Dollar',symbol:'N$'},{code:'MAD',name:'Moroccan Dirham',symbol:'DH'},{code:'TND',name:'Tunisian Dinar',symbol:'DT'},
+  {code:'DZD',name:'Algerian Dinar',symbol:'DA'},{code:'AED',name:'UAE Dirham',symbol:'د.إ'},{code:'SAR',name:'Saudi Riyal',symbol:'﷼'},
+  {code:'QAR',name:'Qatari Riyal',symbol:'QR'},{code:'ILS',name:'Israeli Shekel',symbol:'₪'},{code:'TRY',name:'Turkish Lira',symbol:'₺'},
+  {code:'INR',name:'Indian Rupee',symbol:'₹'},{code:'PKR',name:'Pakistani Rupee',symbol:'₨'},{code:'BDT',name:'Bangladeshi Taka',symbol:'৳'},
+  {code:'CNY',name:'Chinese Yuan',symbol:'¥'},{code:'JPY',name:'Japanese Yen',symbol:'¥'},{code:'KRW',name:'South Korean Won',symbol:'₩'},
+  {code:'SGD',name:'Singapore Dollar',symbol:'S$'},{code:'MYR',name:'Malaysian Ringgit',symbol:'RM'},{code:'THB',name:'Thai Baht',symbol:'฿'},
+  {code:'IDR',name:'Indonesian Rupiah',symbol:'Rp'},{code:'PHP',name:'Philippine Peso',symbol:'₱'},{code:'VND',name:'Vietnamese Dong',symbol:'₫'},
+  {code:'AUD',name:'Australian Dollar',symbol:'A$'},{code:'NZD',name:'New Zealand Dollar',symbol:'NZ$'},{code:'CAD',name:'Canadian Dollar',symbol:'C$'},
+  {code:'CHF',name:'Swiss Franc',symbol:'CHF'},{code:'SEK',name:'Swedish Krona',symbol:'kr'},{code:'NOK',name:'Norwegian Krone',symbol:'kr'},
+  {code:'DKK',name:'Danish Krone',symbol:'kr'},{code:'PLN',name:'Polish Złoty',symbol:'zł'},{code:'CZK',name:'Czech Koruna',symbol:'Kč'},
+  {code:'HUF',name:'Hungarian Forint',symbol:'Ft'},{code:'RON',name:'Romanian Leu',symbol:'lei'},{code:'RUB',name:'Russian Ruble',symbol:'₽'},
+  {code:'BRL',name:'Brazilian Real',symbol:'R$'},{code:'MXN',name:'Mexican Peso',symbol:'MX$'},{code:'ARS',name:'Argentine Peso',symbol:'AR$'},
+  {code:'COP',name:'Colombian Peso',symbol:'CO$'},{code:'CLP',name:'Chilean Peso',symbol:'CL$'},{code:'PEN',name:'Peruvian Sol',symbol:'S/'},
+];
 let APP_MODE='construction';
 let _pending=null,_mic=null,_isReg=false,REG_APP_MODE='construction';
 let CHART_OF_ACCOUNTS=[],PERIODS=[],RETAIL_PRODUCTS=[],POS_CART=[],POS_DISCOUNT=0;
@@ -552,7 +595,48 @@ let SESSION={userId:null,username:'',companyId:null,role:'owner',projectScope:nu
 
 // ── UTILITIES ─────────────────────────────────────────────────────
 function today(){return new Date().toISOString().split('T')[0];}
-function fc(n){if(CUR==='SSP')return'SSP £'+(+(n||0)*SSP_RATE).toLocaleString(undefined,{maximumFractionDigits:0});return'$'+(+(n||0)).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});}
+// Returns "1 USD = ? [code]" — the company's own manual rate wins for whichever currency
+// they've configured as LOCAL_CURRENCY (since that's usually the one forex feeds don't
+// track reliably, e.g. SSP), otherwise the live-fetched rate is used. Returns null if the
+// currency is neither the local one nor present in the live rates (caller must handle that).
+function getDisplayRate(code){
+  if(!code||code==='USD')return 1;
+  if(code===LOCAL_CURRENCY&&SSP_RATE)return SSP_RATE;
+  if(FX_RATES[code])return FX_RATES[code];
+  return null;
+}
+function currencySymbol(code){const c=CURRENCIES.find(x=>x.code===code);return c?c.symbol:(code||'');}
+function currencySelectOptions(selectedCode){return CURRENCIES.map(c=>`<option value="${c.code}" ${c.code===(selectedCode||'USD')?'selected':''}>${c.code} — ${c.name}</option>`).join('');}
+// Converts an amount typed in a foreign currency into USD, the app's single internal ledger
+// currency — every transaction still posts in USD regardless of what currency the supplier
+// invoiced in, exactly like the existing SSP handling already worked, just generalized to
+// any currency with a known rate. Returns the original amount unconverted if the rate is
+// unknown (nothing to divide by) — callers should warn the user in that case.
+function convertToUSD(amount,fromCurrency){
+  const amt=parseFloat(amount)||0;
+  if(!fromCurrency||fromCurrency==='USD')return amt;
+  const rate=getDisplayRate(fromCurrency);
+  if(!rate)return amt;
+  return amt/rate;
+}
+// Fetches live rates (base USD) from the backend, which itself caches for 12h server-side —
+// safe to call often; only hits the external API when the shared cache goes stale.
+async function loadExchangeRates(){
+  try{
+    const r=await dbApi({action:'getExchangeRates'});
+    FX_RATES=r.rates||{};
+    FX_FETCHED_AT=r.fetchedAt||null;
+    FX_SOURCE=r.source||null;
+  }catch(e){console.error('loadExchangeRates',e);}
+}
+function fc(n){
+  const amt=+(n||0);
+  if(CUR==='USD')return'$'+amt.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+  const rate=getDisplayRate(CUR);
+  if(!rate)return'$'+amt.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}); // no known rate — fall back to USD rather than show a wrong number
+  const converted=amt*rate;
+  return currencySymbol(CUR)+' '+converted.toLocaleString(undefined,{maximumFractionDigits:Math.abs(converted)>=1000?0:2});
+}
 function showToast(msg,dur=3000){const t=document.getElementById('toast');if(!t)return;t.textContent=msg;t.style.display='block';setTimeout(()=>t.style.display='none',dur);}
 function safeNum(val){if(typeof val==='number')return isFinite(val)?val:0;const n=parseFloat(String(val||'').replace(/[,\s$£]/g,'').trim());return isFinite(n)?n:0;}
 
@@ -639,8 +723,9 @@ async function enterCompany(c){
   SESSION.companyId=c.company_id;SESSION.role=c.role;SESSION.projectScope=c.project_scope||null;
   APP_MODE=c.app_mode||'construction';
   BIZ_NAME=c.biz_name;SSP_RATE=parseFloat(c.ssp_rate)||1300;INV_COSTING_METHOD=c.costing_method||'WAC';
+  LOCAL_CURRENCY=c.local_currency||'SSP';
   ACTIVE_PROJECT='';CUR='USD';DB=freshDB();RETAIL_PRODUCTS=[];POS_CART=[];CUSTOMERS=[];SUPPLIERS=[];
-  await loadDB();await loadChartOfAccounts();await loadPeriods();await loadTaxSettings();await loadCustomers();await loadSuppliers();
+  await loadDB();await loadChartOfAccounts();await loadPeriods();await loadTaxSettings();await loadCustomers();await loadSuppliers();await loadExchangeRates();
   document.getElementById('companyScreen').style.display='none';
   document.getElementById('loginScreen').style.display='none';
   document.getElementById('mainApp').style.display='block';
@@ -648,8 +733,10 @@ async function enterCompany(c){
   const rb=document.getElementById('roleBadge');if(rb){rb.textContent=SESSION.role==='owner'?'👑 Owner':SESSION.role==='accountant'?'📊 Accountant':'👤 Staff';rb.className='role-badge '+SESSION.role;}
   const sb=document.getElementById('scopeBanner');if(sb){sb.innerHTML=SESSION.projectScope&&SESSION.role==='staff'?`<div class="scope-banner">🔐 You can only see: <strong>${getScopedNames().join(', ')||'(none)'}</strong></div>`:'';} 
   injectModeSwitcher();renderSidebar(APP_MODE);renderModeBadge();
+  populateCurOtherSelect();
   if(APP_MODE==='retail')await loadRetailProducts();
   injectRetailPages();
+  refreshEntryCurrencySelects();
   refreshCustomerDropdowns();refreshSupplierDropdowns();
   autoDepreciation();renderAll();runAudit();renderStaffPanel();loadPeriodList();
   setTimeout(()=>{injectModeSettingsCard();if(APP_MODE==='retail'){renderPOSProductGrid();renderPOLines();}},300);
@@ -666,7 +753,7 @@ function renderModeBadge(){const b=document.getElementById('modeBadge');if(!b)re
 function injectModeSwitcher(){if(document.getElementById('modeBadge'))return;const tbCur=document.querySelector('.tb-cur');if(!tbCur)return;const sw=document.createElement('div');sw.style.cssText='display:flex;align-items:center;gap:6px;position:relative';sw.innerHTML=`<span id="modeBadge" style="font-size:10px;padding:3px 9px;border-radius:4px;font-family:'JetBrains Mono',monospace;cursor:pointer;white-space:nowrap" onclick="toggleModeMenu()">🏗️ Construction</span><div id="modeMenu" style="display:none;position:absolute;top:32px;left:0;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:6px;z-index:999;min-width:200px;box-shadow:var(--shadow)"><div onclick="switchAppMode('construction')" style="padding:9px 12px;cursor:pointer;border-radius:5px;font-size:12px;color:var(--text)" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='transparent'">🏗️ Construction Company</div><div onclick="switchAppMode('retail')" style="padding:9px 12px;cursor:pointer;border-radius:5px;font-size:12px;color:var(--text)" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='transparent'">🛒 Retail / Supermarket</div></div>`;tbCur.parentNode.insertBefore(sw,tbCur);}
 function toggleModeMenu(){const m=document.getElementById('modeMenu');if(m)m.style.display=m.style.display==='none'?'block':'none';}
 document.addEventListener('click',e=>{const m=document.getElementById('modeMenu');if(m&&!e.target.closest('#modeBadge')&&!m.contains(e.target))m.style.display='none';});
-async function switchAppMode(newMode){if(newMode===APP_MODE){const m=document.getElementById('modeMenu');if(m)m.style.display='none';return;}try{await dbApi({action:'switchMode',companyId:SESSION.companyId,appMode:newMode});APP_MODE=newMode;renderSidebar(newMode);renderModeBadge();const m=document.getElementById('modeMenu');if(m)m.style.display='none';await loadChartOfAccounts();if(newMode==='retail'){await loadRetailProducts();injectRetailPages();setTimeout(()=>{renderPOSProductGrid();renderPOLines();},200);}const constructionOnly=['projects','invoice','retention','materials','deliveries','jobcost','materialpo'];const retailOnly=['pos','products','stockin','purchaseorders','retailsales','stockval'];const guard=newMode==='retail'?constructionOnly:retailOnly;const active=document.querySelector('.page.on');if(active&&guard.some(p=>active.id==='pg-'+p))nav('home');renderAll();injectModeSettingsCard();showToast(`✅ Switched to ${newMode==='retail'?'🛒 Retail':'🏗️ Construction'} mode`);}catch(e){showToast('❌ '+e.message);}}
+async function switchAppMode(newMode){if(newMode===APP_MODE){const m=document.getElementById('modeMenu');if(m)m.style.display='none';return;}try{await dbApi({action:'switchMode',companyId:SESSION.companyId,appMode:newMode});APP_MODE=newMode;renderSidebar(newMode);renderModeBadge();const m=document.getElementById('modeMenu');if(m)m.style.display='none';await loadChartOfAccounts();if(newMode==='retail'){await loadRetailProducts();injectRetailPages();refreshEntryCurrencySelects();setTimeout(()=>{renderPOSProductGrid();renderPOLines();},200);}const constructionOnly=['projects','invoice','retention','materials','deliveries','jobcost','materialpo'];const retailOnly=['pos','products','stockin','purchaseorders','retailsales','stockval'];const guard=newMode==='retail'?constructionOnly:retailOnly;const active=document.querySelector('.page.on');if(active&&guard.some(p=>active.id==='pg-'+p))nav('home');renderAll();injectModeSettingsCard();showToast(`✅ Switched to ${newMode==='retail'?'🛒 Retail':'🏗️ Construction'} mode`);}catch(e){showToast('❌ '+e.message);}}
 
 // ── NAVIGATION ────────────────────────────────────────────────────
 async function nav(page,el){
@@ -678,15 +765,15 @@ async function nav(page,el){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
   document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('on'));
   const pg=document.getElementById('pg-'+page);if(pg)pg.classList.add('on');if(el)el.classList.add('on');
-  if(page==='ledger')renderLedger();if(page==='trial')renderTrial();if(page==='income')renderIncome();if(page==='balance')renderBalance();if(page==='cashflow')renderCashflow();if(page==='jobcost')renderJobCost();if(page==='retention')renderRetention();if(page==='journal')renderJournal();if(page==='audit'){runAudit();switchAuditTab('bot');}if(page==='coa')renderCOA();if(page==='periods')loadPeriodList();if(page==='settings'){const bn=document.getElementById('bizName');if(bn)bn.value=BIZ_NAME;const sr=document.getElementById('sspRate');if(sr)sr.value=SSP_RATE;renderCostingButtons();renderProjectScopeCheckboxes();injectModeSettingsCard();await loadTaxSettings();renderTaxSettingsCard();}
+  if(page==='ledger')renderLedger();if(page==='trial')renderTrial();if(page==='income')renderIncome();if(page==='balance')renderBalance();if(page==='cashflow')renderCashflow();if(page==='jobcost')renderJobCost();if(page==='retention')renderRetention();if(page==='journal')renderJournal();if(page==='audit'){runAudit();switchAuditTab('bot');}if(page==='coa')renderCOA();if(page==='periods')loadPeriodList();if(page==='settings'){const bn=document.getElementById('bizName');if(bn)bn.value=BIZ_NAME;const sr=document.getElementById('sspRate');if(sr)sr.value=SSP_RATE;const lcs=document.getElementById('localCurrencySelect');if(lcs)lcs.innerHTML=currencySelectOptions(LOCAL_CURRENCY);renderFxStatusLine();renderCostingButtons();renderProjectScopeCheckboxes();injectModeSettingsCard();await loadTaxSettings();renderTaxSettingsCard();}
   // Retail pages that depend on the product catalogue always refetch fresh from the DB on entry,
   // so newly added products (e.g. from the Products page or the Quick Add modal) show up immediately.
   if(page==='pos'){await loadRetailProducts();renderPOSCart();refreshCustomerDropdowns();setTimeout(()=>{const s=document.getElementById('pos-scan');if(s)s.focus();},100);}
   if(page==='products'){await loadRetailProducts();}
-  if(page==='stockin'){await loadRetailProducts();renderManualIntakeRows();await loadPurchaseOrdersCache();renderPOReceiveSelect();refreshSupplierDropdowns();}
+  if(page==='stockin'){await loadRetailProducts();renderManualIntakeRows();await loadPurchaseOrdersCache();renderPOReceiveSelect();refreshSupplierDropdowns();refreshEntryCurrencySelects();}
   if(page==='stockval'){await loadRetailProducts();}
   if(page==='retailsales'){renderRetailSalesPage();}
-  if(page==='purchaseorders'){await loadRetailProducts();await loadPurchaseOrdersCache();renderPOList();refreshSupplierDropdowns();}
+  if(page==='purchaseorders'){await loadRetailProducts();await loadPurchaseOrdersCache();renderPOList();refreshSupplierDropdowns();refreshEntryCurrencySelects();}
   if(page==='taxreport'){await loadTaxSettings();await loadPeriods();initTaxReportPage();}
   if(page==='customers'){await loadCustomers();renderCustomerList();}
   if(page==='suppliers'){await loadSuppliers();renderSupplierList();}
@@ -695,7 +782,25 @@ async function nav(page,el){
   if(page==='materialpo'){refreshSupplierDropdowns();refreshMaterialDropdowns();renderMaterialPOLines();await loadPurchaseOrdersCache();renderMaterialPOList();}
   if(page==='petty'){refreshSupplierDropdowns();}
 }
-function setCur(c){CUR=c;document.getElementById('cur-usd').classList.toggle('on',c==='USD');document.getElementById('cur-ssp').classList.toggle('on',c==='SSP');renderAll();}
+function setCur(c){CUR=c;document.getElementById('cur-usd').classList.toggle('on',c==='USD');const sel=document.getElementById('curOtherSelect');if(sel){sel.classList.toggle('on',c!=='USD');if(c!=='USD')sel.value=c;}renderAll();}
+function populateCurOtherSelect(){const sel=document.getElementById('curOtherSelect');if(!sel)return;sel.innerHTML=currencySelectOptions(LOCAL_CURRENCY);}
+function refreshEntryCurrencySelects(){document.querySelectorAll('.entry-currency-select').forEach(sel=>{const prev=sel.value;sel.innerHTML=currencySelectOptions('USD');if(prev&&CURRENCIES.some(c=>c.code===prev))sel.value=prev;});}
+// Shared hint shown next to any purchase-entry currency picker — tells the user whether
+// their chosen currency has a known conversion rate (live or the company's own manual local
+// rate) before they start typing costs in it, since silently falling back to "no
+// conversion" would be a costly surprise.
+function onIntakeCurrencyChange(selectId,hintId){
+  const sel=document.getElementById(selectId),hint=document.getElementById(hintId);
+  if(!sel||!hint)return;
+  const code=sel.value;
+  if(code==='USD'){hint.textContent='';return;}
+  const rate=getDisplayRate(code);
+  if(rate){
+    hint.innerHTML=`<span style="color:var(--text3)">1 USD = ${rate} ${code}${code===LOCAL_CURRENCY?' (your local rate)':' (live)'} — costs entered below will be converted to USD automatically.</span>`;
+  }else{
+    hint.innerHTML=`<span style="color:var(--orange3)">⚠️ No known rate for ${code} — amounts won't convert. Set a rate for it in Settings first, or enter costs in USD.</span>`;
+  }
+}
 
 // ── CHART OF ACCOUNTS ─────────────────────────────────────────────
 async function loadChartOfAccounts(){try{const r=await dbApi({action:'listAccounts',companyId:SESSION.companyId});CHART_OF_ACCOUNTS=r.accounts||[];}catch{}}
@@ -1177,6 +1282,7 @@ function showUniversalDocReview(p){
   const items=p.line_items||[];
   document.getElementById('udocLineItems').innerHTML=items.length?`<table><thead><tr><th>Description</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead><tbody>${items.map(it=>`<tr><td>${it.description||''}</td><td style="font-family:'JetBrains Mono',monospace">${it.quantity||''}</td><td style="font-family:'JetBrains Mono',monospace">${it.unit_price?fc(it.unit_price):''}</td><td style="font-family:'JetBrains Mono',monospace">${it.total_price?fc(it.total_price):''}</td></tr>`).join('')}</tbody></table>`:'<div style="color:var(--text3);font-size:12px;padding:7px 0">No line items extracted</div>';
   document.getElementById('udocTotals').innerHTML=`<div class="fs-row"><span>Subtotal</span><span class="fs-val">${fc(t.subtotal||0)}</span></div><div class="fs-row"><span>Tax</span><span class="fs-val">${fc(t.tax_amount||0)}</span></div><div class="fs-row sub"><span>Grand Total (${p.currency||'USD'})</span><span class="fs-val">${fc(t.grand_total||0)}</span></div>${(p.currency&&p.currency!=='USD')?`<div class="fs-row total"><span>Grand Total (Base — USD)</span><span class="fs-val" style="color:var(--gold3)">${fc(t.grand_total_in_base_currency||t.grand_total||0)}</span></div>`:''}`;
+  renderUdocFxWarning(p);
   renderUdocStockRows(p);
   const rowsWrap=document.getElementById('udocPostingRows');
   rowsWrap.innerHTML='';
@@ -1190,6 +1296,40 @@ function showUniversalDocReview(p){
   recalcUdocBalance();
 }
 let _udocRowSeq=0;
+// Cross-checks the AI's guessed exchange_rate against our own live/manually-configured
+// rate for that currency. The AI can only estimate a rate from general knowledge — our
+// live feed (or the company's own manually-entered rate for untracked currencies like SSP)
+// is the trustworthy source, so a meaningful mismatch is worth flagging before anything posts.
+function renderUdocFxWarning(p){
+  const wrap=document.getElementById('udocFxWarning');if(!wrap)return;
+  if(!p.currency||p.currency==='USD'||!p.exchange_rate){wrap.style.display='none';wrap.innerHTML='';return;}
+  const liveRate=getDisplayRate(p.currency);
+  if(!liveRate){
+    wrap.style.display='block';
+    wrap.innerHTML=`<div class="alert al-warn"><span class="alert-ico">⚠️</span><div class="alert-body">No live or manually-configured rate is available for ${p.currency} — the AI's own estimate (1 USD = ${p.exchange_rate} ${p.currency}) was used for the amounts below. Double-check them, or set a rate for ${p.currency} in Settings first.</div></div>`;
+    return;
+  }
+  const diffPct=Math.abs(liveRate-p.exchange_rate)/liveRate*100;
+  if(diffPct<2){wrap.style.display='none';wrap.innerHTML='';return;} // close enough — no need to alarm the user
+  wrap.style.display='block';
+  const rateLabel=p.currency===LOCAL_CURRENCY?'the rate configured in Settings':'the live rate';
+  wrap.innerHTML=`<div class="alert al-danger"><span class="alert-ico">💱</span><div class="alert-body"><div class="alert-title">Exchange rate mismatch (${diffPct.toFixed(1)}% difference)</div>AI estimated 1 USD = ${p.exchange_rate} ${p.currency}, but ${rateLabel} is 1 USD = ${liveRate} ${p.currency}. The posting amounts below may be off.<div class="btn-row"><button class="btn btn-gold" style="font-size:11px" onclick="recalcUdocWithLiveRate(${liveRate},${p.exchange_rate})">✅ Recalculate all amounts using ${liveRate}</button></div></div></div>`;
+}
+// Rescales every debit/credit row proportionally from the AI's rate to the trustworthy
+// live/manual rate. Safe for the common case (a single foreign-currency document converted
+// at one rate) since every posted amount scales by the same ratio; if a document genuinely
+// mixes currencies this won't apply — the user can still edit any row by hand regardless.
+function recalcUdocWithLiveRate(liveRate,aiRate){
+  if(!liveRate||!aiRate)return;
+  const ratio=aiRate/liveRate;
+  document.querySelectorAll('.udoc-posting-row .udoc-row-amt').forEach(inp=>{
+    const val=parseFloat(inp.value)||0;
+    inp.value=Math.round(val*ratio*100)/100;
+  });
+  recalcUdocBalance();
+  showToast('✅ Amounts recalculated using the live rate');
+}
+
 // Document types where the line items plausibly represent physical goods moving in or out,
 // with the DEFAULT direction that movement takes — user can always flip it per-row, since a
 // DELIVERY_NOTE or INVENTORY_COUNT_SHEET's direction isn't always predictable from type alone.
@@ -1356,7 +1496,7 @@ function postPettyExpense(){const desc=document.getElementById('pcDesc').value.t
 function renderPettyHistory(){const el=document.getElementById('pettyHistory');if(!el)return;const items=DB.entries.filter(e=>e.type==='Petty Cash'||e.type==='Petty Cash Expense').slice(-20).reverse();if(!items.length){el.innerHTML='<div style="text-align:center;padding:14px;color:var(--text3)">No entries</div>';return;}el.innerHTML=items.map(e=>`<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px"><div><div>${e.desc}</div><div style="font-size:10px;color:var(--text3)">${e.date}</div></div><div style="font-family:'JetBrains Mono',monospace;color:${e.type==='Petty Cash'?'var(--green3)':'var(--red3)'}">${e.type==='Petty Cash'?'+':'-'}${fc(e.amount)}</div></div>`).join('');}
 
 // ── MOBILE MONEY ──────────────────────────────────────────────────
-function addMobileMoney(){const net=document.getElementById('mmNet').value,type=document.getElementById('mmType').value;let amt=parseFloat(document.getElementById('mmAmt').value);const cur=document.getElementById('mmCur').value,ref=document.getElementById('mmRef').value.trim(),st=document.getElementById('mmSt');if(!amt){st.innerHTML='<span style="color:var(--red3)">Enter amount</span>';return;}if(cur==='SSP')amt=amt/SSP_RATE;DB.mobileMoney.push({id:Date.now(),net,type,amt,ref,date:today()});DB.entries.push({id:DB.nextId++,date:today(),desc:`Mobile Money ${type==='in'?'IN':'OUT'} (${net.toUpperCase()}) — ${ref}`,type:'Mobile Money',amount:amt,project:'',debits:type==='in'?[{acct:'Cash',amt,atype:'asset'}]:[{acct:'Miscellaneous Expense',amt,atype:'expense'}],credits:type==='in'?[{acct:'Contract Revenue',amt,atype:'revenue'}]:[{acct:'Cash',amt,atype:'asset'}]});saveData();renderAll();st.innerHTML=`<span style="color:var(--green3)">✅ ${fc(amt)}</span>`;setTimeout(()=>st.innerHTML='',3000);}
+function addMobileMoney(){const net=document.getElementById('mmNet').value,type=document.getElementById('mmType').value;let amt=parseFloat(document.getElementById('mmAmt').value);const cur=document.getElementById('mmCur').value,ref=document.getElementById('mmRef').value.trim(),st=document.getElementById('mmSt');if(!amt){st.innerHTML='<span style="color:var(--red3)">Enter amount</span>';return;}amt=convertToUSD(amt,cur);DB.mobileMoney.push({id:Date.now(),net,type,amt,ref,date:today()});DB.entries.push({id:DB.nextId++,date:today(),desc:`Mobile Money ${type==='in'?'IN':'OUT'} (${net.toUpperCase()}) — ${ref}`,type:'Mobile Money',amount:amt,project:'',debits:type==='in'?[{acct:'Cash',amt,atype:'asset'}]:[{acct:'Miscellaneous Expense',amt,atype:'expense'}],credits:type==='in'?[{acct:'Contract Revenue',amt,atype:'revenue'}]:[{acct:'Cash',amt,atype:'asset'}]});saveData();renderAll();st.innerHTML=`<span style="color:var(--green3)">✅ ${fc(amt)}</span>`;setTimeout(()=>st.innerHTML='',3000);}
 function renderMobileMoneySummary(){const mtnIn=DB.mobileMoney.filter(m=>m.net==='mtn'&&m.type==='in').reduce((s,m)=>s+m.amt,0),airtelIn=DB.mobileMoney.filter(m=>m.net==='airtel'&&m.type==='in').reduce((s,m)=>s+m.amt,0),out=DB.mobileMoney.filter(m=>m.type==='out').reduce((s,m)=>s+m.amt,0),net2=mtnIn+airtelIn-out;const g=id=>document.getElementById(id);if(g('mtnInVal'))g('mtnInVal').textContent=fc(mtnIn);if(g('airtelInVal'))g('airtelInVal').textContent=fc(airtelIn);if(g('mmOutVal'))g('mmOutVal').textContent=fc(out);if(g('mmNetVal')){g('mmNetVal').textContent=fc(net2);g('mmNetVal').className='kpi-val '+(net2>=0?'pos':'neg');}}
 function renderMobileMoneyList(){const el=document.getElementById('mmList');if(!el)return;if(!DB.mobileMoney.length){el.innerHTML='<div style="text-align:center;padding:14px;color:var(--text3)">No transactions</div>';return;}el.innerHTML=DB.mobileMoney.slice(-30).reverse().map(m=>`<div class="mm-row"><div class="mm-logo ${m.net}">${m.net.toUpperCase()}</div><div class="mm-body"><div class="mm-name">${m.ref||'—'}</div><div class="mm-ref">${m.date}</div></div><div class="mm-amount ${m.type}">${m.type==='in'?'+':'-'}${fc(m.amt)}</div></div>`).join('');}
 function handleStatementUpload(event){const file=event.target.files[0];if(!file)return;const st=document.getElementById('reconSt');st.innerHTML='⏳ Parsing...';const ext=file.name.split('.').pop().toLowerCase();if(ext==='csv'){Papa.parse(file,{header:true,skipEmptyLines:true,complete:r=>processStatementRows(r.data),error:e=>st.innerHTML=`<span style="color:var(--red3)">${e.message}</span>`});}else{const reader=new FileReader();reader.onload=e=>{try{const wb=XLSX.read(e.target.result,{type:'array'});processStatementRows(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''}));}catch(err){st.innerHTML=`<span style="color:var(--red3)">${err.message}</span>`;}};reader.readAsArrayBuffer(file);}}
@@ -1497,12 +1637,13 @@ async function confirmMaterialsDelivery(){
   if(!supplier){st.innerHTML='<span style="color:var(--red3)">Enter a supplier</span>';return;}
   const rowEls=Array.from(document.querySelectorAll('#del-rows .del-intake-row'));
   const candidates=[];
+  const delCurrency=(document.getElementById('del-currency')||{}).value||'USD';
   rowEls.forEach(row=>{
     const sel=row.querySelector('.material-select');
     const materialId=sel?sel.value:'';
     const parsedName=row.dataset.parsedName||'';
     const qty=parseFloat(row.querySelector('.del-row-qty').value)||0;
-    const unitCost=parseFloat(row.querySelector('.del-row-cost').value)||0;
+    const unitCost=convertToUSD(parseFloat(row.querySelector('.del-row-cost').value)||0,delCurrency);
     if(qty<=0||unitCost<=0)return;
     candidates.push({materialId,parsedName,qty,unitCost});
   });
@@ -1568,6 +1709,8 @@ async function handleMaterialsReceiptUpload(file){
     }
     const supplierEl=document.getElementById('delSupplier');if(supplierEl)supplierEl.value=parsed.supplier||'';
     onDelSupplierTextInput();
+    const curEl=document.getElementById('del-currency');if(curEl&&parsed.currency)curEl.value=parsed.currency;
+    onIntakeCurrencyChange('del-currency','del-currency-hint');
     const wrap=document.getElementById('del-rows');if(wrap){wrap.innerHTML='';_delRowSeq=0;}
     parsed.items.forEach(it=>{
       const match=findMaterialByName(it.name);
@@ -1609,11 +1752,11 @@ function addMaterialPOLine(){
   el.appendChild(row);
 }
 async function submitMaterialPurchaseOrder(){
-  const supplier=document.getElementById('mpo-supplier').value.trim(),payMethod=document.getElementById('mpo-pay').value,notes=document.getElementById('mpo-notes').value.trim(),st=document.getElementById('mpo-st');
+  const supplier=document.getElementById('mpo-supplier').value.trim(),payMethod=document.getElementById('mpo-pay').value,notes=document.getElementById('mpo-notes').value.trim(),st=document.getElementById('mpo-st'),mpoCurrency=(document.getElementById('mpo-currency')||{}).value||'USD';
   if(!supplier){st.innerHTML='<span style="color:var(--red3)">Enter supplier</span>';return;}
   const rows=document.querySelectorAll('.mpo-line-row');const items=[];let total=0;
   rows.forEach(row=>{
-    const materialId=row.querySelector('.material-select').value,qty=parseFloat(row.querySelector('.mpo-line-qty').value)||0,unitCost=parseFloat(row.querySelector('.mpo-line-cost').value)||0;
+    const materialId=row.querySelector('.material-select').value,qty=parseFloat(row.querySelector('.mpo-line-qty').value)||0,unitCost=convertToUSD(parseFloat(row.querySelector('.mpo-line-cost').value)||0,mpoCurrency);
     if(!materialId||!qty||!unitCost)return;
     const mat=DB.materials.find(m=>String(m.id)===String(materialId));if(!mat)return;
     const lineTotal=qty*unitCost;total+=lineTotal;
@@ -1725,7 +1868,7 @@ async function confirmMaterialPOReceipt(){
 function calcPAYE(gross){const bands=[{upTo:235,rate:0},{upTo:335,rate:.10},{upTo:410,rate:.20},{upTo:Infinity,rate:.30}];let tax=0,prev=0;for(const b of bands){if(gross>prev){tax+=(Math.min(gross,b.upTo)-prev)*b.rate;prev=b.upTo;}else break;}return Math.round(tax*100)/100;}
 function calcNSSF(gross){return{employee:Math.round(gross*.05*100)/100,employer:Math.round(gross*.10*100)/100};}
 function toggleWorkerClassFields(){const cls=document.getElementById('wkClass').value;document.getElementById('wkPermanentFields').style.display=cls==='Permanent'?'grid':'none';document.getElementById('wkCasualFields').style.display=cls==='Casual'?'grid':'none';}
-function addWorker(){const name=document.getElementById('wkName').value.trim(),role=document.getElementById('wkRole').value,cls=document.getElementById('wkClass').value,cur=document.getElementById('wkCur').value,st=document.getElementById('wkAddSt');if(!name){st.innerHTML='<span style="color:var(--red3)">Enter name</span>';return;}let w={id:Date.now(),name,role,classification:cls,casualLog:{}};if(cls==='Permanent'){let sal=parseFloat(document.getElementById('wkSalary').value)||0;if(!sal){st.innerHTML='<span style="color:var(--red3)">Enter salary</span>';return;}if(cur==='SSP')sal=sal/SSP_RATE;w.salary=sal;}else{let rate=parseFloat(document.getElementById('wkDailyRate').value)||0;if(!rate){st.innerHTML='<span style="color:var(--red3)">Enter daily rate</span>';return;}if(cur==='SSP')rate=rate/SSP_RATE;w.dailyRate=rate;w.salary=0;}DB.workers.push(w);saveData();renderAll();document.getElementById('wkName').value='';document.getElementById('wkSalary').value='';document.getElementById('wkDailyRate').value='';st.innerHTML=`<span style="color:var(--green3)">✅ ${name}</span>`;setTimeout(()=>st.innerHTML='',3000);}
+function addWorker(){const name=document.getElementById('wkName').value.trim(),role=document.getElementById('wkRole').value,cls=document.getElementById('wkClass').value,cur=document.getElementById('wkCur').value,st=document.getElementById('wkAddSt');if(!name){st.innerHTML='<span style="color:var(--red3)">Enter name</span>';return;}let w={id:Date.now(),name,role,classification:cls,casualLog:{}};if(cls==='Permanent'){let sal=parseFloat(document.getElementById('wkSalary').value)||0;if(!sal){st.innerHTML='<span style="color:var(--red3)">Enter salary</span>';return;}sal=convertToUSD(sal,cur);w.salary=sal;}else{let rate=parseFloat(document.getElementById('wkDailyRate').value)||0;if(!rate){st.innerHTML='<span style="color:var(--red3)">Enter daily rate</span>';return;}rate=convertToUSD(rate,cur);w.dailyRate=rate;w.salary=0;}DB.workers.push(w);saveData();renderAll();document.getElementById('wkName').value='';document.getElementById('wkSalary').value='';document.getElementById('wkDailyRate').value='';st.innerHTML=`<span style="color:var(--green3)">✅ ${name}</span>`;setTimeout(()=>st.innerHTML='',3000);}
 function logCasualDays(){const wid=parseInt(document.getElementById('casualWorker').value),days=parseFloat(document.getElementById('casualDays').value)||0,month=document.getElementById('casualMonth').value||today().slice(0,7),st=document.getElementById('casualSt');const w=DB.workers.find(x=>x.id===wid);if(!w||w.classification!=='Casual'){st.innerHTML='<span style="color:var(--red3)">Select casual worker</span>';return;}if(!days){st.innerHTML='<span style="color:var(--red3)">Enter days</span>';return;}if(!w.casualLog)w.casualLog={};w.casualLog[month]=(w.casualLog[month]||0)+days;saveData();renderAll();st.innerHTML=`<span style="color:var(--green3)">✅ ${days} days for ${w.name}</span>`;setTimeout(()=>st.innerHTML='',4000);}
 function getWorkerGrossForMonth(w,month){return w.classification==='Casual'?((w.casualLog&&w.casualLog[month])||0)*(w.dailyRate||0):w.salary||0;}
 function renderWorkerList(){const el=document.getElementById('workerList');if(!el)return;if(!DB.workers.length){el.innerHTML='<div style="text-align:center;padding:14px;color:var(--text3)">No workers</div>';return;}const thisMonth=today().slice(0,7);el.innerHTML=`<table><thead><tr><th>Name</th><th>Role</th><th>Class</th><th>Rate</th><th>This Month</th><th></th></tr></thead><tbody>${DB.workers.map(w=>`<tr><td>${w.name}</td><td>${w.role}</td><td><span class="tag ${w.classification==='Casual'?'t-orange':'t-blue'}">${w.classification}</span></td><td style="font-family:'JetBrains Mono',monospace">${w.classification==='Casual'?fc(w.dailyRate||0)+'/day':fc(w.salary||0)+'/mo'}</td><td style="font-family:'JetBrains Mono',monospace">${fc(getWorkerGrossForMonth(w,thisMonth))}</td><td><button class="btn btn-danger" style="font-size:10px;padding:3px 7px" onclick="deleteWorker(${w.id})">✕</button></td></tr>`).join('')}</tbody></table>`;}
@@ -1738,7 +1881,7 @@ function updateDisburseBalance(){const wid=parseInt(document.getElementById('dis
 function disburseSalary(){const wid=parseInt(document.getElementById('disburseWorker').value),fromAcct=document.getElementById('disburseFrom').value,st=document.getElementById('disburseSt');const w=DB.workers.find(x=>x.id===wid);if(!w){st.innerHTML='<span style="color:var(--red3)">Select worker</span>';return;}const owed=getWorkerPayableBalance(w.name);if(owed<=0){st.innerHTML='<span style="color:var(--red3)">No payable outstanding</span>';return;}DB.entries.push({id:DB.nextId++,date:today(),desc:`Salary Disbursement: ${w.name}`,type:'Payroll Disbursement',amount:owed,project:'',debits:[{acct:'Salaries Payable',amt:owed,atype:'liability'}],credits:[{acct:fromAcct,amt:owed,atype:'asset'}]});saveData();renderAll();showToast(`✅ Paid ${fc(owed)} to ${w.name}`);updateDisburseBalance();}
 
 // ── PROJECTS ──────────────────────────────────────────────────────
-function addProject(){const name=document.getElementById('pjName').value.trim(),client=document.getElementById('pjClient').value.trim();let value=parseFloat(document.getElementById('pjValue').value)||0;const cur=document.getElementById('pjCur').value,location=document.getElementById('pjLocation').value.trim(),retention=parseFloat(document.getElementById('pjRetention').value)||10,start=document.getElementById('pjStart').value,end=document.getElementById('pjEnd').value,st=document.getElementById('projAddSt');if(!name||!value){st.innerHTML='<span style="color:var(--red3)">Fill name and value</span>';return;}if(cur==='SSP')value=value/SSP_RATE;DB.projects.push({id:Date.now(),name,client,value,location,retention,start,end,status:'Active',billed:0});saveData();renderAll();document.getElementById('pjName').value='';document.getElementById('pjValue').value='';st.innerHTML=`<span style="color:var(--green3)">✅ ${name}</span>`;setTimeout(()=>st.innerHTML='',3000);}
+function addProject(){const name=document.getElementById('pjName').value.trim(),client=document.getElementById('pjClient').value.trim();let value=parseFloat(document.getElementById('pjValue').value)||0;const cur=document.getElementById('pjCur').value,location=document.getElementById('pjLocation').value.trim(),retention=parseFloat(document.getElementById('pjRetention').value)||10,start=document.getElementById('pjStart').value,end=document.getElementById('pjEnd').value,st=document.getElementById('projAddSt');if(!name||!value){st.innerHTML='<span style="color:var(--red3)">Fill name and value</span>';return;}value=convertToUSD(value,cur);DB.projects.push({id:Date.now(),name,client,value,location,retention,start,end,status:'Active',billed:0});saveData();renderAll();document.getElementById('pjName').value='';document.getElementById('pjValue').value='';st.innerHTML=`<span style="color:var(--green3)">✅ ${name}</span>`;setTimeout(()=>st.innerHTML='',3000);}
 function renderProjectCards(){const el=document.getElementById('projectCards');if(!el)return;const visible=SESSION.projectScope&&SESSION.role==='staff'?DB.projects.filter(p=>SESSION.projectScope.includes(p.id)):DB.projects;if(!visible.length){el.innerHTML='<div class="card" style="text-align:center;color:var(--text3);padding:22px">No projects</div>';return;}el.innerHTML=visible.map(p=>{const costs=DB.entries.filter(e=>e.project===p.name).reduce((s,e)=>s+(e.debits||[]).filter(d=>d.atype==='expense').reduce((ss,d)=>ss+d.amt,0),0),pct=p.value>0?Math.min(100,Math.round((p.billed||0)/p.value*100)):0;return`<div class="card"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px"><div><div style="font-size:14px;font-weight:700;color:var(--text)">${p.name}</div><div style="font-size:11px;color:var(--text3)">${p.client||''} · ${p.location||''}</div></div><div style="display:flex;gap:5px"><span class="tag ${p.status==='Active'?'t-green':'t-blue'}">${p.status}</span><button class="btn btn-outline" style="font-size:10px;padding:2px 7px" onclick="toggleProjectStatus(${p.id})">${p.status==='Active'?'Complete':'Reopen'}</button>${SESSION.role==='owner'?`<button class="btn btn-danger" style="font-size:10px;padding:2px 7px" onclick="deleteProject(${p.id})">✕</button>`:''}</div></div><div class="kgrid" style="grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:10px"><div class="kpi"><div class="kpi-lbl">Contract</div><div class="kpi-val" style="font-size:13px">${fc(p.value)}</div></div><div class="kpi"><div class="kpi-lbl">Billed</div><div class="kpi-val pos" style="font-size:13px">${fc(p.billed||0)}</div></div><div class="kpi"><div class="kpi-lbl">Costs</div><div class="kpi-val neg" style="font-size:13px">${fc(costs)}</div></div><div class="kpi"><div class="kpi-lbl">Margin</div><div class="kpi-val ${(p.billed||0)-costs>=0?'pos':'neg'}" style="font-size:13px">${fc((p.billed||0)-costs)}</div></div></div><div class="prog-wrap"><div class="prog-labels"><span>Billed ${pct}%</span><span>${fc(p.value-(p.billed||0))} remaining</span></div><div class="prog"><div class="prog-fill gold" style="width:${pct}%"></div></div></div><div style="font-size:10px;color:var(--text3);margin-top:5px">${p.start||'—'} → ${p.end||'—'} · Retention: ${p.retention}%</div></div>`;}).join('');}
 function toggleProjectStatus(id){const p=DB.projects.find(x=>x.id===id);if(!p)return;p.status=p.status==='Active'?'Completed':'Active';saveData();renderProjectCards();}
 function deleteProject(id){if(!canDo('deleteProject'))return;if(!confirm('Delete?'))return;DB.projects=DB.projects.filter(p=>p.id!==id);logAudit('deleteProject',`#${id}`);saveData();renderAll();}
@@ -1831,7 +1974,46 @@ function renderARaging(){const ak=document.getElementById('arKpis'),at=document.
 async function sendChat(){const inp=document.getElementById('chatInp'),q=inp.value.trim();if(!q)return;inp.value='';const msgs=document.getElementById('chatMsgs');msgs.innerHTML+=`<div class="msg user">${q}</div><div class="msg ai loading" id="aiLoad">🤖 ይሓስብ ኣሎ...</div>`;msgs.scrollTop=msgs.scrollHeight;const b=getBal();const context=APP_MODE==='retail'?`RETAIL: ${BIZ_NAME}\nSALES: ${fc(sumByType(b,'revenue'))} · COGS: ${fc(b['Cost of Goods Sold']?b['Cost of Goods Sold'].net:0)} · CASH: ${fc(b['Cash']?b['Cash'].net:0)}\nINVENTORY: ${fc(b['Inventory (Stock)']?b['Inventory (Stock)'].net:0)} · PRODUCTS: ${RETAIL_PRODUCTS.length}`:`COMPANY: ${BIZ_NAME} · ${CUR}\nREVENUE: ${fc(sumByType(b,'revenue'))} · EXPENSES: ${fc(sumByType(b,'expense'))} · CASH: ${fc(b['Cash']?b['Cash'].net:0)}\nPROJECTS: ${DB.projects.map(p=>p.name).join(', ')||'none'}`;try{const res=await fetch('/api/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:q,mode:'advisor',context,appMode:APP_MODE})});const data=await res.json();const text=data.result||'ምላሽ ኣይመጸን';document.getElementById('aiLoad').remove();msgs.innerHTML+=`<div class="msg ai">${text.replace(/\n/g,'<br>')}</div>`;msgs.scrollTop=msgs.scrollHeight;}catch(err){document.getElementById('aiLoad').remove();msgs.innerHTML+=`<div class="msg ai" style="color:var(--red3)">Error: ${err.message}</div>`;}}
 
 // ── SETTINGS ──────────────────────────────────────────────────────
-async function saveSettings(){BIZ_NAME=document.getElementById('bizName').value.trim()||BIZ_NAME;SSP_RATE=parseFloat(document.getElementById('sspRate').value)||1300;const tb=document.getElementById('tbBiz');if(tb)tb.textContent=BIZ_NAME;try{await dbApi({action:'saveSettings',companyId:SESSION.companyId,name:BIZ_NAME,sspRate:SSP_RATE,costingMethod:INV_COSTING_METHOD});renderAll();document.getElementById('settingsSt').innerHTML='<span style="color:var(--green3)">✅ Saved</span>';}catch(e){document.getElementById('settingsSt').innerHTML=`<span style="color:var(--red3)">❌ ${e.message}</span>`;}setTimeout(()=>document.getElementById('settingsSt').innerHTML='',3000);}
+async function saveSettings(){BIZ_NAME=document.getElementById('bizName').value.trim()||BIZ_NAME;SSP_RATE=parseFloat(document.getElementById('sspRate').value)||1300;const lcs=document.getElementById('localCurrencySelect');LOCAL_CURRENCY=lcs?lcs.value:LOCAL_CURRENCY;const tb=document.getElementById('tbBiz');if(tb)tb.textContent=BIZ_NAME;try{await dbApi({action:'saveSettings',companyId:SESSION.companyId,name:BIZ_NAME,sspRate:SSP_RATE,costingMethod:INV_COSTING_METHOD,localCurrency:LOCAL_CURRENCY});populateCurOtherSelect();renderAll();document.getElementById('settingsSt').innerHTML='<span style="color:var(--green3)">✅ Saved</span>';}catch(e){document.getElementById('settingsSt').innerHTML=`<span style="color:var(--red3)">❌ ${e.message}</span>`;}setTimeout(()=>document.getElementById('settingsSt').innerHTML='',3000);}
+// When the Owner switches which currency is "local", try to pre-fill a sensible starting
+// rate from the live feed — they can always overwrite it, and for currencies the feed
+// doesn't cover (SSP, etc.) the field is simply left as whatever was there before.
+function onLocalCurrencyChange(){
+  const sel=document.getElementById('localCurrencySelect');if(!sel)return;
+  const code=sel.value;
+  const hint=document.getElementById('liveRateHint');
+  if(FX_RATES[code]){
+    document.getElementById('sspRate').value=FX_RATES[code];
+    if(hint)hint.innerHTML=`<span style="color:var(--green3)">✅ Pre-filled from live rate (1 USD = ${FX_RATES[code]} ${code})</span>`;
+  }else if(hint){
+    hint.innerHTML=`<span style="color:var(--orange3)">⚠️ ${code} isn't in the live feed — enter its rate manually.</span>`;
+  }
+}
+function useLiveRateForLocalCurrency(){
+  const sel=document.getElementById('localCurrencySelect');if(!sel)return;
+  const code=sel.value;
+  const hint=document.getElementById('liveRateHint');
+  if(FX_RATES[code]){
+    document.getElementById('sspRate').value=FX_RATES[code];
+    if(hint)hint.innerHTML=`<span style="color:var(--green3)">✅ Set to live rate: 1 USD = ${FX_RATES[code]} ${code}</span>`;
+  }else if(hint){
+    hint.innerHTML=`<span style="color:var(--orange3)">⚠️ No live rate available for ${code} — this currency isn't tracked by the forex feed. Enter the rate manually.</span>`;
+  }
+}
+async function refreshLiveRatesNow(){
+  const line=document.getElementById('fxStatusLine');
+  if(line)line.textContent='⏳ Refreshing...';
+  await loadExchangeRates();
+  renderFxStatusLine();
+  showToast('✅ Live rates refreshed');
+}
+function renderFxStatusLine(){
+  const line=document.getElementById('fxStatusLine');if(!line)return;
+  if(!FX_FETCHED_AT){line.textContent='No live rates loaded yet.';return;}
+  const when=new Date(FX_FETCHED_AT).toLocaleString();
+  const srcLabel=FX_SOURCE==='live'?'freshly fetched':FX_SOURCE==='cached'?'cached':FX_SOURCE==='cached-stale'?'⚠️ stale (live fetch failed)':FX_SOURCE||'';
+  line.textContent=`Live rates as of ${when} (${srcLabel}) · ${Object.keys(FX_RATES).length} currencies covered`;
+}
 function renderProjectScopeCheckboxes(){const el=document.getElementById('staffProjectScope');if(!el)return;const role=document.getElementById('staffRole').value;const ss=document.getElementById('scopeSection');if(ss)ss.style.display=role==='staff'?'block':'none';el.innerHTML=DB.projects.length?DB.projects.map(p=>`<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;padding:4px 0"><input type="checkbox" value="${p.id}" style="accent-color:var(--gold2)"/> ${p.name}</label>`).join(''):'<div style="font-size:11px;color:var(--text3)">No projects yet</div>';}
 async function addStaff(){const uname=document.getElementById('staffUsername').value.trim(),pw=document.getElementById('staffPassword').value,role=document.getElementById('staffRole').value,st=document.getElementById('staffSt');if(!uname||!pw){st.innerHTML='<span style="color:var(--red3)">Fill username and password</span>';return;}let projectScope=null;if(role==='staff'){const checked=Array.from(document.querySelectorAll('#staffProjectScope input[type="checkbox"]:checked')).map(cb=>parseInt(cb.value));projectScope=checked.length?checked:null;}try{await dbApi({action:'registerStaff',username:uname,password:pw,companyId:SESSION.companyId,role,projectScope});st.innerHTML=`<span style="color:var(--green3)">✅ ${uname} added as ${role}</span>`;document.getElementById('staffUsername').value='';document.getElementById('staffPassword').value='';renderStaffPanel();}catch(e){st.innerHTML=`<span style="color:var(--red3)">❌ ${e.message}</span>`;}setTimeout(()=>st.innerHTML='',5000);}
 async function renderStaffPanel(){const el=document.getElementById('staffList');if(!el)return;if(SESSION.role!=='owner'){el.innerHTML='<div style="color:var(--text3);font-size:12px">Only owners can manage staff.</div>';return;}try{const r=await dbApi({action:'listStaff',companyId:SESSION.companyId});el.innerHTML=(r.staff||[]).map(s=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px"><div style="flex:1">${s.username}</div><span class="tag ${s.role==='owner'?'t-gold':s.role==='accountant'?'t-blue':'t-purple'}">${s.role}</span>${s.role!=='owner'?`<button style="padding:2px 6px;background:transparent;border:1px solid rgba(192,48,42,.3);border-radius:3px;color:var(--red3);font-size:10px;cursor:pointer" onclick="removeStaff(${s.membership_id})">✕</button>`:''}</div>`).join('')||'<div style="color:var(--text3);font-size:12px">No staff yet</div>';}catch(e){el.innerHTML=`<div style="color:var(--red3);font-size:12px">${e.message}</div>`;}}
@@ -2153,9 +2335,9 @@ async function handleStockReceiptUpload(file){
 const RECEIPT_PARSE_PROMPT=`You are a data-extraction engine for supplier delivery receipts and invoices.
 Return ONLY valid JSON. No markdown, no commentary, no trailing commas, no text outside the JSON.
 Structure exactly:
-{"supplier":"Supplier name, or empty string if not found","items":[{"name":"Product name exactly as written on the receipt","qty":10,"unitCost":1.5,"taxCategory":"standard","taxRatePct":18,"taxInclusive":false}]}
+{"supplier":"Supplier name, or empty string if not found","currency":"ISO currency code such as USD, EUR, UGX, KES — your best read of the document's currency, default to USD only if truly no currency indicator is present","items":[{"name":"Product name exactly as written on the receipt","qty":10,"unitCost":1.5,"taxCategory":"standard","taxRatePct":18,"taxInclusive":false}]}
 Rules:
-1. qty and unitCost must be plain numbers, never strings or currency symbols.
+1. qty and unitCost must be plain numbers, never strings or currency symbols. unitCost is in whatever currency you detected — do NOT convert it, just report the number as printed.
 2. If unit cost isn't stated directly but a line total and quantity are, compute unitCost = lineTotal / qty.
 3. List every distinct line item separately — never merge different products into one line.
 4. If a field truly cannot be found, use 0 for numbers and "" for the supplier — never fabricate values.
@@ -2198,7 +2380,7 @@ async function parseReceiptWithAI(rawText){
 function showReceiptReview(parsed){
   RS_PARSED_RECEIPT=parsed;
   if(parsed.items.length===1){
-    populateSingleIntakeForm(parsed.supplier,parsed.items[0]);
+    populateSingleIntakeForm(parsed.supplier,parsed.items[0],parsed.currency);
     const wrap=document.getElementById('rsReceiptReview');if(wrap){wrap.style.display='none';wrap.innerHTML='';}
     setRSReceiptStatus('✅ Fields auto-filled below from the receipt — please verify, then click "Receive Stock".');
     return;
@@ -2219,8 +2401,10 @@ function showReceiptReview(parsed){
 // matches the already-correct behavior in renderReceiptReviewTable() (multi-item path)
 // and receiveStock() (manual intake) — those two never had this bug.
 // ═══════════════════════════════════════════════════════════════════════
-function populateSingleIntakeForm(supplier,item){
+function populateSingleIntakeForm(supplier,item,currency){
   const supplierEl=document.getElementById('si-supplier');if(supplierEl)supplierEl.value=supplier||'';
+  const curEl=document.getElementById('si-currency');if(curEl&&currency)curEl.value=currency;
+  onIntakeCurrencyChange('si-currency','si-currency-hint');
   const match=posFindProduct(item.name,true); // reuse the same fuzzy matcher built for POS voice
   // Tax tier: an already-known product's own configured tier wins (the Owner set that on
   // purpose); otherwise use the AI's own classification of this line item. Computed
@@ -2275,12 +2459,15 @@ function renderReceiptReviewTable(parsed){
     ?`<div class="alert al-info" style="margin-bottom:10px"><span class="alert-ico">🤖</span><div class="alert-body">Tax tiers below are auto-classified by AI for new items (🤖 badge) — review and adjust any row before confirming.</div></div>`
     :`<div class="alert al-warn" style="margin-bottom:10px"><span class="alert-ico">💰</span><div class="alert-body">This business isn't VAT-registered. If a tax tier applies to a row, that tax is absorbed straight into Inventory cost (Accounts Payable still matches the full invoice) — nothing is tracked as a VAT Receivable.</div></div>`;
   wrap.innerHTML=`
-    <div class="fgrid"><div class="fg"><label>Supplier</label><input id="rs-review-supplier" type="text" value="${(parsed.supplier||'').replace(/"/g,'&quot;')}" placeholder="Supplier name"/></div><div class="fg"><label>Payment</label><select id="rs-review-pay"><option value="credit">Credit (AP)</option><option value="cash">Cash</option></select></div></div>
+    <div class="fgrid"><div class="fg"><label>Supplier</label><input id="rs-review-supplier" type="text" value="${(parsed.supplier||'').replace(/"/g,'&quot;')}" placeholder="Supplier name"/></div><div class="fg"><label>Invoice Currency</label><select id="rs-review-currency" class="entry-currency-select" onchange="onIntakeCurrencyChange('rs-review-currency','rs-review-currency-hint')"></select></div><div class="fg"><label>Payment</label><select id="rs-review-pay"><option value="credit">Credit (AP)</option><option value="cash">Cash</option></select></div></div>
+    <div id="rs-review-currency-hint" style="font-size:10px;color:var(--text3);margin:-4px 0 8px"></div>
     ${vatOn?`<div class="fg"><label>Supplier Tax Invoice Number <span style="color:var(--red3)">*</span></label><input id="rs-review-invoice" type="text" placeholder="Required for VAT-registered businesses"/></div>`:''}
     ${taxHint}
     ${rows}
     <div class="btn-row"><button class="btn btn-gold" onclick="confirmReceiptIntake()">✅ Confirm Receive All</button><button class="btn btn-outline" onclick="cancelReceiptReview()">Cancel</button></div>
   `;
+  const curSel=document.getElementById('rs-review-currency');
+  if(curSel){curSel.innerHTML=currencySelectOptions(parsed.currency||'USD');onIntakeCurrencyChange('rs-review-currency','rs-review-currency-hint');}
 }
 function cancelReceiptReview(){const wrap=document.getElementById('rsReceiptReview');if(wrap){wrap.style.display='none';wrap.innerHTML='';}RS_PARSED_RECEIPT=null;setRSReceiptStatus('');}
 async function confirmReceiptIntake(){
@@ -2292,12 +2479,13 @@ async function confirmReceiptIntake(){
   if(isRegistered&&!invoiceNo){setRSReceiptStatus('⚠️ Supplier Tax Invoice Number is required for VAT-registered businesses.',true);return;}
   const rowEls=Array.from(wrap.querySelectorAll('.rs-review-row'));
   const candidates=[];let skipped=0;
+  const intakeCurrency=(document.getElementById('rs-review-currency')||{}).value||'USD';
   rowEls.forEach(row=>{
     const sel=row.querySelector('.rs-review-product');
     const productId=sel?sel.value:'';
     const parsedName=row.dataset.parsedName||'';
     const qty=parseFloat(row.querySelector('.rs-review-qty').value)||0;
-    const unitCost=parseFloat(row.querySelector('.rs-review-cost').value)||0;
+    const unitCost=convertToUSD(parseFloat(row.querySelector('.rs-review-cost').value)||0,intakeCurrency);
     const taxTierSel=row.querySelector('.rs-review-tax-tier');
     const taxTierId=taxTierSel?taxTierSel.value:'';
     const rateInput=row.querySelector('.rs-review-tax-rate');
@@ -2382,12 +2570,13 @@ async function receiveStock(){
   if(isRegistered&&!invoiceNo){st.innerHTML='<span style="color:var(--red3)">Supplier Tax Invoice Number is required for VAT-registered businesses</span>';return;}
   const rowEls=Array.from(document.querySelectorAll('#si-rows .si-intake-row'));
   const candidates=[];
+  const intakeCurrency=(document.getElementById('si-currency')||{}).value||'USD';
   rowEls.forEach(row=>{
     const sel=row.querySelector('.si-row-product');
     const productId=sel?sel.value:'';
     const parsedName=row.dataset.parsedName||'';
     const qty=parseFloat(row.querySelector('.si-row-qty').value)||0;
-    const unitCost=parseFloat(row.querySelector('.si-row-cost').value)||0;
+    const unitCost=convertToUSD(parseFloat(row.querySelector('.si-row-cost').value)||0,intakeCurrency);
     const taxTierSel=row.querySelector('.si-row-tax-tier');
     const taxTierId=taxTierSel?taxTierSel.value:'';
     const rateInput=row.querySelector('.si-row-tax-rate');
@@ -2768,7 +2957,7 @@ function addPOLine(){
   `;
   el.appendChild(row);
 }
-async function submitPurchaseOrder(){const supplier=document.getElementById('po-supplier').value.trim(),payMethod=document.getElementById('po-pay').value,notes=document.getElementById('po-notes').value.trim(),st=document.getElementById('po-st');if(!supplier){st.innerHTML='<span style="color:var(--red3)">Enter supplier</span>';return;}const rows=document.querySelectorAll('.po-line-row');const items=[];let total=0;rows.forEach(row=>{const productId=row.querySelector('.po-line-product').value,qty=parseFloat(row.querySelector('.po-line-qty').value)||0,unitCost=parseFloat(row.querySelector('.po-line-cost').value)||0;if(!productId||!qty||!unitCost)return;const product=RETAIL_PRODUCTS.find(p=>p.id===parseInt(productId));if(!product)return;const lineTotal=qty*unitCost;total+=lineTotal;items.push({productId:parseInt(productId),name:product.name,qty,unitCost,lineTotal,receivedQty:0});});if(!items.length){st.innerHTML='<span style="color:var(--red3)">Add at least one item</span>';return;}try{const existedBefore=!!findSupplierByName(supplier);const supplierRecord=await ensureSupplierExists(supplier);await dbApi({action:'savePurchaseOrder',companyId:SESSION.companyId,supplier,po_date:today(),items,total,paymentMethod:payMethod,notes});st.innerHTML=`<span style="color:var(--green3)">✅ PO saved — ${fc(total)} from ${supplier}${supplierRecord&&!existedBefore?' (new supplier added)':''}. No journal entry posted yet; that happens when stock is received.</span>`;document.getElementById('po-supplier').value='';const poSel=document.getElementById('po-supplier-sel');if(poSel)poSel.value='';if(document.getElementById('po-notes'))document.getElementById('po-notes').value='';renderPOLines();await loadPurchaseOrdersCache();await renderPOList();}catch(e){st.innerHTML=`<span style="color:var(--red3)">❌ ${e.message}</span>`;}setTimeout(()=>{const s=document.getElementById('po-st');if(s)s.innerHTML='';},6000);}
+async function submitPurchaseOrder(){const supplier=document.getElementById('po-supplier').value.trim(),payMethod=document.getElementById('po-pay').value,notes=document.getElementById('po-notes').value.trim(),st=document.getElementById('po-st'),poCurrency=(document.getElementById('po-currency')||{}).value||'USD';if(!supplier){st.innerHTML='<span style="color:var(--red3)">Enter supplier</span>';return;}const rows=document.querySelectorAll('.po-line-row');const items=[];let total=0;rows.forEach(row=>{const productId=row.querySelector('.po-line-product').value,qty=parseFloat(row.querySelector('.po-line-qty').value)||0,unitCost=convertToUSD(parseFloat(row.querySelector('.po-line-cost').value)||0,poCurrency);if(!productId||!qty||!unitCost)return;const product=RETAIL_PRODUCTS.find(p=>p.id===parseInt(productId));if(!product)return;const lineTotal=qty*unitCost;total+=lineTotal;items.push({productId:parseInt(productId),name:product.name,qty,unitCost,lineTotal,receivedQty:0});});if(!items.length){st.innerHTML='<span style="color:var(--red3)">Add at least one item</span>';return;}try{const existedBefore=!!findSupplierByName(supplier);const supplierRecord=await ensureSupplierExists(supplier);await dbApi({action:'savePurchaseOrder',companyId:SESSION.companyId,supplier,po_date:today(),items,total,paymentMethod:payMethod,notes});st.innerHTML=`<span style="color:var(--green3)">✅ PO saved — ${fc(total)} from ${supplier}${supplierRecord&&!existedBefore?' (new supplier added)':''}. No journal entry posted yet; that happens when stock is received.</span>`;document.getElementById('po-supplier').value='';const poSel=document.getElementById('po-supplier-sel');if(poSel)poSel.value='';if(document.getElementById('po-notes'))document.getElementById('po-notes').value='';renderPOLines();await loadPurchaseOrdersCache();await renderPOList();}catch(e){st.innerHTML=`<span style="color:var(--red3)">❌ ${e.message}</span>`;}setTimeout(()=>{const s=document.getElementById('po-st');if(s)s.innerHTML='';},6000);}
 function onPoSupplierTextInput(){const txt=document.getElementById('po-supplier').value.trim();const sel=document.getElementById('po-supplier-sel');if(!sel)return;const match=findSupplierByName(txt);sel.value=match?match.id:'';}
 function onPoSupplierSelChange(){const sel=document.getElementById('po-supplier-sel');const supplier=sel?SUPPLIERS.find(s=>String(s.id)===String(sel.value)):null;const txt=document.getElementById('po-supplier');if(supplier&&txt)txt.value=supplier.name;}
 
@@ -2879,7 +3068,8 @@ function injectRetailPages(){
     <div id="rsReceiptStatus" style="font-size:11px;color:var(--text3);margin-top:6px"></div>
     <div id="rsReceiptReview" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)"></div>
   </div>
-  <div class="fgrid"><div class="fg"><label>Supplier</label><input id="si-supplier" type="text" placeholder="Supplier name" oninput="onSiSupplierTextInput()"/></div><div class="fg"><label>Supplier Account (for AP tagging)</label><div style="display:flex;gap:6px"><select id="si-supplier-sel" class="supplier-select" style="flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:9px 11px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none" onchange="onSiSupplierSelChange()"></select><button type="button" class="btn btn-outline" style="padding:9px 11px;white-space:nowrap" onclick="openQuickAddParty('supplier','si-supplier-sel')">+ New</button></div></div><div class="fg"><label>Payment</label><select id="si-pay"><option value="credit">Credit (AP)</option><option value="cash">Cash</option></select></div></div>
+  <div class="fgrid"><div class="fg"><label>Supplier</label><input id="si-supplier" type="text" placeholder="Supplier name" oninput="onSiSupplierTextInput()"/></div><div class="fg"><label>Supplier Account (for AP tagging)</label><div style="display:flex;gap:6px"><select id="si-supplier-sel" class="supplier-select" style="flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:9px 11px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none" onchange="onSiSupplierSelChange()"></select><button type="button" class="btn btn-outline" style="padding:9px 11px;white-space:nowrap" onclick="openQuickAddParty('supplier','si-supplier-sel')">+ New</button></div></div><div class="fg"><label>Invoice Currency</label><select id="si-currency" class="entry-currency-select" onchange="onIntakeCurrencyChange('si-currency','si-currency-hint')"></select></div><div class="fg"><label>Payment</label><select id="si-pay"><option value="credit">Credit (AP)</option><option value="cash">Cash</option></select></div></div>
+  <div id="si-currency-hint" style="font-size:10px;color:var(--text3);margin:-4px 0 8px"></div>
   <div class="fg" id="si-invoice-wrap" style="display:none"><label>Supplier Tax Invoice Number <span style="color:var(--red3)">*</span></label><input id="si-invoice-no" type="text" placeholder="Required for VAT-registered businesses"/></div>
   <div id="si-tax-hint"></div>
   <div style="font-size:10px;color:var(--text2);margin-bottom:7px">Line Items</div>
@@ -2892,7 +3082,8 @@ function injectRetailPages(){
     ['pg-retailsales',`<div class="ph"><h1>💰 Sales Report</h1></div><div class="card"><div id="retailSalesList"></div></div>`],
     ['pg-purchaseorders',`<div class="ph"><h1>🚚 Purchase Orders</h1></div>
 <div class="card"><div class="card-hdr">➕ Create Purchase Order</div>
-  <div class="fgrid"><div class="fg"><label>Supplier</label><input id="po-supplier" type="text" placeholder="Supplier name" oninput="onPoSupplierTextInput()"/></div><div class="fg"><label>Supplier Account (for AP tagging)</label><div style="display:flex;gap:6px"><select id="po-supplier-sel" class="supplier-select" style="flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:9px 11px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none" onchange="onPoSupplierSelChange()"></select><button type="button" class="btn btn-outline" style="padding:9px 11px;white-space:nowrap" onclick="openQuickAddParty('supplier','po-supplier-sel')">+ New</button></div></div><div class="fg"><label>Payment</label><select id="po-pay"><option value="credit">Credit (AP)</option><option value="cash">Cash</option></select></div></div>
+  <div class="fgrid"><div class="fg"><label>Supplier</label><input id="po-supplier" type="text" placeholder="Supplier name" oninput="onPoSupplierTextInput()"/></div><div class="fg"><label>Supplier Account (for AP tagging)</label><div style="display:flex;gap:6px"><select id="po-supplier-sel" class="supplier-select" style="flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:5px;padding:9px 11px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);outline:none" onchange="onPoSupplierSelChange()"></select><button type="button" class="btn btn-outline" style="padding:9px 11px;white-space:nowrap" onclick="openQuickAddParty('supplier','po-supplier-sel')">+ New</button></div></div><div class="fg"><label>Invoice Currency</label><select id="po-currency" class="entry-currency-select" onchange="onIntakeCurrencyChange('po-currency','po-currency-hint')"></select></div><div class="fg"><label>Payment</label><select id="po-pay"><option value="credit">Credit (AP)</option><option value="cash">Cash</option></select></div></div>
+  <div id="po-currency-hint" style="font-size:10px;color:var(--text3);margin:-4px 0 8px"></div>
   <div class="fg"><label>Notes</label><input id="po-notes" type="text" placeholder="Optional notes"/></div>
   <div style="font-size:10px;color:var(--text2);margin-bottom:7px">Line Items</div>
   <div id="po-lines"></div>
