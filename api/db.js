@@ -260,6 +260,27 @@ async function ensurePartyTables() {
   `);
 }
 
+// ── MULTI-CURRENCY / LIVE FX RATES ───────────────────────────────────────────
+// A single shared cache, not per-company — exchange rates are a fact about the world, not
+// about any one business. Fetched from a free public forex API (no key required) and
+// refreshed only when the cache is older than the TTL below, so normal usage never waits
+// on a network call. Some currencies (notably SSP — South Sudanese Pound) aren't reliably
+// tracked by ANY forex feed because they trade on informal/parallel markets; when the live
+// source doesn't return a rate for a requested currency, the frontend falls back to each
+// company's own manually-entered rate for that specific currency instead.
+const FX_CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
+async function ensureFxTable() {
+  await query(`
+    CREATE TABLE IF NOT EXISTS hh_fx_rates (
+      id SERIAL PRIMARY KEY,
+      base_currency TEXT NOT NULL,
+      rates JSONB NOT NULL DEFAULT '{}',
+      fetched_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(base_currency)
+    );
+  `);
+}
+
 // ── TAX ENGINE (Multi-country VAT) ───────────────────────────────────────────
 // Available to BOTH construction and retail modes — materials purchases and contract
 // invoices are just as taxable as retail sales, so this isn't gated by app_mode.
@@ -420,6 +441,7 @@ module.exports = async function handler(req, res) {
     await ensureRetailTables();
     await ensureTaxTables();
     await ensurePartyTables();
+    await ensureFxTable();
     const { action } = body;
 
     // ── REGISTER ─────────────────────────────────────────────────────────────
@@ -448,11 +470,13 @@ module.exports = async function handler(req, res) {
         return res.status(401).json({ error: 'Wrong username or password' });
       const uid = ur.rows[0].id;
       await query("ALTER TABLE hh_companies ADD COLUMN IF NOT EXISTS app_mode TEXT DEFAULT 'construction'").catch(()=>{});
+      await query("ALTER TABLE hh_companies ADD COLUMN IF NOT EXISTS local_currency TEXT DEFAULT 'SSP'").catch(()=>{});
       const cr = await query(`
         SELECT DISTINCT ON (uc.company_id)
           uc.company_id, uc.role, uc.project_scope,
           c.name as biz_name, c.ssp_rate, c.costing_method,
-          COALESCE(c.app_mode, 'construction') as app_mode
+          COALESCE(c.app_mode, 'construction') as app_mode,
+          COALESCE(c.local_currency, 'SSP') as local_currency
         FROM hh_user_companies uc
         JOIN hh_companies c ON c.id = uc.company_id
         WHERE uc.user_id = $1
@@ -556,11 +580,47 @@ module.exports = async function handler(req, res) {
 
     // ── SAVE SETTINGS ─────────────────────────────────────────────────────────
     if (action === 'saveSettings') {
-      const { companyId, name, sspRate, costingMethod } = body;
+      const { companyId, name, sspRate, costingMethod, localCurrency } = body;
       if (!companyId) return res.status(400).json({ error: 'Missing companyId' });
-      await query('UPDATE hh_companies SET name=$1,ssp_rate=$2,costing_method=$3 WHERE id=$4',
-        [name, sspRate || 1300, costingMethod || 'WAC', parseInt(companyId)]);
+      await query("ALTER TABLE hh_companies ADD COLUMN IF NOT EXISTS local_currency TEXT DEFAULT 'SSP'").catch(()=>{});
+      await query('UPDATE hh_companies SET name=$1,ssp_rate=$2,costing_method=$3,local_currency=$4 WHERE id=$5',
+        [name, sspRate || 1300, costingMethod || 'WAC', localCurrency || 'SSP', parseInt(companyId)]);
       return res.status(200).json({ ok: true });
+    }
+
+    // ── LIVE FX RATES ──────────────────────────────────────────────────────────
+    // Base is always USD (the app's internal ledger currency). Returns a map of
+    // { CURRENCY_CODE: rate } meaning "1 USD = rate units of that currency". Cached for
+    // FX_CACHE_TTL_MS so normal page loads never wait on the external call; only refetches
+    // when the cache is missing or stale. If the live source is unreachable, falls back to
+    // whatever was last cached (however old) rather than failing outright — the frontend
+    // itself is responsible for letting the user manually override any single currency's
+    // rate (essential for SSP and similar currencies no forex feed reliably tracks).
+    if (action === 'getExchangeRates') {
+      const base = 'USD';
+      const cached = await query('SELECT * FROM hh_fx_rates WHERE base_currency=$1', [base]);
+      const isStale = !cached.rows.length || (Date.now() - new Date(cached.rows[0].fetched_at).getTime() > FX_CACHE_TTL_MS);
+      if (isStale) {
+        try {
+          const resp = await fetch(`https://open.er-api.com/v6/latest/${base}`);
+          const data = await resp.json();
+          if (data && data.result === 'success' && data.rates) {
+            await query(`
+              INSERT INTO hh_fx_rates(base_currency,rates,fetched_at) VALUES($1,$2::jsonb,NOW())
+              ON CONFLICT(base_currency) DO UPDATE SET rates=$2::jsonb,fetched_at=NOW()
+            `, [base, JSON.stringify(data.rates)]);
+            return res.status(200).json({ ok: true, base, rates: data.rates, fetchedAt: new Date().toISOString(), source: 'live' });
+          }
+        } catch (e) {
+          console.error('FX live fetch failed:', e.message);
+        }
+        // Live fetch failed or returned something unexpected — serve whatever is cached, if anything.
+        if (cached.rows.length) {
+          return res.status(200).json({ ok: true, base, rates: cached.rows[0].rates, fetchedAt: cached.rows[0].fetched_at, source: 'cached-stale' });
+        }
+        return res.status(502).json({ error: 'Could not fetch live exchange rates and no cache is available yet.' });
+      }
+      return res.status(200).json({ ok: true, base, rates: cached.rows[0].rates, fetchedAt: cached.rows[0].fetched_at, source: 'cached' });
     }
 
     // ── LIST STAFF ────────────────────────────────────────────────────────────
