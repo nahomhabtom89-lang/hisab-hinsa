@@ -1,4 +1,4 @@
-// api/ai.js — Hisabi Hensi · AI handler (Groq llama-3.3-70b)
+// api/ai.js — Hisabi Hensi · AI handler (Groq openai/gpt-oss-120b)
 // Unchanged core logic, compatible with new multi-tenant schema
 
 module.exports = async function handler(req, res) {
@@ -257,7 +257,7 @@ module.exports = async function handler(req, res) {
         "Authorization": "Bearer " + GROQ_KEY
       },
       body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
+        model: "openai/gpt-oss-120b",
         messages: [
           { role: "system", content: systemText },
           { role: "user", content: prompt }
