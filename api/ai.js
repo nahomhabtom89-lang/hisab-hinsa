@@ -103,7 +103,10 @@ module.exports = async function handler(req, res) {
         "  * IF isVatRegistered IS TRUE (VAT Business):\n" +
         "    - Split tax out into a separate VAT Receivable or VAT Payable account.\n" +
         "    - Keep Inventory / Asset cost at the net raw value.\n" +
-        "  * The specific account (VAT Receivable vs VAT Payable) and direction (debit vs credit) for the CURRENT document type is governed by section 2 above — always defer to section 2's rule for that type rather than re-deriving it here.\n\n" +
+        "  * The specific account (VAT Receivable vs VAT Payable) and direction (debit vs credit) for the CURRENT document type is governed by section 2 above — always defer to section 2's rule for that type rather than re-deriving it here.\n" +
+        "  * BUYER/SELLER VAT CLAIMABILITY MATRIX (applies to PURCHASE_INVOICE, ASSET_PURCHASE, and any purchase-side document): Input VAT can ONLY be claimed if BOTH this company (isVatRegistered) AND the supplier are VAT-registered. Detect supplier registration from the document itself: a printed VAT/TIN/registration number, a document titled 'Tax Invoice'/'VAT Invoice', or an itemized VAT breakdown = registered. A plain receipt/delivery note with none of that = NOT registered — when in doubt, treat the supplier as NOT registered (the safe direction). If either side is not registered, absorb the FULL tax-inclusive amount into Inventory/Materials/Asset cost and do not reference any VAT account, even if isVatRegistered is true for this company. Report your finding in supplier_vat_registered.\n" +
+        "  * INCLUSIVE TAX EXTRACTION: when prices are tax-inclusive, extract tax as amount × (rate / (100 + rate)), NEVER amount × (rate / 100). Example: $472 total inclusive of 18% VAT → Input VAT = 472 × (18/118) = $72.00, Net Base = $400.00. Verify inclusivity by comparing the sum of extracted line items against any printed grand total — if they match with no separate tax line added on top, prices are tax-inclusive; if the grand total is visibly higher than the line sum by roughly the tax rate, prices are tax-exclusive and the difference is the tax already added on top.\n" +
+        "  * PAYMENT DETECTION: read payment keywords on the document. 'Paid'/'Cash'/'Card'/'Paid by card' → Cash; 'Mobile Money'/'M-Pesa'/'MTN Money'/'Airtel Money' → Mobile Money; 'Bank Transfer'/'EFT'/'Wire' → Bank Account; 'On Account'/'Credit'/'Net 30'/'Invoice Due'/'Balance Due'/unpaid or unstated → Accounts Payable. Reflect this as the credit side of the posting instead of always defaulting to Accounts Payable. Report your finding in payment_status as one of: cash, mobile, bank, credit.\n\n" +
         "--------------------------------------------------\n" +
         "4. MULTI-CURRENCY EXTRACTION RULES\n" +
         "--------------------------------------------------\n" +
@@ -137,6 +140,8 @@ module.exports = async function handler(req, res) {
         "  \"exchange_rate\": 1.0,\n" +
         "  \"detected_tax_rate\": 0.18,\n" +
         "  \"is_tax_inclusive\": false,\n" +
+        "  \"supplier_vat_registered\": false,\n" +
+        "  \"payment_status\": \"credit\",\n" +
         "  \"line_items\": [\n" +
         "    { \"description\": \"STRING\", \"quantity\": 0.0, \"unit_price\": 0.0, \"total_price\": 0.0 }\n" +
         "  ],\n" +
