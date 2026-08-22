@@ -3,11 +3,13 @@
   "builds": [
     { "src": "api/db.js", "use": "@vercel/node" },
     { "src": "api/ai.js", "use": "@vercel/node" },
-    { "src": "index.html", "use": "@vercel/static" }
+    { "src": "index.html", "use": "@vercel/static" },
+    { "src": "patch-*.js", "use": "@vercel/static" }
   ],
   "routes": [
     { "src": "/api/db", "dest": "/api/db.js" },
     { "src": "/api/ai", "dest": "/api/ai.js" },
+    { "src": "/(patch-.*\\.js)", "dest": "/$1" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
