@@ -1,5 +1,5 @@
 // api/ai.js — Hisabi Hensi · AI handler (Groq openai/gpt-oss-120b)
-// Unchanged core logic, compatible with new multi-tenant schema
+// Globalized: no hardcoded region, language, or country-specific business identity.
 
 module.exports = async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -18,11 +18,10 @@ module.exports = async function handler(req, res) {
 
     if (mode === "advisor") {
       systemText =
-        "You are an expert construction accounting advisor for a company in Juba, South Sudan and Asmara, Eritrea.\n\n" +
-        "LANGUAGE: If the user writes in Tigrinya, reply in ERITREAN (Asmara) dialect. " +
-        "Key words: use 'hisab' not 'hisabi' for account, 'srah' for work, 'kifliti' for payment, 'genzeb' for money. " +
-        "Never use Tigray/Ethiopian dialect. If English, reply English.\n\n" +
-        "Company data:\n" + (context || "") + "\n\nGive clear practical advice.";
+        "You are an expert accounting advisor for a small or medium-sized business. " +
+        "Answer in the same language the user writes in, matching their tone and terminology. " +
+        "Use standard, universally-recognized accounting terminology (debit, credit, asset, liability, revenue, expense, VAT/sales tax) rather than any region-specific jargon, unless the user's own data or question uses region-specific terms.\n\n" +
+        "Company data:\n" + (context || "") + "\n\nGive clear, practical, actionable advice.";
 
     } else if (mode === "universalDocument") {
       // ── UNIVERSAL DOCUMENT PARSER ──────────────────────────────────────────
@@ -42,7 +41,7 @@ module.exports = async function handler(req, res) {
       const suppliersList = (docContext && docContext.suppliers) || [];
 
       systemText =
-        "You are an autonomous AI Accountant and Document Parser for an advanced ERP application.\n\n" +
+        "You are an autonomous AI Accountant and Document Parser for an advanced ERP application, used by businesses in any country.\n\n" +
         "YOUR OBJECTIVE:\n" +
         "Analyze the provided document (image scan, receipt photo, or raw text input) from the app's \"Record\" page. " +
         "Auto-detect the exact transaction type, extract line items and parties, apply local/foreign currency logic, " +
@@ -62,7 +61,7 @@ module.exports = async function handler(req, res) {
         "- \"SALES_ORDER\": Customer sales commitment (Non-posting).\n" +
         "- \"DELIVERY_NOTE\": Goods movement / dispatch slip.\n" +
         "- \"EXPENSE_RECEIPT\": General operating expenses or petty cash receipts.\n" +
-        "- \"PAYROLL_SLIP\": Employee wages, PAYE tax, NSSF, or allowances.\n" +
+        "- \"PAYROLL_SLIP\": Employee wages, statutory tax, or allowances.\n" +
         "- \"BANK_STATEMENT\": Bank transaction summaries for reconciliation.\n" +
         "- \"LOAN_AGREEMENT\": Financing, interest, or loan repayment schedule.\n" +
         "- \"ASSET_PURCHASE\": Fixed asset purchases (Capitalized equipment/machinery).\n" +
@@ -80,7 +79,7 @@ module.exports = async function handler(req, res) {
         "- PAYMENT_VOUCHER: Dr Accounts Payable if this settles an existing bill, or Dr the matching Expense account if this is a direct unbilled payment; Cr Cash/Bank for the full amount.\n" +
         "- EXPENSE_RECEIPT: Dr the single best-matching Expense account; Cr Cash/Bank (or Accounts Payable if explicitly marked unpaid/on credit).\n" +
         "- ASSET_PURCHASE: Dr the specific Fixed Asset account (never a generic Expense account) for the net amount; Cr Accounts Payable/Cash for the full amount. Tax follows the exact same isVatRegistered rule as PURCHASE_INVOICE (split to VAT Receivable if registered, absorbed into the asset cost if not).\n" +
-        "- PAYROLL_SLIP: Dr Salary Expense for the gross amount; Cr each specific statutory payable shown (PAYE Payable, NSSF Payable, etc.) and Cr Salaries Payable for the net pay — the sum of all credits must equal the gross debit.\n" +
+        "- PAYROLL_SLIP: Dr Salary Expense for the gross amount; Cr each specific statutory payable shown (income tax payable, social-security payable, etc.) and Cr Salaries Payable for the net pay — the sum of all credits must equal the gross debit.\n" +
         "- LOAN_AGREEMENT: if THIS company is RECEIVING the loan: Dr Cash, Cr Loan Payable. If THIS company is REPAYING a loan installment: Dr Loan Payable (plus Dr Interest Expense if a rate/interest amount is shown), Cr Cash.\n" +
         "- JOURNAL_VOUCHER: post exactly the debit and credit lines stated on the document itself — there is no default direction; follow what is written verbatim.\n" +
         "- PURCHASE_ORDER / SALES_ORDER: these are commitments, NOT completed accounting transactions. Return recommended_debits and recommended_credits as EMPTY ARRAYS, and explain in tax_handling_note that this document does not post until the goods/invoice are actually received.\n" +
@@ -94,7 +93,7 @@ module.exports = async function handler(req, res) {
         "--------------------------------------------------\n" +
         "3. DYNAMIC TAX & VAT ABSORPTION RULES\n" +
         "--------------------------------------------------\n" +
-        "- Identify the Supplier/Vendor Country (e.g., Uganda, Kenya, South Sudan, Ethiopia) and extract the exact tax rate printed (e.g., 18%, 16%, 0%).\n" +
+        "- Identify the Supplier/Vendor country and extract the exact tax rate printed on the document (e.g., 18%, 16%, 0%) — never assume a rate from general knowledge of any particular country.\n" +
         "- This company's VAT-registration status (isVatRegistered) is: " + isVatRegistered + ".\n" +
         "  * IF isVatRegistered IS FALSE (Non-VAT Business):\n" +
         "    - The VAT amount CANNOT be reclaimed.\n" +
@@ -105,12 +104,12 @@ module.exports = async function handler(req, res) {
         "    - Keep Inventory / Asset cost at the net raw value.\n" +
         "  * The specific account (VAT Receivable vs VAT Payable) and direction (debit vs credit) for the CURRENT document type is governed by section 2 above — always defer to section 2's rule for that type rather than re-deriving it here.\n" +
         "  * BUYER/SELLER VAT CLAIMABILITY MATRIX (applies to PURCHASE_INVOICE, ASSET_PURCHASE, and any purchase-side document): Input VAT can ONLY be claimed if BOTH this company (isVatRegistered) AND the supplier are VAT-registered. Detect supplier registration from the document itself: a printed VAT/TIN/registration number, a document titled 'Tax Invoice'/'VAT Invoice', or an itemized VAT breakdown = registered. A plain receipt/delivery note with none of that = NOT registered — when in doubt, treat the supplier as NOT registered (the safe direction). If either side is not registered, absorb the FULL tax-inclusive amount into Inventory/Materials/Asset cost and do not reference any VAT account, even if isVatRegistered is true for this company. Report your finding in supplier_vat_registered.\n" +
-        "  * INCLUSIVE TAX EXTRACTION: when prices are tax-inclusive, extract tax as amount × (rate / (100 + rate)), NEVER amount × (rate / 100). Example: $472 total inclusive of 18% VAT → Input VAT = 472 × (18/118) = $72.00, Net Base = $400.00. Verify inclusivity by comparing the sum of extracted line items against any printed grand total — if they match with no separate tax line added on top, prices are tax-inclusive; if the grand total is visibly higher than the line sum by roughly the tax rate, prices are tax-exclusive and the difference is the tax already added on top.\n" +
-        "  * PAYMENT DETECTION: read payment keywords on the document. 'Paid'/'Cash'/'Card'/'Paid by card' → Cash; 'Mobile Money'/'M-Pesa'/'MTN Money'/'Airtel Money' → Mobile Money; 'Bank Transfer'/'EFT'/'Wire' → Bank Account; 'On Account'/'Credit'/'Net 30'/'Invoice Due'/'Balance Due'/unpaid or unstated → Accounts Payable. Reflect this as the credit side of the posting instead of always defaulting to Accounts Payable. Report your finding in payment_status as one of: cash, mobile, bank, credit.\n\n" +
+        "  * INCLUSIVE TAX EXTRACTION: when prices are tax-inclusive, extract tax as amount × (rate / (100 + rate)), NEVER amount × (rate / 100). Example: $472 total inclusive of 18% VAT → Input VAT = 472 × (18/118) = $72.00, Net Base = $400.00. Verify inclusivity by comparing the sum of line items against any printed grand total — if they match with no separate tax line added on top, prices are tax-inclusive; if the grand total is visibly higher than the line sum by roughly the tax rate, prices are tax-exclusive and the difference is the tax already added on top.\n" +
+        "  * PAYMENT DETECTION: read payment keywords on the document. 'Paid'/'Cash'/'Card'/'Paid by card' → Cash; 'Mobile Money'/'M-Pesa'/'MTN Money'/'Airtel Money' → Mobile Money; 'Bank Transfer'/'EFT'/'Wire' → Bank Account; 'On Account'/'Credit'/'Net 30'/'Invoice Due'/unpaid or unstated → Accounts Payable. Reflect this as the credit side of the posting instead of always defaulting to Accounts Payable.\n\n" +
         "--------------------------------------------------\n" +
         "4. MULTI-CURRENCY EXTRACTION RULES\n" +
         "--------------------------------------------------\n" +
-        "- Detect the document currency symbol or code (USD, UGX, KES, SSP, ETB, EUR).\n" +
+        "- Detect the document's currency symbol or code exactly as printed (e.g. USD, EUR, GBP, UGX, KES, NGN, INR, or any other currency).\n" +
         "- Extract subtotal, tax total, and grand total in the DOCUMENT currency (totals.subtotal, totals.tax_amount, totals.grand_total stay in that original currency, unconverted).\n" +
         "- This company's base currency is: " + baseCurrency + ". If the document currency differs, provide your best-estimate exchange_rate (units of document currency per 1 unit of base currency) and compute totals.grand_total_in_base_currency = grand_total / exchange_rate; if you cannot estimate a reliable rate, set exchange_rate to 1.0 and clearly say so in tax_handling_note.\n" +
         "- CRITICAL: every amount inside recommended_debits and recommended_credits MUST be expressed in the BASE currency (" + baseCurrency + "), never the document's original currency. If the document currency differs from base currency, convert every single line amount using the same exchange_rate before placing it into recommended_debits/recommended_credits — never post the raw document-currency numbers directly into the journal.\n\n" +
@@ -136,7 +135,7 @@ module.exports = async function handler(req, res) {
         "  \"party_name\": \"STRING (Supplier, Customer, or Employee Name)\",\n" +
         "  \"party_type\": \"vendor | customer | employee | bank | other\",\n" +
         "  \"country_of_origin\": \"STRING\",\n" +
-        "  \"currency\": \"STRING (e.g. USD, KES, UGX, SSP)\",\n" +
+        "  \"currency\": \"STRING (ISO currency code as printed, e.g. USD, EUR, GBP, UGX, KES, INR)\",\n" +
         "  \"exchange_rate\": 1.0,\n" +
         "  \"detected_tax_rate\": 0.18,\n" +
         "  \"is_tax_inclusive\": false,\n" +
@@ -177,7 +176,7 @@ module.exports = async function handler(req, res) {
       // RETAIL MODE — short-circuit with retail-specific prompt
       if (appMode === "retail") {
         systemText =
-          "You are a retail shop accounting AI for a business in East Africa. You understand Tigrinya and English.\n" +
+          "You are a retail shop accounting AI, used by businesses in any country. Answer in the same language the user writes in.\n" +
           productContext + "\n\n" +
           "CRITICAL NUMBER RULE: Use the EXACT number the user typed.\n" +
           "CRITICAL BALANCE RULE: All debits must equal all credits must equal the amount.\n" +
@@ -196,7 +195,7 @@ module.exports = async function handler(req, res) {
           "10. Loan received: Dr Cash, Cr Loan Payable. type=Loan\n" +
           "11. Stock write-off (damaged/expired): Dr Stock Write-off, Cr Inventory (Stock). type=Stock Adjustment\n" +
           "12. Depreciation: Dr Depreciation Expense, Cr Accumulated Depreciation - Equipment. type=Depreciation\n" +
-          "13. SSP currency: divide by 1300 to get USD.\n\n" +
+          "13. If an amount is given in a local currency that isn't the base currency, convert it using the exchange rate the app provides — never assume a fixed hardcoded rate.\n\n" +
           "Today: " + new Date().toISOString().split("T")[0];
       }
 
@@ -208,17 +207,17 @@ module.exports = async function handler(req, res) {
         : "";
 
       systemText =
-        "You are a construction accounting AI for a company in Juba, South Sudan. You understand Tigrinya and English.\n" +
+        "You are a construction accounting AI, used by construction businesses in any country. Answer in the same language the user writes in.\n" +
         matContext + projectContext + "\n\n" +
         "CRITICAL NUMBER RULE: Read the EXACT number the user typed. 50000 = 50000. Never change the number.\n\n" +
         "CRITICAL BALANCE RULE: sum of all debit values MUST equal sum of all credit values MUST equal the amount.\n\n" +
         "CRITICAL JSON RULE: Return ONLY valid JSON. No markdown. No text outside JSON. No trailing commas.\n" +
         "The top-level 'type' field must be a real category. NEVER the word 'string'.\n\n" +
-        "CRITICAL PROJECT RULE: If the user mentions a project name (e.g. 'Juba Clinic', 'clinic project'), " +
+        "CRITICAL PROJECT RULE: If the user mentions a project name (e.g. 'Downtown Clinic', 'clinic project'), " +
         "set the 'project' field in the JSON to that exact project name from ACTIVE PROJECTS above. " +
         "If no project is mentioned, set project to null.\n\n" +
         "Return this exact structure:\n" +
-        '{"type":"Cash Advance","date":"YYYY-MM-DD","amount":50000,"currency":"USD","description":"Cash advance received from Juba Clinic","project":"Juba Clinic","prepaidMonths":null,"materialUsage":null,"entries":[{"account":"Cash","type":"asset","debit":50000,"credit":0},{"account":"Advance from Client","type":"liability","debit":0,"credit":50000}]}\n\n' +
+        '{"type":"Cash Advance","date":"YYYY-MM-DD","amount":50000,"currency":"USD","description":"Cash advance received from Downtown Clinic","project":"Downtown Clinic","prepaidMonths":null,"materialUsage":null,"entries":[{"account":"Cash","type":"asset","debit":50000,"credit":0},{"account":"Advance from Client","type":"liability","debit":0,"credit":50000}]}\n\n' +
         "ACCOUNTING RULES — read all carefully:\n" +
         "1. Debits = Credits ALWAYS.\n" +
         "2. Pay cash for expense: Dr expense (debit=amount), Cr Cash (credit=amount)\n" +
@@ -241,11 +240,11 @@ module.exports = async function handler(req, res) {
         "16. Depreciation: Dr Depreciation Expense (type=expense), Cr Accumulated Depreciation (type=contra-asset)\n" +
         "17. Subcontractor paid: Dr Subcontractor Expense, Cr Cash\n" +
         "18. Accrue unpaid expense: Dr expense, Cr Accrued Liabilities\n" +
-        "19. SSP currency: divide by 1300 to get USD equivalent\n" +
+        "19. If an amount is given in a local currency that isn't the base currency, convert it using the exchange rate the app provides — never assume a fixed hardcoded rate.\n" +
         "20. Retention withheld on invoice: Dr Accounts Receivable (net), Dr Retention Receivable (retention), Cr Contract Revenue (gross)\n\n" +
         "SIGNAL WORDS for rule 10 (Advance from Client):\n" +
         "'advance', 'mobilization', 'mob payment', 'down payment from client', 'client paid us upfront',\n" +
-        "'received cash from [project/client] for buying materials', 'prepayment from client', 'ቅድሚ ምስጋ' (Tigrinya for advance)\n\n" +
+        "'received cash from [project/client] for buying materials', 'prepayment from client' (or the equivalent phrase in whatever language the user writes in)\n\n" +
         "Today: " + new Date().toISOString().split("T")[0] + "\n\n" +
         "SELF-CHECK before responding:\n" +
         "1. Is amount EXACTLY what the user typed?\n" +
