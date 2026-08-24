@@ -387,6 +387,21 @@ const COUNTRY_TAX_DEFAULTS = {
   BD: { label: 'Bangladesh',       tiers: [{name:'Standard Rate', code:'standard', rate:15},   {name:'Exempt', code:'exempt', rate:0}] },
   OTHER: { label: "My country isn't listed", tiers: [{name:'Standard Rate', code:'standard', rate:0}, {name:'Zero-Rated', code:'zero', rate:0}, {name:'Exempt', code:'exempt', rate:0}] },
 };
+
+// Maps each COUNTRY_TAX_DEFAULTS code to its official national currency (ISO 4217).
+// Used at registration/company-creation so a business's display currency is set
+// automatically from the country they pick, instead of always defaulting to SSP.
+// Falls back to USD for OTHER or any unrecognized code — the app's internal ledger
+// currency is always USD regardless, so this only ever affects the DISPLAY/entry currency.
+const COUNTRY_CURRENCY_MAP = {
+  UG:'UGX', KE:'KES', TZ:'TZS', RW:'RWF', SS:'SSP', ET:'ETB', ZM:'ZMW', NG:'NGN', GH:'GHS',
+  CI:'XOF', SN:'XOF', ZA:'ZAR', BW:'BWP', NA:'NAD', ZW:'ZWL', EG:'EGP', MA:'MAD', TN:'TND', DZ:'DZD',
+  GB:'GBP', DE:'EUR', FR:'EUR', IT:'EUR', ES:'EUR', NL:'EUR', BE:'EUR', IE:'EUR', PT:'EUR', AT:'EUR',
+  SE:'SEK', DK:'DKK', NO:'NOK', FI:'EUR', CH:'CHF', PL:'PLN', CZ:'CZK', GR:'EUR', RO:'RON', HU:'HUF',
+  TR:'TRY', US:'USD', CA:'CAD', MX:'MXN', BR:'BRL', AR:'ARS', CL:'CLP', CO:'COP', PE:'PEN',
+  AE:'AED', SA:'SAR', IL:'ILS', QA:'QAR', JP:'JPY', KR:'KRW', CN:'CNY', IN:'INR', AU:'AUD', NZ:'NZD',
+  SG:'SGD', ID:'IDR', PH:'PHP', VN:'VND', TH:'THB', PK:'PKR', BD:'BDT', OTHER:'USD',
+};
 async function seedTaxTiers(companyId, country) {
   const preset = COUNTRY_TAX_DEFAULTS[country] || COUNTRY_TAX_DEFAULTS.OTHER;
   for (const [i, t] of preset.tiers.entries()) {
@@ -446,19 +461,36 @@ module.exports = async function handler(req, res) {
 
     // ── REGISTER ─────────────────────────────────────────────────────────────
     if (action === 'register') {
-      const { username, password, bizName, appMode } = body;
+      const { username, password, bizName, appMode, country } = body;
       if (!username || !password || !bizName) return res.status(400).json({ error: 'Missing fields' });
       const ex = await query('SELECT id FROM hh_users WHERE username=$1', [username]);
       if (ex.rows.length) return res.status(409).json({ error: 'Username taken' });
       const ur = await query('INSERT INTO hh_users(username,password_b64) VALUES($1,$2) RETURNING id', [username, btoa(password)]);
       const uid = ur.rows[0].id;
       const mode = appMode === 'retail' ? 'retail' : 'construction';
+      // Resolve the chosen country to a known tax-country code (falls back to OTHER), then
+      // to that country's official currency — this is what sets the new company's display
+      // currency automatically instead of always defaulting to SSP.
+      const countryCode = COUNTRY_TAX_DEFAULTS[country] ? country : 'OTHER';
+      const currency = COUNTRY_CURRENCY_MAP[countryCode] || 'USD';
       await query("ALTER TABLE hh_companies ADD COLUMN IF NOT EXISTS app_mode TEXT DEFAULT 'construction'").catch(()=>{});
-      const cr = await query("INSERT INTO hh_companies(name, app_mode) VALUES($1,$2) RETURNING id", [bizName, mode]);
+      await query("ALTER TABLE hh_companies ADD COLUMN IF NOT EXISTS local_currency TEXT DEFAULT 'SSP'").catch(()=>{});
+      await query("ALTER TABLE hh_companies ADD COLUMN IF NOT EXISTS country TEXT DEFAULT 'OTHER'").catch(()=>{});
+      // ssp_rate is left NULL on purpose (instead of the old hardcoded 1300 default) so the
+      // frontend falls through to the live FX rate for whatever currency this country uses,
+      // rather than showing a manually-set number that only ever made sense for SSP.
+      const cr = await query(
+        "INSERT INTO hh_companies(name, app_mode, local_currency, country, ssp_rate) VALUES($1,$2,$3,$4,NULL) RETURNING id",
+        [bizName, mode, currency, countryCode]
+      );
       const cid = cr.rows[0].id;
       await query('INSERT INTO hh_user_companies(user_id,company_id,role) VALUES($1,$2,$3)', [uid, cid, 'owner']);
       if (mode === 'retail') await seedRetailAccounts(cid); else await seedChartOfAccounts(cid);
-      return res.status(200).json({ ok: true, userId: uid, companyId: cid, role: 'owner', bizName, appMode: mode });
+      // Seed tax settings/tiers with the real chosen country right away, instead of the old
+      // lazy 'OTHER' default that only got fixed once the Owner visited Tax Settings manually.
+      await query('INSERT INTO hh_tax_settings(company_id,is_vat_registered,country) VALUES($1,FALSE,$2) ON CONFLICT(company_id) DO NOTHING', [cid, countryCode]);
+      await seedTaxTiers(cid, countryCode);
+      return res.status(200).json({ ok: true, userId: uid, companyId: cid, role: 'owner', bizName, appMode: mode, localCurrency: currency, country: countryCode });
     }
 
     // ── LOGIN ─────────────────────────────────────────────────────────────────
@@ -471,12 +503,14 @@ module.exports = async function handler(req, res) {
       const uid = ur.rows[0].id;
       await query("ALTER TABLE hh_companies ADD COLUMN IF NOT EXISTS app_mode TEXT DEFAULT 'construction'").catch(()=>{});
       await query("ALTER TABLE hh_companies ADD COLUMN IF NOT EXISTS local_currency TEXT DEFAULT 'SSP'").catch(()=>{});
+      await query("ALTER TABLE hh_companies ADD COLUMN IF NOT EXISTS country TEXT DEFAULT 'OTHER'").catch(()=>{});
       const cr = await query(`
         SELECT DISTINCT ON (uc.company_id)
           uc.company_id, uc.role, uc.project_scope,
           c.name as biz_name, c.ssp_rate, c.costing_method,
           COALESCE(c.app_mode, 'construction') as app_mode,
-          COALESCE(c.local_currency, 'SSP') as local_currency
+          COALESCE(c.local_currency, 'SSP') as local_currency,
+          COALESCE(c.country, 'OTHER') as country
         FROM hh_user_companies uc
         JOIN hh_companies c ON c.id = uc.company_id
         WHERE uc.user_id = $1
@@ -487,9 +521,11 @@ module.exports = async function handler(req, res) {
 
     // ── CREATE COMPANY (existing user adds a new company) ────────────────────
     if (action === 'createCompany') {
-      const { userId, bizName, appMode } = body;
+      const { userId, bizName, appMode, country } = body;
       if (!userId || !bizName) return res.status(400).json({ error: 'Missing fields' });
       await query("ALTER TABLE hh_companies ADD COLUMN IF NOT EXISTS app_mode TEXT DEFAULT 'construction'").catch(()=>{});
+      await query("ALTER TABLE hh_companies ADD COLUMN IF NOT EXISTS local_currency TEXT DEFAULT 'SSP'").catch(()=>{});
+      await query("ALTER TABLE hh_companies ADD COLUMN IF NOT EXISTS country TEXT DEFAULT 'OTHER'").catch(()=>{});
       const existing = await query(
         "SELECT c.id, c.name FROM hh_companies c JOIN hh_user_companies uc ON uc.company_id=c.id WHERE uc.user_id=$1 AND LOWER(c.name)=LOWER($2)",
         [parseInt(userId), bizName]
@@ -498,11 +534,18 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({ ok: true, companyId: existing.rows[0].id, bizName: existing.rows[0].name });
       }
       const mode = appMode === 'retail' ? 'retail' : 'construction';
-      const cr = await query("INSERT INTO hh_companies(name, app_mode) VALUES($1,$2) RETURNING id", [bizName, mode]);
+      const countryCode = COUNTRY_TAX_DEFAULTS[country] ? country : 'OTHER';
+      const currency = COUNTRY_CURRENCY_MAP[countryCode] || 'USD';
+      const cr = await query(
+        "INSERT INTO hh_companies(name, app_mode, local_currency, country, ssp_rate) VALUES($1,$2,$3,$4,NULL) RETURNING id",
+        [bizName, mode, currency, countryCode]
+      );
       const cid = cr.rows[0].id;
       await query('INSERT INTO hh_user_companies(user_id,company_id,role) VALUES($1,$2,$3)', [parseInt(userId), cid, 'owner']);
       if (mode === 'retail') await seedRetailAccounts(cid); else await seedChartOfAccounts(cid);
-      return res.status(200).json({ ok: true, companyId: cid, bizName, appMode: mode });
+      await query('INSERT INTO hh_tax_settings(company_id,is_vat_registered,country) VALUES($1,FALSE,$2) ON CONFLICT(company_id) DO NOTHING', [cid, countryCode]);
+      await seedTaxTiers(cid, countryCode);
+      return res.status(200).json({ ok: true, companyId: cid, bizName, appMode: mode, localCurrency: currency, country: countryCode });
     }
 
     // ── REGISTER STAFF ────────────────────────────────────────────────────────
