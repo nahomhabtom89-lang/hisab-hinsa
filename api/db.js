@@ -479,8 +479,13 @@ module.exports = async function handler(req, res) {
       // ssp_rate is left NULL on purpose (instead of the old hardcoded 1300 default) so the
       // frontend falls through to the live FX rate for whatever currency this country uses,
       // rather than showing a manually-set number that only ever made sense for SSP.
+      // base_currency = currency too: for a brand-new company these start identical (the
+      // ledger and the display both begin in the country's own currency), but base_currency
+      // is the one that stays fixed forever — local_currency can still be changed anytime in
+      // Settings purely for viewing, without touching how transactions are actually recorded.
+      await query("ALTER TABLE hh_companies ADD COLUMN IF NOT EXISTS base_currency TEXT DEFAULT 'USD'").catch(()=>{});
       const cr = await query(
-        "INSERT INTO hh_companies(name, app_mode, local_currency, country, ssp_rate) VALUES($1,$2,$3,$4,NULL) RETURNING id",
+        "INSERT INTO hh_companies(name, app_mode, local_currency, country, ssp_rate, base_currency) VALUES($1,$2,$3,$4,NULL,$3) RETURNING id",
         [bizName, mode, currency, countryCode]
       );
       const cid = cr.rows[0].id;
@@ -504,13 +509,24 @@ module.exports = async function handler(req, res) {
       await query("ALTER TABLE hh_companies ADD COLUMN IF NOT EXISTS app_mode TEXT DEFAULT 'construction'").catch(()=>{});
       await query("ALTER TABLE hh_companies ADD COLUMN IF NOT EXISTS local_currency TEXT DEFAULT 'SSP'").catch(()=>{});
       await query("ALTER TABLE hh_companies ADD COLUMN IF NOT EXISTS country TEXT DEFAULT 'OTHER'").catch(()=>{});
+      // base_currency is the TRUE ledger currency — unlike local_currency (a freely-editable
+      // display preference), this is set once and never changed by Settings. Defaults to 'USD'
+      // for safety, but for THIS project (test data only, per Owner's explicit instruction) we
+      // also backfill it to match each of the user's existing companies' local_currency below,
+      // so old test companies get the new native-currency ledger behavior too, not just new ones.
+      await query("ALTER TABLE hh_companies ADD COLUMN IF NOT EXISTS base_currency TEXT DEFAULT 'USD'").catch(()=>{});
+      await query(
+        "UPDATE hh_companies c SET base_currency = c.local_currency FROM hh_user_companies uc WHERE uc.company_id = c.id AND uc.user_id = $1 AND c.local_currency IS NOT NULL AND c.base_currency IS DISTINCT FROM c.local_currency",
+        [uid]
+      ).catch(()=>{});
       const cr = await query(`
         SELECT DISTINCT ON (uc.company_id)
           uc.company_id, uc.role, uc.project_scope,
           c.name as biz_name, c.ssp_rate, c.costing_method,
           COALESCE(c.app_mode, 'construction') as app_mode,
           COALESCE(c.local_currency, 'SSP') as local_currency,
-          COALESCE(c.country, 'OTHER') as country
+          COALESCE(c.country, 'OTHER') as country,
+          COALESCE(c.base_currency, 'USD') as base_currency
         FROM hh_user_companies uc
         JOIN hh_companies c ON c.id = uc.company_id
         WHERE uc.user_id = $1
@@ -536,8 +552,9 @@ module.exports = async function handler(req, res) {
       const mode = appMode === 'retail' ? 'retail' : 'construction';
       const countryCode = COUNTRY_TAX_DEFAULTS[country] ? country : 'OTHER';
       const currency = COUNTRY_CURRENCY_MAP[countryCode] || 'USD';
+      await query("ALTER TABLE hh_companies ADD COLUMN IF NOT EXISTS base_currency TEXT DEFAULT 'USD'").catch(()=>{});
       const cr = await query(
-        "INSERT INTO hh_companies(name, app_mode, local_currency, country, ssp_rate) VALUES($1,$2,$3,$4,NULL) RETURNING id",
+        "INSERT INTO hh_companies(name, app_mode, local_currency, country, ssp_rate, base_currency) VALUES($1,$2,$3,$4,NULL,$3) RETURNING id",
         [bizName, mode, currency, countryCode]
       );
       const cid = cr.rows[0].id;
