@@ -949,14 +949,24 @@ module.exports = async function handler(req, res) {
     // 'updatePurchaseOrderStatus' below, since materials live in the client-side hh_data
     // blob, not a server-tracked table.
     if (action === 'savePurchaseOrder') {
-      const { companyId, supplier, po_date, items, total, paymentMethod, notes, kind } = body;
+      const { companyId, supplier, po_date, items, total, paymentMethod, notes, kind, currency, fxRate } = body;
       if (!companyId || !supplier) return res.status(400).json({ error: 'Missing fields' });
       await query("ALTER TABLE hh_purchase_orders ADD COLUMN IF NOT EXISTS kind TEXT DEFAULT 'retail'").catch(()=>{});
+      // currency/fx_rate: the PO's original invoice currency and the rate used to convert
+      // it to the company's base currency AT THE TIME THE PO WAS CREATED — this is what
+      // actually produced the base-currency unitCost figures stored in `items`. NULL means
+      // the PO was already entered directly in the base currency (nothing foreign to track).
+      // Kept on the PO record (not just the eventual journal entry) because receiving can
+      // happen much later, using cost figures already fixed at PO-creation time — so forex
+      // tagging at receiving must reuse THIS rate, not look up a fresh one.
+      await query("ALTER TABLE hh_purchase_orders ADD COLUMN IF NOT EXISTS currency TEXT").catch(()=>{});
+      await query("ALTER TABLE hh_purchase_orders ADD COLUMN IF NOT EXISTS fx_rate NUMERIC").catch(()=>{});
       const itemsWithReceipt = (items||[]).map(it => ({ ...it, receivedQty: parseFloat(it.receivedQty) || 0 }));
-      const r = await query(`INSERT INTO hh_purchase_orders(company_id,supplier,po_date,items,total,payment_method,notes,status,kind)
-        VALUES($1,$2,$3,$4::jsonb,$5,$6,$7,'pending',$8) RETURNING id`,
+      const r = await query(`INSERT INTO hh_purchase_orders(company_id,supplier,po_date,items,total,payment_method,notes,status,kind,currency,fx_rate)
+        VALUES($1,$2,$3,$4::jsonb,$5,$6,$7,'pending',$8,$9,$10) RETURNING id`,
         [parseInt(companyId), supplier, po_date||new Date().toISOString().split('T')[0],
-         JSON.stringify(itemsWithReceipt), total||0, paymentMethod||'credit', notes||'', kind==='construction_materials'?'construction_materials':'retail']);
+         JSON.stringify(itemsWithReceipt), total||0, paymentMethod||'credit', notes||'', kind==='construction_materials'?'construction_materials':'retail',
+         currency||null, fxRate||null]);
       return res.status(200).json({ ok: true, poId: r.rows[0].id });
     }
     if (action === 'listPurchaseOrders') {
