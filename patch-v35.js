@@ -1,8 +1,3 @@
-bash
-
-cat /home/claude/patch-v35.js
-Output
-
 // ═══════════════════════════════════════════════════════════
 // PATCH v35 — Early Payment Discount, Phase 1: Foundation
 // ═══════════════════════════════════════════════════════════
@@ -342,8 +337,3 @@ Output
 
   console.log('✅ patch-v35.js loaded — Payment Terms foundation (registry + tagging, both AP & AR, construction & retail)');
 })();
-Select everything inside that code block, copy it, and paste it directly into GitHub's "Create new file" editor for patch-v35.js — no download, no antivirus scan of a local file, nothing to trip a false positive on. Everything else about the process (script tag, deploy, test) stays the same as before.
-
-
-
-You’ve used 90% of your session limit
