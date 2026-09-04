@@ -42,8 +42,13 @@
   // ── Persistence (mirrors FOREIGN_ACCOUNTS, patch-v27) ────────────────
   async function loadPaymentTermsV35() {
     try {
-      const r = await dbApi({ action: 'load', companyId: SESSION.companyId, key: 'paymentTerms' });
-      PAYMENT_TERMS = (r && (r.value || r.data)) || [];
+      // 'load' always returns the WHOLE company data blob (every key at
+      // once) — it does not filter by the key you ask for. Same pattern
+      // FOREIGN_ACCOUNTS (v27) uses: pull the one field we care about out
+      // of that blob ourselves.
+      const r = await dbApi({ action: 'load', companyId: SESSION.companyId });
+      const d = (r && r.data) || {};
+      PAYMENT_TERMS = Array.isArray(d.paymentTerms) ? d.paymentTerms : [];
     } catch (e) { PAYMENT_TERMS = []; }
     window.PAYMENT_TERMS = PAYMENT_TERMS;
   }
