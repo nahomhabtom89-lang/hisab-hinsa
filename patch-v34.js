@@ -58,8 +58,11 @@
   // ── Persistence ──────────────────────────────────────────────────────
   async function loadManualFxRatesV34() {
     try {
-      const r = await dbApi({ action: 'load', companyId: SESSION.companyId, key: 'manualFxRates' });
-      const d = (r && (r.value || r.data)) || {};
+      // 'load' always returns the WHOLE company data blob, ignoring which
+      // key you ask for — pull our own field out of it, same pattern
+      // FOREIGN_ACCOUNTS (v27) and Payment Terms (v35) use.
+      const r = await dbApi({ action: 'load', companyId: SESSION.companyId });
+      const d = (r && r.data && r.data.manualFxRates) || {};
       MANUAL_FX_RATES = d.rates || {};
       FX_RATE_MODE = d.modes || {};
     } catch (e) {
