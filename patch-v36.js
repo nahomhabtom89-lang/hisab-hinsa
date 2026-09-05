@@ -97,13 +97,17 @@ function renderPaySupplierDiscountRowV36(inv){
 // Redefines renderPaySupplierRow (from v21) as a superset: fx rows and
 // non-fx rows without terms render byte-for-byte identically; a non-fx
 // row WITH terms gets the discount block appended below its Apply input.
+// NOTE: must be an assignment (window.X = function(){}), not a bare
+// "function X(){}" declaration — a same-named declaration later in this
+// file would hoist to the top and get captured as "_orig" instead of
+// v21's real original, causing infinite self-recursion.
 const _origRenderPaySupplierRowV36 = renderPaySupplierRow;
-function renderPaySupplierRow(inv){
+window.renderPaySupplierRow = function(inv){
   const html = _origRenderPaySupplierRowV36(inv);
   if(inv.fx || !inv.terms) return html; // FX rows and plain rows without terms: unchanged
   // Inject the discount block just before the closing </td></tr> of the Apply cell.
   return html.replace('</td>\n  </tr>', `${renderPaySupplierDiscountRowV36(inv)}</td>\n  </tr>`);
-}
+};
 
 function onPaySupplierDiscountChange(invoiceId){
   refreshPaySupplierDiscountV36(invoiceId);
@@ -159,7 +163,7 @@ if(typeof _origOpenPaySupplierModalV36 === 'function'){
 // Redefines recalcPaySupplierTotal (superset of v21's version): same total
 // logic, plus refreshes each discount row and shows total discount if any.
 const _origRecalcPaySupplierTotalV36 = recalcPaySupplierTotal;
-function recalcPaySupplierTotal(){
+window.recalcPaySupplierTotal = function(){
   document.querySelectorAll('.ps-apply-amt').forEach(el=>{
     const invId = el.dataset.invoiceId;
     if(document.querySelector(`.ps-discount-status[data-invoice-id="${invId}"]`)) refreshPaySupplierDiscountV36(invId);
@@ -186,7 +190,7 @@ function recalcPaySupplierTotal(){
     const totalEl = document.getElementById('ps-total');
     if(totalEl) totalEl.value += `  (incl. ${fc(totalDiscount)} discount)`;
   }
-}
+};
 
 // Redefines recordSupplierPayment as a superset of v28's version: FX rows
 // (.ps-fx-settle) processed EXACTLY as before, untouched. Non-fx rows
