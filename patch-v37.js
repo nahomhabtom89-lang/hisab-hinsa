@@ -88,12 +88,17 @@ function renderReceivePaymentDiscountRowV37(inv){
   </div>`;
 }
 
+// NOTE: must be an assignment (window.X = function(){}), not a bare
+// "function X(){}" declaration — a same-named declaration later in this
+// file would hoist to the top and get captured as "_orig" instead of
+// v25/v28's real original, causing infinite self-recursion (the exact bug
+// caught and fixed in patch-v36 before it shipped this way).
 const _origRenderReceivePaymentRowV37 = renderReceivePaymentRow;
-function renderReceivePaymentRow(inv){
+window.renderReceivePaymentRow = function(inv){
   const html = _origRenderReceivePaymentRowV37(inv);
   if(inv.fx || !inv.terms) return html;
   return html.replace('</td>\n  </tr>', `${renderReceivePaymentDiscountRowV37(inv)}</td>\n  </tr>`);
-}
+};
 
 function onReceivePaymentDiscountChange(invoiceId){
   refreshReceivePaymentDiscountV37(invoiceId);
@@ -145,7 +150,7 @@ if(typeof _origOpenReceivePaymentModalV37 === 'function'){
 }
 
 const _origRecalcReceivePaymentTotalV37 = recalcReceivePaymentTotal;
-function recalcReceivePaymentTotal(){
+window.recalcReceivePaymentTotal = function(){
   document.querySelectorAll('.rp-apply-amt').forEach(el=>{
     const invId = el.dataset.invoiceId;
     if(document.querySelector(`.rp-discount-status[data-invoice-id="${invId}"]`)) refreshReceivePaymentDiscountV37(invId);
@@ -172,7 +177,7 @@ function recalcReceivePaymentTotal(){
     const totalEl = document.getElementById('rp-total');
     if(totalEl) totalEl.value += `  (incl. ${fc(totalDiscount)} discount)`;
   }
-}
+};
 
 // Redefines recordCustomerPayment as a superset of v28's version: FX rows
 // (.rp-fx-settle) processed EXACTLY as before, untouched. Non-fx rows
