@@ -124,18 +124,28 @@
   function tagLastEntryWithTermsV35(termsId, invoiceDateStr) {
     if (!termsId) return; // "— No Terms —" selected, nothing to do
     if (!DB || !DB.entries || !DB.entries.length) return;
-    const entry = DB.entries[DB.entries.length - 1];
-    if (!entry || entry.terms) return;
-    const controlLine = (entry.credits || []).find(function (l) { return l.acct === 'Accounts Payable'; })
-      || (entry.debits || []).find(function (l) { return l.acct === 'Accounts Payable'; })
-      || (entry.debits || []).find(function (l) { return l.acct === 'Accounts Receivable'; })
-      || (entry.credits || []).find(function (l) { return l.acct === 'Accounts Receivable'; });
-    if (!controlLine) return; // cash-paid entry, nothing open to apply terms to
-    const taxLine = (entry.debits || []).concat(entry.credits || []).find(function (l) { return l.acct === 'VAT Receivable (Input VAT)' || l.acct === 'VAT Payable (Output VAT)'; });
-    const termsBlock = buildTermsBlockV35(termsId, invoiceDateStr, controlLine.amt, taxLine ? taxLine.amt : 0);
-    if (termsBlock) {
-      entry.terms = termsBlock;
-      if (typeof saveData === 'function') saveData();
+    // Don't assume it's literally the LAST entry pushed — a POS sale, for
+    // instance, pushes the Sale entry (with the AR line) and THEN a
+    // separate COGS entry right after it. Search backward for the most
+    // recent untagged entry that actually has an AP/AR control line
+    // (same class of issue patch-v31 already had to work around for
+    // foreign-account retagging on POS sales).
+    const maxLookback = 5;
+    for (let i = DB.entries.length - 1, count = 0; i >= 0 && count < maxLookback; i--, count++) {
+      const entry = DB.entries[i];
+      if (!entry || entry.terms) continue;
+      const controlLine = (entry.credits || []).find(function (l) { return l.acct === 'Accounts Payable'; })
+        || (entry.debits || []).find(function (l) { return l.acct === 'Accounts Payable'; })
+        || (entry.debits || []).find(function (l) { return l.acct === 'Accounts Receivable'; })
+        || (entry.credits || []).find(function (l) { return l.acct === 'Accounts Receivable'; });
+      if (!controlLine) continue; // e.g. a COGS entry with no AP/AR line — keep looking further back
+      const taxLine = (entry.debits || []).concat(entry.credits || []).find(function (l) { return l.acct === 'VAT Receivable (Input VAT)' || l.acct === 'VAT Payable (Output VAT)'; });
+      const termsBlock = buildTermsBlockV35(termsId, invoiceDateStr, controlLine.amt, taxLine ? taxLine.amt : 0);
+      if (termsBlock) {
+        entry.terms = termsBlock;
+        if (typeof saveData === 'function') saveData();
+      }
+      return; // found and tagged (or built nothing valid) — stop searching
     }
   }
   window.tagLastEntryWithTermsV35 = tagLastEntryWithTermsV35;
