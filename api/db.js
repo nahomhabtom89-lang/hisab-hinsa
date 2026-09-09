@@ -876,14 +876,21 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ ok: true, products: r.rows });
     }
     if (action === 'saveProduct') {
-      const { companyId, id, sku, barcode, name, category, sale_price, cost_price, qty, min_qty, unit, tax_tier_id, price_inclusive } = body;
+      const { companyId, id, sku, barcode, name, category, sale_price, cost_price, qty, min_qty, unit, tax_tier_id, price_inclusive, layers } = body;
       if (!companyId || !name) return res.status(400).json({ error: 'Missing fields' });
       const taxTierId = tax_tier_id ? parseInt(tax_tier_id) : null;
       const priceIncl = !!price_inclusive;
+      // layers is optional — when provided (e.g. by the FIFO depletion patch,
+      // after a sale consumes stock), it fully replaces the stored batches.
+      // When omitted, COALESCE leaves the existing layers column untouched,
+      // so every pre-existing caller of saveProduct keeps working exactly
+      // as before.
+      const layersJson = layers !== undefined ? JSON.stringify(layers) : null;
       if (id) {
         await query(`UPDATE hh_products SET sku=$1,barcode=$2,name=$3,category=$4,sale_price=$5,
-          cost_price=$6,qty=$7,min_qty=$8,unit=$9,tax_tier_id=$10,price_inclusive=$11 WHERE id=$12 AND company_id=$13`,
-          [sku,barcode,name,category||'General',sale_price||0,cost_price||0,qty||0,min_qty||0,unit||'unit',taxTierId,priceIncl,parseInt(id),parseInt(companyId)]);
+          cost_price=$6,qty=$7,min_qty=$8,unit=$9,tax_tier_id=$10,price_inclusive=$11,
+          layers=COALESCE($14::jsonb, layers) WHERE id=$12 AND company_id=$13`,
+          [sku,barcode,name,category||'General',sale_price||0,cost_price||0,qty||0,min_qty||0,unit||'unit',taxTierId,priceIncl,parseInt(id),parseInt(companyId),layersJson]);
       } else {
         const r = await query(`INSERT INTO hh_products(company_id,sku,barcode,name,category,sale_price,cost_price,qty,min_qty,unit,layers,tax_tier_id,price_inclusive)
           VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'[]',$11,$12) ON CONFLICT(company_id,name)
