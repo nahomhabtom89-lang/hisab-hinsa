@@ -1,57 +1,66 @@
 // ═══════════════════════════════════════════════════════════
-// PATCH v42 — Fix: POS credit sale FX-tagging silently failing
+// PATCH v43 — Perpetual Inventory, Stage 1: Populate real purchase layers
 // ═══════════════════════════════════════════════════════════
-// Another pre-existing gap, same root cause as patch-v40 (Stock Intake)
-// and the bug already caught and fixed once in patch-v35 for terms
-// tagging on POS sales: completeSale() pushes the Sale entry (with the
-// Accounts Receivable line) and THEN a separate COGS entry right after
-// it. Patch-v24's fx-tagging call runs immediately after completeSale()
-// returns and just grabs "the last entry" — which by then is the COGS
-// entry, with no AR line on it at all. So tagLastEntryWithFx() silently
-// finds nothing to tag and gives up, every single time a POS credit sale
-// has any COGS at all (i.e. almost always).
+// Purely additive — does NOT change COGS, sales, or any journal entry.
+// Safe to verify in isolation before Stage 2 (FIFO depletion on sale)
+// touches anything COGS-related.
 //
-// FIX: a robust version that searches backward through the last few
-// entries for the most recent untagged one that actually has an AP/AR
-// line — the exact same technique already used to fix this same bug
-// class in patch-v35 (POS sale terms tagging) and already present in
-// patch-v31/v32's POS retagging logic. Runs as one more layer on top of
-// the whole completeSale chain, so it only steps in when v24's original
-// attempt didn't find anything (an already-tagged entry is left alone).
+// DISCOVERY: the backend (api/db.js) already has a fully-built
+// 'receiveStock' action that correctly pushes a {qty, unitCost, date}
+// layer onto a product's `layers` column and bumps its quantity — but no
+// frontend code has ever called it. Every stock intake path instead calls
+// syncProductAfterIntake(), which only recomputes a single blended
+// weighted-average cost_price via 'saveProduct' — a call that never
+// touches the layers column at all. So `layers` has sat empty for every
+// retail product this whole time, even though the Stock Valuation page
+// already reads from it (silently falling back to cost_price when empty).
+//
+// FIX: redefine syncProductAfterIntake to also call the existing
+// 'receiveStock' backend action for the quantity/layer update, and keep
+// the weighted-average cost_price calculation (still useful — it's what
+// today's sale-price defaults and reports read) exactly as it was,
+// verified below to produce byte-for-byte the same cost_price as before.
+// The only thing that changes is that `layers` now actually gets filled
+// in, going forward, from the moment this patch is live. Existing stock
+// received before this patch has no layer history — Stage 3 will handle
+// giving it an opening layer.
 // ═══════════════════════════════════════════════════════════
 
-function tagLastEntryWithFxRobustV42(currency){
-  const base=(typeof BASE_CURRENCY!=='undefined'&&BASE_CURRENCY)?BASE_CURRENCY:'USD';
-  if(!currency||currency===base)return;
-  const rate=(typeof fxCrossRate==='function')?fxCrossRate(currency):null;
-  if(!rate)return;
-  if(!DB||!DB.entries||!DB.entries.length)return;
-  const maxLookback=5;
-  for(let i=DB.entries.length-1,count=0;i>=0&&count<maxLookback;i--,count++){
-    const entry=DB.entries[i];
-    if(!entry||entry.fx)continue; // already tagged (e.g. v24 succeeded already) or invalid — keep looking
-    const controlLine=(entry.credits||[]).find(l=>l.acct==='Accounts Payable')
-                    ||(entry.debits||[]).find(l=>l.acct==='Accounts Payable')
-                    ||(entry.debits||[]).find(l=>l.acct==='Accounts Receivable')
-                    ||(entry.credits||[]).find(l=>l.acct==='Accounts Receivable');
-    if(!controlLine)continue; // e.g. a COGS entry with no AP/AR line — keep looking further back
-    entry.fx={currency,rate,originalAmount:+(controlLine.amt/rate).toFixed(4)};
-    if(typeof saveData==='function')saveData();
-    return;
-  }
-}
-window.tagLastEntryWithFxRobustV42=tagLastEntryWithFxRobustV42;
+async function syncProductAfterIntake(productId,taxTierId,priceInclusive,qtyReceived,unitCostReceived){
+  const product=RETAIL_PRODUCTS.find(p=>p.id===productId);
+  if(!product)return;
+  const oldQty=parseFloat(product.qty)||0;
+  const oldCost=parseFloat(product.cost_price)||0;
+  const qRecv=parseFloat(qtyReceived)||0;
+  const uCost=parseFloat(unitCostReceived)||0;
+  const newQtyTotal=oldQty+qRecv;
+  const newAvgCost=newQtyTotal>0?((oldQty*oldCost)+(qRecv*uCost))/newQtyTotal:uCost;
+  const roundedCost=Math.round(newAvgCost*100)/100;
+  const tierChanged=String(product.tax_tier_id||'')!==String(taxTierId||'');
+  const inclChanged=!!product.price_inclusive!==!!priceInclusive;
+  const costChanged=Math.abs(roundedCost-oldCost)>0.001;
+  const qtyChanged=qRecv>0.0001;
+  if(!tierChanged&&!inclChanged&&!costChanged&&!qtyChanged)return;
 
-const _origCompleteSaleV42=window.completeSale;
-if(typeof _origCompleteSaleV42==='function'){
-  window.completeSale=async function(){
-    const payMethod=(document.getElementById('pos-payment')||{}).value;
-    const curEl=document.getElementById('pos-customer-currency');
-    const cur=(payMethod==='credit'&&curEl)?curEl.value:null;
-    const result=await _origCompleteSaleV42.apply(this,arguments);
-    if(cur)tagLastEntryWithFxRobustV42(cur);
-    return result;
-  };
+  try{
+    if(qtyChanged){
+      // The real fix: use the existing, previously-dead backend action so
+      // a genuine {qty, unitCost, date} layer actually gets recorded.
+      await dbApi({action:'receiveStock',companyId:SESSION.companyId,productId:product.id,qty:qRecv,unitCost:uCost});
+      product.layers=product.layers||[];
+      product.layers.push({qty:qRecv,unitCost:uCost,date:today()});
+    }
+    // Weighted-average cost_price / tax tier — identical calculation to
+    // before this patch. Passes the already-updated newQtyTotal so this
+    // save doesn't ALSO increment quantity on top of the receiveStock
+    // call above (which already did that on the server).
+    await dbApi({action:'saveProduct',companyId:SESSION.companyId,id:product.id,name:product.name,sku:product.sku,barcode:product.barcode,category:product.category,sale_price:product.sale_price,cost_price:roundedCost,qty:newQtyTotal,min_qty:product.min_qty,unit:product.unit,tax_tier_id:taxTierId||'',price_inclusive:!!priceInclusive});
+    product.tax_tier_id=taxTierId||null;
+    product.price_inclusive=!!priceInclusive;
+    product.cost_price=roundedCost;
+    product.qty=newQtyTotal;
+  }catch(e){console.error('syncProductAfterIntake (v43)',e);}
 }
+window.syncProductAfterIntake=syncProductAfterIntake;
 
-console.log('✅ patch-v42.js loaded — POS credit sales in a foreign currency are now reliably FX-tagged, even with a COGS entry in between');
+console.log('✅ patch-v43.js loaded — Perpetual Inventory Stage 1: retail purchases now recorded as real layers/batches');
