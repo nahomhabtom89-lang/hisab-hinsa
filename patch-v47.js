@@ -172,7 +172,7 @@ async function recordSupplierPayment(){
       const result=computePaySupplierFxDiscountV38(inv,paymentDate,foreignSettled,overrideOn,overrideGrant);
       if(result.eligible){
         discountForeign=result.discount;
-        discountBase=+(discountForeign*recordedRate).toFixed(2);
+        discountBase=+(discountForeign*rate).toFixed(2); // TODAY'S rate, corrected (see patch-v50 note in v38)
       }
       if(overrideOn){ overrideUsed=true; overrideReason=reasonEl?reasonEl.value.trim():''; }
     }
