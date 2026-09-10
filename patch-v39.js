@@ -12,11 +12,13 @@
 //
 // THE MATH (identical structure to v38):
 //   1. Discount computed in the invoice's OWN currency first.
-//   2. Discount valued at the ORIGINALLY RECORDED rate (a trade term, no
-//      FX exposure of its own).
+//   2. Discount valued at TODAY'S (payment-date) rate — same as v38's
+//      corrected version. See v38's header comment for the full proof of
+//      why this, not the original booking rate, is the rigorous
+//      treatment.
 //   3. Cash actually collected converts the NET (post-discount) foreign
-//      amount at TODAY'S rate — the FX exposure lives here.
-//   4. FX gain/loss isolated from the discount by construction, same
+//      amount at TODAY'S rate — unchanged.
+//   4. FX gain/loss isolated from the (correctly valued) discount, same
 //      sign convention v25/v28/v37 already use for AR (+ = gain).
 //
 // Debits:  Cash/Bank (net foreign amount × today's rate)
@@ -222,7 +224,7 @@ async function recordCustomerPayment(){
       const result=computeReceivePaymentFxDiscountV39(inv,paymentDate,foreignSettled,overrideOn,overrideGrant);
       if(result.eligible){
         discountForeign=result.discount;
-        discountBase=+(discountForeign*recordedRate).toFixed(2); // valued at the ORIGINAL rate
+        discountBase=+(discountForeign*rate).toFixed(2); // valued at TODAY'S (payment-date) rate — the rigorous decomposition, not the original booking rate (see patch-v50)
       }
       if(overrideOn){ overrideUsed=true; overrideReason=reasonEl?reasonEl.value.trim():''; }
     }
