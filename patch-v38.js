@@ -10,14 +10,21 @@
 //   1. Compute the discount in the invoice's OWN currency first — same
 //      engine (evaluateDiscountV35), just fed the foreign amount being
 //      settled instead of a base-currency one.
-//   2. The discount itself is valued at the ORIGINALLY RECORDED rate — it's
-//      a trade term, not a currency position, so it shouldn't carry any
-//      FX gain/loss of its own.
+//   2. The discount is valued at TODAY'S (payment-date) rate — the same
+//      rate the actual cash settlement uses. [Corrected from an earlier
+//      version of this patch, which valued it at the ORIGINAL booking
+//      rate — that reasoning sounded plausible ("a trade term, not a
+//      currency position") but wasn't the rigorous treatment. Proof: take
+//      "what the full invoice would cost TODAY at today's rate" minus
+//      "what was originally booked" — that isolates the PURE FX gain/loss
+//      with zero contamination from the discount. The discount is then
+//      simply the stated percentage of that today's-rate figure. This
+//      decomposes cleanly and reproduces the correct split; valuing the
+//      discount at the original rate does not.]
 //   3. The actual cash paid converts the NET (post-discount) foreign
-//      amount at TODAY'S rate — that's where the FX exposure lives.
-//   4. The FX gain/loss is isolated from the discount by construction —
-//      exactly the same netAdjustment formula already used for plain FX
-//      invoices, just computed against the discounted net amount.
+//      amount at TODAY'S rate — same as before, unchanged.
+//   4. The FX gain/loss is whatever's left over once the (now correctly
+//      valued) discount and the actual cash are both accounted for.
 //
 // Debits:  Accounts Payable (bookedPortion, unchanged — full original
 //          amount at the original rate, discount or not)
@@ -231,7 +238,7 @@ async function recordSupplierPayment(){
       const result=computePaySupplierFxDiscountV38(inv,paymentDate,foreignSettled,overrideOn,overrideGrant);
       if(result.eligible){
         discountForeign=result.discount;
-        discountBase=+(discountForeign*recordedRate).toFixed(2); // valued at the ORIGINAL rate — a trade term, not an FX position
+        discountBase=+(discountForeign*rate).toFixed(2); // valued at TODAY'S (payment-date) rate — the rigorous decomposition, not the original booking rate (see patch-v50)
       }
       if(overrideOn){ overrideUsed=true; overrideReason=reasonEl?reasonEl.value.trim():''; }
     }
