@@ -35,6 +35,19 @@
   }
   window.persistDNSignatureV54 = persistDNField;
 
+  // The base app's own dark-theme CSS apparently gives <td> a lighter,
+  // secondary-text color than <th> somewhere globally (common "muted
+  // table body text" pattern). v53's print stylesheet set borders/padding
+  // on td but never forced a color, so that ambient rule was quietly
+  // winning and item rows printed faint next to the bold labels. Force it
+  // explicitly, scoped to the print content only.
+  const _dnFixTableColorV54 = document.createElement('style');
+  _dnFixTableColorV54.textContent = `
+    #dn-print-content-v53 td, #dn-print-content-v53 th { color:#111 !important; }
+    #dn-print-content-v53 td { font-weight:500; }
+  `;
+  document.head.appendChild(_dnFixTableColorV54);
+
   function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
 
   function injectShareButtonV54() {
