@@ -127,12 +127,37 @@
   };
 
   // ── Sidebar entry (both modes) ────────────────────────────────────────
-  if (typeof RETAIL_NAV !== 'undefined' && !RETAIL_NAV.some(function (s) { return s.section === '📦 Delivery'; })) {
-    RETAIL_NAV.push({ section: '📦 Delivery', items: [{ ico: '📦', ti: 'Delivery Notes', en: 'Delivery', page: 'deliverynotes' }] });
+  // IMPORTANT (found while debugging with the user): patch-v7.js fully
+  // redefined renderSidebar() to read from RETAIL_NAV_EN /
+  // CONSTRUCTION_NAV_EN instead of the base RETAIL_NAV / CONSTRUCTION_NAV
+  // declared in index.html — nothing after v7 reads the base arrays
+  // anymore, so pushing onto them alone (what v53 originally did) had no
+  // visible effect. On top of that, the two pairs are exposed two
+  // different ways:
+  //   - RETAIL_NAV / CONSTRUCTION_NAV: plain top-level `const` in
+  //     index.html's own <script> tag (not wrapped in an IIFE) — real
+  //     global bindings, reachable as a bare identifier, but `let`/
+  //     `const` never attach to `window`, so window.RETAIL_NAV is
+  //     undefined even though bare `RETAIL_NAV` works fine.
+  //   - RETAIL_NAV_EN / CONSTRUCTION_NAV_EN: `const` declared INSIDE
+  //     patch-v7.js's own (function(){...})() closure — only reachable
+  //     at all because v7 explicitly runs window.RETAIL_NAV_EN=RETAIL_NAV_EN
+  //     afterward.
+  // _dnResolveGlobalV53 checks window[name] first (catches the _EN pair)
+  // and falls back to an eval'd bare-identifier lookup in this script's
+  // own scope (catches the plain-const pair, since classic <script> tags
+  // share one global lexical environment) — safe either way because
+  // typeof/try-catch never throws on a missing identifier.
+  function _dnResolveGlobalV53(name) {
+    if (typeof window[name] !== 'undefined') return window[name];
+    try { return eval(name); } catch (e) { return undefined; }
   }
-  if (typeof CONSTRUCTION_NAV !== 'undefined' && !CONSTRUCTION_NAV.some(function (s) { return s.section === '📦 Delivery'; })) {
-    CONSTRUCTION_NAV.push({ section: '📦 Delivery', items: [{ ico: '📦', ti: 'Delivery Notes', en: 'Delivery', page: 'deliverynotes' }] });
-  }
+  ['RETAIL_NAV', 'RETAIL_NAV_EN', 'CONSTRUCTION_NAV', 'CONSTRUCTION_NAV_EN'].forEach(function (name) {
+    const arr = _dnResolveGlobalV53(name);
+    if (Array.isArray(arr) && !arr.some(function (s) { return s.section === '📦 Delivery'; })) {
+      arr.push({ section: '📦 Delivery', items: [{ ico: '📦', ti: 'Delivery Notes', en: 'Delivery Notes', page: 'deliverynotes' }] });
+    }
+  });
 
   // ── Hook everything up via nav() ──────────────────────────────────────
   const _origNavV53 = window.nav;
