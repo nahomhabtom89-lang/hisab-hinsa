@@ -51,6 +51,24 @@
 (function () {
   function todayStr() { return (typeof today === 'function') ? today() : new Date().toISOString().slice(0, 10); }
 
+  // POS_CART is declared with `let` in index.html (not `var`), so it NEVER
+  // attaches to window — window.POS_CART is always undefined regardless of
+  // the real cart contents. This bit v52 exactly like the RETAIL_NAV bug in
+  // v53: `(window.POS_CART || [])` silently evaluated to [] every time,
+  // which is why delivery notes shipped with zero line items even though
+  // the sale itself clearly had real items in it. Fix: resolve via
+  // window[name] first, falling back to an eval'd bare-identifier lookup
+  // in this script's own scope (classic <script> tags share one global
+  // lexical environment) — same pattern used to fix the sidebar bug.
+  function _dnResolveGlobalV52(name) {
+    if (typeof window[name] !== 'undefined') return window[name];
+    try { return eval(name); } catch (e) { return undefined; }
+  }
+  function _dnGetPOSCartV52() {
+    const c = _dnResolveGlobalV52('POS_CART');
+    return Array.isArray(c) ? c : [];
+  }
+
   // ── Numbering — derived by scanning, no new persisted counter needed ──
   function nextDNNumberV52() {
     let max = 0;
@@ -107,7 +125,7 @@
   // ── POS panel ──────────────────────────────────────────────────────
   function renderDNPartialLinesPOSV52() {
     const wrap = document.getElementById('dn-pos-lines'); if (!wrap) return;
-    const cart = window.POS_CART || [];
+    const cart = _dnGetPOSCartV52();
     if (!cart.length) { wrap.innerHTML = '<div style="font-size:11px;color:var(--text3)">Cart is empty</div>'; return; }
     wrap.innerHTML = cart.map(function (item) {
       return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:4px 0;font-size:11px">
@@ -169,7 +187,7 @@
         const inp = document.getElementById('dn-pos-qtydel-' + item.id);
         if (inp && inp.value !== '') qDel = Math.max(0, parseFloat(inp.value) || 0);
       }
-      return { description: item.name, unit: item.unit || 'unit', qtyOrdered: qOrd, qtyDelivered: qDel };
+      return { description: item.name, sku: item.sku || '', unit: item.unit || 'unit', qtyOrdered: qOrd, qtyDelivered: qDel };
     });
     return {
       refType: 'pos', shipTo: val('dn-pos-shipto'), driverName: val('dn-pos-driver'),
@@ -194,9 +212,10 @@
     const row = document.createElement('div');
     row.className = 'dn-inv-line-row';
     row.dataset.lineId = id;
-    row.style.cssText = 'display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:6px;margin-bottom:5px;align-items:center';
+    row.style.cssText = 'display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr auto;gap:6px;margin-bottom:5px;align-items:center';
     row.innerHTML = `
       <input class="dn-inv-line-desc" type="text" placeholder="Item / material description" style="background:var(--bg);border:1px solid var(--border2);border-radius:5px;padding:6px 8px;font-size:11px;color:var(--text);outline:none"/>
+      <input class="dn-inv-line-sku" type="text" placeholder="SKU / part no." style="background:var(--bg);border:1px solid var(--border2);border-radius:5px;padding:6px 8px;font-size:11px;color:var(--text);outline:none"/>
       <input class="dn-inv-line-unit" type="text" placeholder="unit (bags, m³...)" style="background:var(--bg);border:1px solid var(--border2);border-radius:5px;padding:6px 8px;font-size:11px;color:var(--text);outline:none"/>
       <input class="dn-inv-line-qord" type="number" placeholder="Qty Ordered" min="0" style="background:var(--bg);border:1px solid var(--border2);border-radius:5px;padding:6px 8px;font-size:11px;color:var(--text);outline:none"/>
       <input class="dn-inv-line-qdel" type="number" placeholder="Qty Delivered" min="0" style="background:var(--bg);border:1px solid var(--border2);border-radius:5px;padding:6px 8px;font-size:11px;color:var(--text);outline:none"/>
@@ -239,16 +258,17 @@
     let lines = [];
     rows.forEach(function (row) {
       const desc = (row.querySelector('.dn-inv-line-desc') || {}).value || '';
+      const sku = (row.querySelector('.dn-inv-line-sku') || {}).value || '';
       const unit = (row.querySelector('.dn-inv-line-unit') || {}).value || '';
       const qOrd = parseFloat((row.querySelector('.dn-inv-line-qord') || {}).value) || 0;
       const qDelRaw = (row.querySelector('.dn-inv-line-qdel') || {}).value;
       const qDel = qDelRaw === '' ? qOrd : Math.max(0, parseFloat(qDelRaw) || 0);
-      if (desc.trim() && qOrd > 0) lines.push({ description: desc.trim(), unit: unit.trim() || 'unit', qtyOrdered: qOrd, qtyDelivered: qDel });
+      if (desc.trim() && qOrd > 0) lines.push({ description: desc.trim(), sku: sku.trim(), unit: unit.trim() || 'unit', qtyOrdered: qOrd, qtyDelivered: qDel });
     });
     if (!lines.length) {
       // Fallback: box was checked but no lines typed — never ship an
       // empty delivery note. See the scope note at the top of this file.
-      lines = [{ description: 'See Invoice for billing detail', unit: 'lot', qtyOrdered: 1, qtyDelivered: 1 }];
+      lines = [{ description: 'See Invoice for billing detail', sku: '', unit: 'lot', qtyOrdered: 1, qtyDelivered: 1 }];
     }
     return {
       refType: 'construction_invoice', shipTo: val('dn-inv-shipto'), driverName: val('dn-inv-driver'),
@@ -269,7 +289,7 @@
   if (typeof _origCompleteSaleV52 === 'function') {
     window.completeSale = async function () {
       const beforeLen = (DB && DB.entries) ? DB.entries.length : 0;
-      const cartSnapshot = (window.POS_CART || []).map(function (i) { return Object.assign({}, i); });
+      const cartSnapshot = _dnGetPOSCartV52().map(function (i) { return Object.assign({}, i); });
       const custEl = document.getElementById('pos-customer');
       const custOpt = custEl && custEl.selectedOptions && custEl.selectedOptions[0];
       const dnData = readPOSDeliveryNoteDataV52(cartSnapshot);
