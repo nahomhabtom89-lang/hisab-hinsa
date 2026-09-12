@@ -88,6 +88,26 @@
     if (pad) pad.clear();
   };
 
+  // v54's injectShareButtonV54() was never exposed on window (it's a
+  // private function inside v54's own closure) — only
+  // window.shareDeliveryNoteV54 was. So v55's earlier
+  // `typeof injectShareButtonV54 === 'function'` check was always false
+  // and the Share button silently stopped being added the moment v55
+  // took over rendering. Fix: don't depend on reaching into another
+  // patch's closure at all — keep a self-contained copy here (idempotent,
+  // guarded by the same existing-button check, so it's harmless if v54's
+  // own copy also happens to run).
+  function injectShareButtonV55() {
+    const headerRow = document.querySelector('#pg-dn-print-v53 .no-print');
+    if (!headerRow || document.getElementById('dn-share-btn-v54')) return;
+    const btn = document.createElement('button');
+    btn.id = 'dn-share-btn-v54';
+    btn.className = 'btn btn-outline';
+    btn.textContent = '📤 Share';
+    btn.onclick = function () { if (window._dnCurrentEntryIdV54 != null && typeof shareDeliveryNoteV54 === 'function') shareDeliveryNoteV54(window._dnCurrentEntryIdV54); };
+    headerRow.appendChild(btn);
+  }
+
   function signatureBlockHtml(role, entryId, label, canvasIdSuffix, printedNameVal) {
     const canvasId = 'dn-sig-canvas-' + canvasIdSuffix + '-' + entryId;
     return `<div class="dn-sig-block">
@@ -108,7 +128,7 @@
     if (!entry || !entry.deliveryNote) { if (typeof showToast === 'function') showToast('⚠️ Delivery note not found'); return; }
     const dn = entry.deliveryNote;
     if (typeof injectDNPagesV53 === 'function') injectDNPagesV53();
-    if (typeof injectShareButtonV54 === 'function') injectShareButtonV54();
+    injectShareButtonV55();
     window._dnCurrentEntryIdV54 = entryId;
 
     const content = document.getElementById('dn-print-content-v53');
