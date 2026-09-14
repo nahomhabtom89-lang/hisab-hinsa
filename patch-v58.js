@@ -334,39 +334,56 @@
     window.open('https://wa.me/?text=' + encodeURIComponent(summaryText), '_blank');
   };
 
-  // ── Wire "Ship" + "Shipments" buttons into v57's list rendering ─────
-  // v57's renderSalesOrdersListV57 is exposed on window, so this is a
-  // safe wrap (calling a captured, window-exposed original), not a
-  // reach into a private closure.
-  const _origRenderSOListV58 = window.renderSalesOrdersListV57;
-  if (typeof _origRenderSOListV58 === 'function') {
-    window.renderSalesOrdersListV57 = function () {
-      const result = _origRenderSOListV58.apply(this, arguments);
-      const el = document.getElementById('so-list-v57'); if (!el) return result;
-      el.querySelectorAll('tr[data-so-augmented]').length; // no-op guard placeholder
-      const rows = el.querySelectorAll('tbody tr');
-      const orders = (DB.salesOrders || []).slice().sort(function (a, b) { return (b.id || 0) - (a.id || 0); });
-      rows.forEach(function (row, i) {
-        const so = orders[i]; if (!so || row.dataset.soAugmented) return;
-        row.dataset.soAugmented = '1';
-        const actionsCell = row.querySelector('td:last-child'); if (!actionsCell) return;
-        if (so.status !== 'Cancelled' && so.status !== 'Fulfilled') {
-          const shipBtn = document.createElement('button');
-          shipBtn.className = 'btn btn-outline'; shipBtn.style.cssText = 'padding:4px 9px;font-size:11px';
-          shipBtn.textContent = '🚚 Ship';
-          shipBtn.onclick = function () { openShipFormV58(so.id); };
-          actionsCell.appendChild(shipBtn);
-        }
-        if ((so.shipments || []).length) {
-          const viewBtn = document.createElement('button');
-          viewBtn.className = 'btn btn-outline'; viewBtn.style.cssText = 'padding:4px 9px;font-size:11px';
-          viewBtn.textContent = '📋 Shipments (' + so.shipments.length + ')';
-          viewBtn.onclick = function () { viewShipmentsV58(so.id); };
-          actionsCell.appendChild(viewBtn);
-        }
-      });
-      return result;
-    };
+  // ── Wire "Ship" + "Shipments" buttons into the Sales Orders list ────
+  // IMPORTANT (found while debugging with the user): v57's OWN internal
+  // calls to renderSalesOrdersListV57() (from its nav handler, and from
+  // cancelSalesOrderV57) are bare identifier references resolved through
+  // v57's OWN closure scope — they find v57's local function declaration
+  // directly, NOT window.renderSalesOrdersListV57. So wrapping
+  // window.renderSalesOrdersListV57 (what this file did originally) was
+  // dead code: v57 never actually calls through window for this, so the
+  // wrapper never ran no matter what triggered a re-render. This is a
+  // different flavor of the closure-scoping trap already hit twice this
+  // session (RETAIL_NAV/POS_CART not being on window, and
+  // injectShareButtonV54 being closure-private) — same lesson, new shape.
+  //
+  // Fix: don't depend on hooking any specific function at all. Watch the
+  // list container directly with a MutationObserver, so the buttons get
+  // added after ANY re-render regardless of which code path caused it.
+  function augmentSalesOrdersListV58() {
+    const el = document.getElementById('so-list-v57'); if (!el) return;
+    const rows = el.querySelectorAll('tbody tr');
+    const orders = (DB.salesOrders || []).slice().sort(function (a, b) { return (b.id || 0) - (a.id || 0); });
+    rows.forEach(function (row, i) {
+      const so = orders[i]; if (!so || row.dataset.soAugmented) return;
+      row.dataset.soAugmented = '1';
+      const actionsCell = row.querySelector('td:last-child'); if (!actionsCell) return;
+      if (so.status !== 'Cancelled' && so.status !== 'Fulfilled') {
+        const shipBtn = document.createElement('button');
+        shipBtn.className = 'btn btn-outline'; shipBtn.style.cssText = 'padding:4px 9px;font-size:11px;margin-left:4px';
+        shipBtn.textContent = '🚚 Ship';
+        shipBtn.onclick = function () { openShipFormV58(so.id); };
+        actionsCell.appendChild(shipBtn);
+      }
+      if ((so.shipments || []).length) {
+        const viewBtn = document.createElement('button');
+        viewBtn.className = 'btn btn-outline'; viewBtn.style.cssText = 'padding:4px 9px;font-size:11px;margin-left:4px';
+        viewBtn.textContent = '📋 Shipments (' + so.shipments.length + ')';
+        viewBtn.onclick = function () { viewShipmentsV58(so.id); };
+        actionsCell.appendChild(viewBtn);
+      }
+    });
+  }
+
+  function observeSOListV58() {
+    const el = document.getElementById('so-list-v57'); if (!el || el._soObservedV58) return;
+    el._soObservedV58 = true;
+    // Marking dataset.soAugmented before appending our own buttons (above)
+    // means our own appendChild calls don't cause an infinite loop here —
+    // the next observer-triggered pass just finds nothing left to do.
+    const observer = new MutationObserver(function () { augmentSalesOrdersListV58(); });
+    observer.observe(el, { childList: true, subtree: true });
+    augmentSalesOrdersListV58();
   }
 
   const _origNavV58 = window.nav;
@@ -374,6 +391,7 @@
     window.nav = async function (page, el) {
       const result = await _origNavV58(page, el);
       injectShipPagesV58();
+      if (page === 'salesorders') observeSOListV58();
       if (page !== 'so-ship-print-v58') document.body.classList.remove('soship-printing-v58');
       return result;
     };
