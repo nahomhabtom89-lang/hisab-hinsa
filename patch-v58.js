@@ -388,9 +388,13 @@
 
   const _origNavV58 = window.nav;
   if (typeof _origNavV58 === 'function') {
+    // Same ordering fix as v53/v57 (see v53 for the full explanation):
+    // inject BEFORE awaiting the original chain, so base nav() can find
+    // the target page div on the very first visit instead of hiding
+    // everything because it doesn't exist yet.
     window.nav = async function (page, el) {
-      const result = await _origNavV58(page, el);
       injectShipPagesV58();
+      const result = await _origNavV58(page, el);
       if (page === 'salesorders') observeSOListV58();
       if (page !== 'so-ship-print-v58') document.body.classList.remove('soship-printing-v58');
       return result;
