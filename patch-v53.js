@@ -160,11 +160,22 @@
   });
 
   // ── Hook everything up via nav() ──────────────────────────────────────
+  // IMPORTANT (found while debugging a blank-page-on-first-visit report):
+  // injectDNPagesV53() must run BEFORE awaiting the original nav chain,
+  // not after. Base nav() (deepest in the wrap chain, runs first) does
+  // `document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'))`
+  // then only adds 'on' back to #pg-<page> IF it already exists. On the
+  // very first-ever visit to Delivery Notes, #pg-deliverynotes didn't
+  // exist yet (this function used to only create it AFTER awaiting the
+  // original nav), so base nav() hid every page and had nothing to show
+  // — the page then got created a moment too late for anyone to mark it
+  // visible. Injecting first guarantees the div exists by the time base
+  // nav() looks for it.
   const _origNavV53 = window.nav;
   if (typeof _origNavV53 === 'function') {
     window.nav = async function (page, el) {
-      const result = await _origNavV53(page, el);
       injectDNPagesV53();
+      const result = await _origNavV53(page, el);
       if (page === 'deliverynotes') renderDeliveryNotesListV53();
       if (page !== 'dn-print-v53') document.body.classList.remove('dn-printing-v53');
       return result;
