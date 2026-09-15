@@ -551,11 +551,15 @@
   };
 
   // ── Hook up nav() ─────────────────────────────────────────────────
+  // Same ordering fix as v53 (see its file for the full explanation):
+  // injectSalesOrdersPagesV57() must run BEFORE awaiting the original
+  // nav chain, or base nav() won't find #pg-salesorders yet on the very
+  // first visit and will show a blank page.
   const _origNavV57 = window.nav;
   if (typeof _origNavV57 === 'function') {
     window.nav = async function (page, el) {
-      const result = await _origNavV57(page, el);
       injectSalesOrdersPagesV57();
+      const result = await _origNavV57(page, el);
       if (page === 'salesorders') renderSalesOrdersListV57();
       if (page !== 'so-print-v57') document.body.classList.remove('so-printing-v57');
       return result;
