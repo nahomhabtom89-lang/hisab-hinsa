@@ -165,17 +165,43 @@
     } catch (e) { console.error('persistProductV64', e); }
   }
 
-  // Every AP bill for a supplier, open or not — needed so a return can
-  // reference an ALREADY-SETTLED bill too (the "returns after payment"
-  // case). getOpenAPInvoices() only returns open ones, so this is a
-  // small local superset, not a replacement.
+  // Reads FX info off an entry regardless of which of the two shapes this
+  // app uses: an AP bill carries it at the top level (entry.fx =
+  // {currency, rate, originalAmount}), while a foreign-currency CASH
+  // purchase (patch-v33's payMethod === 'foreign:<id>' path in
+  // buildIntakeJournalEntry) carries it on the credit LINE instead
+  // (foreignAmt + currency, with rate implied by amt/foreignAmt) — there
+  // is no entry.fx on that shape at all. Returns null if neither shape
+  // is present (not a foreign transaction).
+  function entryForeignInfoV64(entry) {
+    if (!entry) return null;
+    if (entry.fx && entry.fx.currency && entry.fx.rate) return { currency: entry.fx.currency, rate: entry.fx.rate };
+    const lines = (entry.credits || []).concat(entry.debits || []);
+    const line = lines.find(function (l) { return l.foreignAmt && l.currency && Math.abs(l.foreignAmt) > 0.0001; });
+    if (line) return { currency: line.currency, rate: +(line.amt / line.foreignAmt).toFixed(6) };
+    return null;
+  }
+
+  // Every purchase entry for a supplier — an AP bill OR a cash/foreign
+  // stock receipt (previously this only looked for an 'Accounts Payable'
+  // credit line, which silently excluded every CASH purchase — including
+  // ones paid from a foreign account — from ever being referenceable by
+  // a return at all). Open or already-settled/cash-cleared, so a return
+  // can reference an already-paid purchase too (the "returns after
+  // payment" case). getOpenAPInvoices() only returns open AP ones, so
+  // this is a broader, purpose-built superset, not a replacement.
   function allSupplierBillsV64(supplierId) {
     return (DB.entries || [])
-      .filter(function (e) { return e.party && e.party.type === 'supplier' && String(e.party.id) === String(supplierId) && (e.credits || []).some(function (l) { return l.acct === 'Accounts Payable'; }); })
+      .filter(function (e) {
+        if (!e.party || e.party.type !== 'supplier' || String(e.party.id) !== String(supplierId)) return false;
+        return (e.debits || []).some(function (l) { return l.acct.indexOf('Inventory (') === 0 || l.acct === 'Inventory (Stock)'; })
+          || (e.credits || []).some(function (l) { return l.acct === 'Accounts Payable'; });
+      })
       .map(function (e) {
         const booked = bookedAmountV64(e);
         const settled = (typeof getSettledAmountForInvoice === 'function') ? getSettledAmountForInvoice(e.id) : 0;
-        return { id: e.id, date: e.date, desc: e.desc, booked: booked, remaining: +(booked - settled).toFixed(2), fx: e.fx || null };
+        const isAP = (e.credits || []).some(function (l) { return l.acct === 'Accounts Payable'; });
+        return { id: e.id, date: e.date, desc: e.desc, booked: booked, remaining: +(booked - settled).toFixed(2), fx: entryForeignInfoV64(e), isAP: isAP };
       })
       .sort(function (a, b) { return b.date.localeCompare(a.date); });
   }
@@ -244,7 +270,7 @@
     if (!supSel || !refSel) return;
     const bills = supSel.value ? allSupplierBillsV64(supSel.value) : [];
     refSel.innerHTML = '<option value="">— no matching invoice / not sure —</option>' + bills.map(function (b) {
-      const status = b.remaining > 0.01 ? ('open, ' + fmtMoney(b.remaining) + ' remaining') : 'fully settled';
+      const status = b.remaining > 0.01 ? ('open, ' + fmtMoney(b.remaining) + ' remaining') : (b.isAP ? 'fully settled' : 'cash purchase' + (b.fx ? (' (' + b.fx.currency + ')') : ''));
       return `<option value="${b.id}">#${b.id} · ${esc(b.desc)} · ${status}</option>`;
     }).join('');
   };
@@ -352,11 +378,13 @@
     const method = (document.querySelector('input[name="pr64-settle-' + id + '"]:checked') || {}).value;
     const fxWrap = document.getElementById('pr64-fx-wrap-' + id);
     const refundWrap = document.getElementById('pr64-refund-wrap-' + id);
-    const isFxReduce = method === 'reduceInvoice' && fxWrap && fxWrap.querySelector('input');
-    if (fxWrap) fxWrap.style.display = (method === 'reduceInvoice') ? 'block' : 'none';
+    const isFxDriven = fxWrap && fxWrap.querySelector('input') && (method === 'reduceInvoice' || method === 'refund');
+    if (fxWrap) fxWrap.style.display = isFxDriven ? 'block' : 'none';
     if (refundWrap) refundWrap.style.display = (method === 'refund') ? 'block' : 'none';
+    const rateWrap = document.getElementById('pr64-fx-rate-wrap-' + id);
+    if (rateWrap) rateWrap.style.display = (isFxDriven && method === 'refund') ? 'block' : 'none';
     const amtWrap = document.getElementById('pr64-amt-wrap-' + id);
-    if (amtWrap) amtWrap.style.display = isFxReduce ? 'none' : 'block';
+    if (amtWrap) amtWrap.style.display = isFxDriven ? 'none' : 'block';
     if (method === 'refund') {
       const sel = document.getElementById('pr64-refund-acct-' + id);
       if (sel && typeof appendForeignAccountOptions === 'function') appendForeignAccountOptions('pr64-refund-acct-' + id);
@@ -368,6 +396,7 @@
     const refBill = r.refEntryId ? bills.find(function (b) { return b.id === r.refEntryId; }) : null;
     const canReduceInvoice = !!(refBill && refBill.remaining > 0.01);
     const isFxBill = !!(refBill && refBill.fx);
+    const liveRate = (isFxBill && typeof fxCrossRate === 'function') ? fxCrossRate(refBill.fx.currency) : null;
     return `<div class="pr64-confirm-panel" id="pr64-confirm-${r.id}" style="display:none;background:var(--bg3);border-radius:8px;padding:12px;margin-top:6px">
       <div style="font-size:12px;font-weight:600;margin-bottom:8px">Supplier agreed — how is this settled?</div>
       <div style="display:flex;flex-direction:column;gap:6px;font-size:12px;margin-bottom:8px">
@@ -385,11 +414,15 @@
         </label>
       </div>
       <div id="pr64-fx-wrap-${r.id}" style="display:none;margin-bottom:8px">
-        ${isFxBill ? `<label style="font-size:10px">Return amount in the invoice's currency (${esc(refBill.fx.currency)}) — original booking rate (${refBill.fx.rate}) is used automatically</label>
-          <input id="pr64-fx-amt-${r.id}" type="number" min="0" step="0.01" value="${+(r.amount / (refBill && refBill.fx ? refBill.fx.rate : 1)).toFixed(2)}" style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;padding:7px 9px;font-size:12px;color:var(--text);outline:none"/>` : ''}
+        ${isFxBill ? `<label style="font-size:10px">Return amount in the purchase's currency (${esc(refBill.fx.currency)}) — original rate was ${refBill.fx.rate}</label>
+          <input id="pr64-fx-amt-${r.id}" type="number" min="0" step="0.01" value="${+(r.amount / refBill.fx.rate).toFixed(2)}" style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;padding:7px 9px;font-size:12px;color:var(--text);outline:none"/>
+          <div id="pr64-fx-rate-wrap-${r.id}" style="display:none;margin-top:8px">
+            <label style="font-size:10px">Today's settlement rate (1 ${esc(refBill.fx.currency)} = ? ${esc((typeof BASE_CURRENCY !== 'undefined' && BASE_CURRENCY) || '')}) — the rate has likely moved since the original purchase; this decides the FX gain/loss on the refund</label>
+            <input id="pr64-fx-settle-rate-${r.id}" type="number" min="0" step="0.0001" value="${liveRate ? liveRate : refBill.fx.rate}" style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;padding:7px 9px;font-size:12px;color:var(--text);outline:none"/>
+          </div>` : ''}
       </div>
       <div id="pr64-refund-wrap-${r.id}" style="display:none;margin-bottom:8px">
-        <label style="font-size:10px">Refund into</label>
+        <label style="font-size:10px">Refund into${isFxBill ? (' (pick Cash/Mobile/Bank, or a ' + esc(refBill.fx.currency) + ' account)') : ''}</label>
         <select id="pr64-refund-acct-${r.id}" style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;padding:7px 9px;font-size:12px;color:var(--text);outline:none">
           <option value="cash">Cash</option><option value="mobile">Mobile Money</option><option value="bank">Bank Account</option>
         </select>
@@ -419,6 +452,8 @@
     const refEntry = r.refEntryId ? DB.entries.find(function (e) { return e.id === r.refEntryId; }) : null;
 
     let returnBase, foreignAmt = null, foreignCurrency = null;
+    let refundActualAmt = null; // only set for a refund referencing a foreign purchase — overrides the debit side
+    let fxGainLoss = null;      // {type:'gain'|'loss', amt} — only for that same case
     if (method === 'reduceInvoice') {
       if (!refBill || refBill.remaining <= 0.01) { if (stEl) stEl.innerHTML = '<span style="color:var(--red3)">That invoice no longer has an open balance — use a refund or supplier credit instead</span>'; return; }
       if (refBill.fx) {
@@ -432,6 +467,29 @@
         returnBase = amtEl ? parseFloat(amtEl.value) || 0 : 0;
       }
       if (returnBase > refBill.remaining + 0.01) { if (stEl) stEl.innerHTML = `<span style="color:var(--red3)">Amount (${fmtMoney(returnBase)}) is more than what's still open on that invoice (${fmtMoney(refBill.remaining)})</span>`; return; }
+    } else if (method === 'refund' && refBill && refBill.fx) {
+      // The scenario this branch exists for: bought cash, foreign currency
+      // (possibly from a foreign account), damaged goods returned, supplier
+      // refunds — but the FX rate has moved between the original purchase
+      // and the refund landing. The return is still valued at the ORIGINAL
+      // rate (same principle as every other return in this app — a return
+      // is a partial reversal, not a new transaction) for what comes OFF
+      // the books (returnBase, below). But the CASH actually received today
+      // is valued at TODAY's rate — the difference between those two is a
+      // genuine Realized FX Gain/Loss, posted exactly the way Pay Supplier
+      // already does it for the payment side (patch-v36), just mirrored for
+      // money coming IN instead of going out.
+      const fxAmtEl = document.getElementById('pr64-fx-amt-' + id);
+      const fxAmt = fxAmtEl ? parseFloat(fxAmtEl.value) || 0 : 0;
+      if (fxAmt <= 0) { if (stEl) stEl.innerHTML = '<span style="color:var(--red3)">Enter the return amount in the purchase\'s currency</span>'; return; }
+      const rateEl = document.getElementById('pr64-fx-settle-rate-' + id);
+      const settleRate = rateEl ? parseFloat(rateEl.value) || 0 : 0;
+      if (!settleRate) { if (stEl) stEl.innerHTML = '<span style="color:var(--red3)">Enter today\'s settlement rate</span>'; return; }
+      returnBase = +(fxAmt * refBill.fx.rate).toFixed(2);       // off the books at the ORIGINAL rate
+      refundActualAmt = +(fxAmt * settleRate).toFixed(2);       // actually received today, at TODAY's rate
+      foreignAmt = fxAmt; foreignCurrency = refBill.fx.currency;
+      const net = +(refundActualAmt - returnBase).toFixed(2);
+      if (Math.abs(net) > 0.01) fxGainLoss = { type: net > 0 ? 'gain' : 'loss', amt: Math.abs(net) };
     } else {
       const amtEl = document.getElementById('pr64-amt-' + id);
       returnBase = amtEl ? parseFloat(amtEl.value) || 0 : 0;
@@ -463,20 +521,31 @@
     } else if (method === 'refund') {
       const acctSel = document.getElementById('pr64-refund-acct-' + id);
       const acctVal = acctSel ? acctSel.value : 'cash';
+      const debitAmt = refundActualAmt != null ? refundActualAmt : returnBase;
       if (acctVal.indexOf('foreign:') === 0) {
         const acctId = acctVal.split(':')[1];
         const foreignAcct = (typeof FOREIGN_ACCOUNTS !== 'undefined' ? FOREIGN_ACCOUNTS : []).find(function (a) { return String(a.id) === String(acctId); });
         if (!foreignAcct) { if (stEl) stEl.innerHTML = '<span style="color:var(--red3)">Selected account not found</span>'; return; }
-        const rate = (typeof fxCrossRate === 'function') ? fxCrossRate(foreignAcct.currency) : null;
-        if (!rate) { if (stEl) stEl.innerHTML = `<span style="color:var(--red3)">No known rate for ${foreignAcct.currency} today</span>`; return; }
-        debitLine = { acct: foreignAccountGLName(foreignAcct), amt: returnBase, atype: 'asset', foreignAmt: +(returnBase / rate).toFixed(4), currency: foreignAcct.currency };
+        if (foreignCurrency && foreignAcct.currency !== foreignCurrency) { if (stEl) stEl.innerHTML = `<span style="color:var(--red3)">This return is in ${foreignCurrency} — pick Cash/Mobile/Bank or a ${foreignCurrency} account, not ${foreignAcct.currency}</span>`; return; }
+        let debitForeignAmt;
+        if (foreignAmt != null) {
+          debitForeignAmt = foreignAmt; // exact units actually received, from the settlement fields above
+        } else {
+          const rate = (typeof fxCrossRate === 'function') ? fxCrossRate(foreignAcct.currency) : null;
+          if (!rate) { if (stEl) stEl.innerHTML = `<span style="color:var(--red3)">No known rate for ${foreignAcct.currency} today</span>`; return; }
+          debitForeignAmt = +(debitAmt / rate).toFixed(4);
+        }
+        debitLine = { acct: foreignAccountGLName(foreignAcct), amt: debitAmt, atype: 'asset', foreignAmt: debitForeignAmt, currency: foreignAcct.currency };
       } else {
         const payAcctMap = { cash: 'Cash', mobile: 'Mobile Money', bank: 'Bank Account' };
-        debitLine = { acct: payAcctMap[acctVal] || 'Cash', amt: returnBase, atype: 'asset' };
+        debitLine = { acct: payAcctMap[acctVal] || 'Cash', amt: debitAmt, atype: 'asset' };
       }
     } else { // credit
       debitLine = { acct: 'Supplier Credit Receivable (' + r.supplierName + ')', amt: returnBase, atype: 'asset' };
     }
+    const debitsArr = [debitLine];
+    if (fxGainLoss && fxGainLoss.type === 'loss') debitsArr.push({ acct: 'Realized FX Loss', amt: fxGainLoss.amt, atype: 'expense' });
+    if (fxGainLoss && fxGainLoss.type === 'gain') credits.push({ acct: 'Realized FX Gain', amt: fxGainLoss.amt, atype: 'income' });
 
     const returnNumber = nextPrNumberV64();
     const creditNoteEl = document.getElementById('pr64-creditnote-' + id);
@@ -485,9 +554,9 @@
 
     const returnEntry = {
       id: DB.nextId++, date: todayStr(),
-      desc: 'Purchase Return (' + returnNumber + ', ' + r.drNumber + ') — ' + r.supplierName + (refEntry ? (' — ref: ' + refEntry.desc) : '') + ' — settled: ' + settleLabel,
+      desc: 'Purchase Return (' + returnNumber + ', ' + r.drNumber + ') — ' + r.supplierName + (refEntry ? (' — ref: ' + refEntry.desc) : '') + ' — settled: ' + settleLabel + (fxGainLoss ? (' — Realized FX ' + (fxGainLoss.type === 'gain' ? 'Gain' : 'Loss') + ' ' + fmtMoney(fxGainLoss.amt)) : ''),
       type: 'Purchase Return', amount: returnBase, returnNumber: returnNumber, returnOf: method === 'reduceInvoice' ? r.refEntryId : null,
-      debits: [debitLine], credits: credits,
+      debits: debitsArr, credits: credits,
       party: { type: 'supplier', id: r.supplierId, name: r.supplierName },
       drNumber: r.drNumber, settlementMethod: method, creditNoteRef: creditNoteRef
     };
