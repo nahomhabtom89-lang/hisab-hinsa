@@ -861,25 +861,52 @@
   };
 
   // ── Suppliers page — surface the same credit balance there too, not
-  // just buried inside Purchase Returns. renderSupplierList() is a plain
-  // top-level declaration in index.html itself (not inside any IIFE), so
-  // reassigning window.renderSupplierList is safe (Lesson 2) — this is a
-  // superset redefinition adding one column + a jump link, everything
-  // else byte-for-byte the same as the original. ─────────────────────
-  window.renderSupplierList = function () {
-    const el = document.getElementById('supplierList'); if (!el) return;
-    if (!SUPPLIERS.length) { el.innerHTML = '<div style="text-align:center;padding:14px;color:var(--text3)">No suppliers yet</div>'; return; }
-    const bal = getPartyBalances('supplier');
-    el.innerHTML = `<table><thead><tr><th>Name</th><th>Contact</th><th>AP Balance</th><th>💳 Credit</th><th></th></tr></thead><tbody>${
-      SUPPLIERS.map(function (s) {
-        const credit = window.getSupplierCreditBalanceV64(s.name);
-        const creditCell = credit > 0.01
-          ? `<span style="font-family:'JetBrains Mono',monospace;color:var(--green3)">${fmtMoney(credit)}</span> <button class="btn btn-outline" style="font-size:9px;padding:2px 6px" onclick="jumpToSupplierCreditV64('${esc(s.name)}')">use</button>`
+  // just buried inside Purchase Returns.
+  //
+  // CORRECTED: renderSupplierList is a plain top-level declaration in
+  // index.html, but by the time THIS file loads, patch-v19.js has
+  // already wrapped window.renderSupplierList itself (to inject its own
+  // "💳 Pay" button next to each supplier via DOM insertion after the
+  // base render). Fully reassigning window.renderSupplierList here (as
+  // an earlier version of this patch did) silently discarded that whole
+  // chain and v19's Pay button along with it — exactly the mistake
+  // Lesson 2 warns about. Fixed: capture and CALL whatever
+  // window.renderSupplierList currently is (v19's wrapper, which itself
+  // calls the true original), then layer the Credit column on top via
+  // DOM insertion only — never touching the row's existing buttons. ──
+  const _origRenderSupplierListV64 = window.renderSupplierList;
+  if (typeof _origRenderSupplierListV64 === 'function') {
+    window.renderSupplierList = function () {
+      const result = _origRenderSupplierListV64.apply(this, arguments);
+      const table = document.querySelector('#supplierList table');
+      if (!table) return result;
+      const headRow = table.querySelector('thead tr');
+      if (headRow && !headRow.querySelector('.pr64-credit-th')) {
+        const th = document.createElement('th');
+        th.className = 'pr64-credit-th';
+        th.textContent = '💳 Credit';
+        const lastTh = headRow.lastElementChild;
+        if (lastTh) headRow.insertBefore(th, lastTh); else headRow.appendChild(th);
+      }
+      table.querySelectorAll('tbody tr').forEach(function (tr) {
+        if (tr.querySelector('.pr64-credit-td')) return; // already added this render pass
+        const ledgerBtn = tr.querySelector('[onclick^="togglePartyLedger(\'supplier\'"]');
+        if (!ledgerBtn) return;
+        const m = /togglePartyLedger\('supplier',(\d+)\)/.exec(ledgerBtn.getAttribute('onclick') || '');
+        if (!m) return;
+        const supplier = (typeof SUPPLIERS !== 'undefined' ? SUPPLIERS : []).find(function (s) { return String(s.id) === m[1]; });
+        const credit = supplier ? window.getSupplierCreditBalanceV64(supplier.name) : 0;
+        const td = document.createElement('td');
+        td.className = 'pr64-credit-td';
+        td.innerHTML = credit > 0.01
+          ? `<span style="font-family:'JetBrains Mono',monospace;color:var(--green3)">${fmtMoney(credit)}</span> <button class="btn btn-outline" style="font-size:9px;padding:2px 6px" onclick="jumpToSupplierCreditV64('${esc(supplier.name)}')">use</button>`
           : `<span style="color:var(--text3)">—</span>`;
-        return `<tr><td style="font-weight:500">${esc(s.name)}</td><td style="color:var(--text3);font-size:11px">${esc(s.contact) || '—'}</td><td style="font-family:'JetBrains Mono',monospace;color:${(bal[s.id] || 0) > 0 ? 'var(--orange3)' : 'var(--text3)'}">${fmtMoney(bal[s.id] || 0)}</td><td>${creditCell}</td><td style="white-space:nowrap"><button class="btn btn-outline" style="font-size:10px;padding:3px 7px;margin-right:4px" onclick="togglePartyLedger('supplier',${s.id})">📒 Ledger</button><button class="btn btn-danger" style="font-size:10px;padding:3px 7px" onclick="deleteSupplier(${s.id})">✕</button></td></tr>`;
-      }).join('')
-    }</tbody></table>`;
-  };
+        const lastTd = tr.lastElementChild; // actions cell (Pay/Ledger/✕)
+        if (lastTd) tr.insertBefore(td, lastTd); else tr.appendChild(td);
+      });
+      return result;
+    };
+  }
 
   window.jumpToSupplierCreditV64 = async function (supplierName) {
     await nav('purchreturns');
