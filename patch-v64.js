@@ -644,6 +644,9 @@
             </select>
           </div>
         </div>
+        <div style="font-size:10px;color:var(--text3);margin-bottom:4px">Items being returned:</div>
+        <div id="pr64-lines"></div>
+        <button type="button" class="btn btn-outline" style="padding:5px 10px;font-size:11px;margin-bottom:10px" onclick="addPRLineV64()">+ Add Item</button>
         <div style="margin-bottom:8px">
           <div class="fg" style="margin:0"><label style="font-size:10px">Reason</label>
             <select id="pr64-reason" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--text);outline:none"></select>
@@ -656,9 +659,6 @@
           <label style="margin-left:10px"><input type="radio" name="pr64-freight" value="us" checked/> Us</label>
           <label style="margin-left:10px"><input type="radio" name="pr64-freight" value="supplier"/> Supplier</label>
         </div>
-        <div style="font-size:10px;color:var(--text3);margin-bottom:4px">Items being returned:</div>
-        <div id="pr64-lines"></div>
-        <button type="button" class="btn btn-outline" style="padding:5px 10px;font-size:11px;margin-bottom:10px" onclick="addPRLineV64()">+ Add Item</button>
         <div><button class="btn btn-gold" onclick="createPurchaseReturnRequestV64()">✅ Create Return Request</button></div>
         <div id="pr64-st" style="margin-top:8px;font-size:12px"></div>
       </div>
