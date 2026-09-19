@@ -541,6 +541,7 @@
         <div style="display:flex;align-items:center;gap:8px">
           <span style="font-family:'JetBrains Mono',monospace;color:var(--green3)">${fmtMoney(bal)}</span>
           <button class="btn btn-outline" style="padding:4px 10px;font-size:11px" onclick="openApplyCreditV64('${esc(name)}')">Apply to a bill</button>
+          <button class="btn btn-outline" style="padding:4px 10px;font-size:11px" onclick="openCashOutCreditV64('${esc(name)}')">💵 Cash it out</button>
         </div>
       </div>`;
     }).join('');
@@ -596,6 +597,71 @@
     await saveData();
     renderAll();
     if (typeof showToast === 'function') showToast('✅ ' + fmtMoney(amt) + ' of ' + supplierName + "'s credit applied to " + bill.desc);
+    wrap.style.display = 'none';
+    renderSupplierCreditBalancesV64();
+  };
+
+  // ── Cash It Out — for exactly the case where you don't have (or don't
+  // want to wait for) a new bill from that supplier to apply the credit
+  // against: e.g. you buy on cash from them, so there's no AP bill to
+  // reduce. This converts some/all of the standing credit into real cash
+  // in hand — Dr the chosen cash/bank/foreign account, Cr the same
+  // "Supplier Credit Receivable" account the original return credited,
+  // so the derived balance (window.getSupplierCreditBalanceV64) drops by
+  // exactly the amount cashed out. Structurally identical to a normal
+  // refund-settled return, just not tied to a specific return event. ──
+  window.openCashOutCreditV64 = function (supplierName) {
+    const wrap = document.getElementById('pr64-cashout-wrap'); if (!wrap) return;
+    wrap.style.display = 'block';
+    wrap.dataset.supplierName = supplierName;
+    const bal = window.getSupplierCreditBalanceV64(supplierName);
+    document.getElementById('pr64-cashout-hdr').textContent = 'Cash out ' + supplierName + "'s credit (" + fmtMoney(bal) + ' available)';
+    const acctSel = document.getElementById('pr64-cashout-acct');
+    acctSel.innerHTML = '<option value="cash">Cash</option><option value="mobile">Mobile Money</option><option value="bank">Bank Account</option>';
+    if (typeof appendForeignAccountOptions === 'function') appendForeignAccountOptions('pr64-cashout-acct');
+    document.getElementById('pr64-cashout-amt').value = bal;
+    document.getElementById('pr64-cashout-st').innerHTML = '';
+    wrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  };
+
+  window.cashOutSupplierCreditV64 = async function () {
+    const wrap = document.getElementById('pr64-cashout-wrap');
+    const st = document.getElementById('pr64-cashout-st');
+    const supplierName = wrap.dataset.supplierName;
+    const amtEl = document.getElementById('pr64-cashout-amt');
+    const amt = amtEl ? parseFloat(amtEl.value) || 0 : 0;
+    if (amt <= 0) { st.innerHTML = '<span style="color:var(--red3)">Enter an amount</span>'; return; }
+    const available = window.getSupplierCreditBalanceV64(supplierName);
+    if (amt > available + 0.01) { st.innerHTML = `<span style="color:var(--red3)">Only ${fmtMoney(available)} credit is available</span>`; return; }
+
+    const acctSel = document.getElementById('pr64-cashout-acct');
+    const acctVal = acctSel ? acctSel.value : 'cash';
+    let debitLine;
+    if (acctVal.indexOf('foreign:') === 0) {
+      const acctId = acctVal.split(':')[1];
+      const foreignAcct = (typeof FOREIGN_ACCOUNTS !== 'undefined' ? FOREIGN_ACCOUNTS : []).find(function (a) { return String(a.id) === String(acctId); });
+      if (!foreignAcct) { st.innerHTML = '<span style="color:var(--red3)">Selected account not found</span>'; return; }
+      const rate = (typeof fxCrossRate === 'function') ? fxCrossRate(foreignAcct.currency) : null;
+      if (!rate) { st.innerHTML = `<span style="color:var(--red3)">No known rate for ${foreignAcct.currency} today</span>`; return; }
+      debitLine = { acct: foreignAccountGLName(foreignAcct), amt: amt, atype: 'asset', foreignAmt: +(amt / rate).toFixed(4), currency: foreignAcct.currency };
+    } else {
+      const payAcctMap = { cash: 'Cash', mobile: 'Mobile Money', bank: 'Bank Account' };
+      debitLine = { acct: payAcctMap[acctVal] || 'Cash', amt: amt, atype: 'asset' };
+    }
+
+    const cashoutEntry = {
+      id: DB.nextId++, date: todayStr(),
+      desc: 'Supplier Credit Cashed Out — ' + supplierName,
+      type: 'Supplier Credit Cashout', amount: amt,
+      debits: [debitLine],
+      credits: [{ acct: 'Supplier Credit Receivable (' + supplierName + ')', amt: amt, atype: 'asset' }],
+      party: { type: 'supplier', id: wrap.dataset.supplierId || '', name: supplierName }
+    };
+    DB.entries.push(cashoutEntry);
+
+    await saveData();
+    renderAll();
+    if (typeof showToast === 'function') showToast('✅ ' + fmtMoney(amt) + ' of ' + supplierName + "'s credit cashed out");
     wrap.style.display = 'none';
     renderSupplierCreditBalancesV64();
   };
@@ -700,6 +766,17 @@
           <div><button class="btn btn-gold" onclick="applySupplierCreditV64()">✔️ Apply Credit</button></div>
           <div id="pr64-apply-credit-st" style="margin-top:6px;font-size:11px"></div>
         </div>
+        <div id="pr64-cashout-wrap" style="display:none;margin-top:10px;padding:10px;background:var(--bg3);border-radius:8px">
+          <div id="pr64-cashout-hdr" style="font-size:12px;font-weight:600;margin-bottom:8px"></div>
+          <div class="fg" style="margin-bottom:8px"><label style="font-size:10px">Into</label>
+            <select id="pr64-cashout-acct" style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;padding:7px 9px;font-size:12px;color:var(--text);outline:none"></select>
+          </div>
+          <div class="fg" style="margin-bottom:8px"><label style="font-size:10px">Amount</label>
+            <input id="pr64-cashout-amt" type="number" min="0" step="0.01" style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;padding:7px 9px;font-size:12px;color:var(--text);outline:none"/>
+          </div>
+          <div><button class="btn btn-gold" onclick="cashOutSupplierCreditV64()">✔️ Cash It Out</button></div>
+          <div id="pr64-cashout-st" style="margin-top:6px;font-size:11px"></div>
+        </div>
       </div>
 
       <div class="card"><div class="card-hdr">Return Requests</div><div id="pr64-list"></div></div>
@@ -781,6 +858,33 @@
       'Return freight borne by: ' + (r.freightBorneBy === 'supplier' ? 'Supplier' : 'Us') + '\n\n' +
       'Please confirm you accept this return so we can proceed.';
     window.open('https://wa.me/?text=' + encodeURIComponent(summaryText), '_blank');
+  };
+
+  // ── Suppliers page — surface the same credit balance there too, not
+  // just buried inside Purchase Returns. renderSupplierList() is a plain
+  // top-level declaration in index.html itself (not inside any IIFE), so
+  // reassigning window.renderSupplierList is safe (Lesson 2) — this is a
+  // superset redefinition adding one column + a jump link, everything
+  // else byte-for-byte the same as the original. ─────────────────────
+  window.renderSupplierList = function () {
+    const el = document.getElementById('supplierList'); if (!el) return;
+    if (!SUPPLIERS.length) { el.innerHTML = '<div style="text-align:center;padding:14px;color:var(--text3)">No suppliers yet</div>'; return; }
+    const bal = getPartyBalances('supplier');
+    el.innerHTML = `<table><thead><tr><th>Name</th><th>Contact</th><th>AP Balance</th><th>💳 Credit</th><th></th></tr></thead><tbody>${
+      SUPPLIERS.map(function (s) {
+        const credit = window.getSupplierCreditBalanceV64(s.name);
+        const creditCell = credit > 0.01
+          ? `<span style="font-family:'JetBrains Mono',monospace;color:var(--green3)">${fmtMoney(credit)}</span> <button class="btn btn-outline" style="font-size:9px;padding:2px 6px" onclick="jumpToSupplierCreditV64('${esc(s.name)}')">use</button>`
+          : `<span style="color:var(--text3)">—</span>`;
+        return `<tr><td style="font-weight:500">${esc(s.name)}</td><td style="color:var(--text3);font-size:11px">${esc(s.contact) || '—'}</td><td style="font-family:'JetBrains Mono',monospace;color:${(bal[s.id] || 0) > 0 ? 'var(--orange3)' : 'var(--text3)'}">${fmtMoney(bal[s.id] || 0)}</td><td>${creditCell}</td><td style="white-space:nowrap"><button class="btn btn-outline" style="font-size:10px;padding:3px 7px;margin-right:4px" onclick="togglePartyLedger('supplier',${s.id})">📒 Ledger</button><button class="btn btn-danger" style="font-size:10px;padding:3px 7px" onclick="deleteSupplier(${s.id})">✕</button></td></tr>`;
+      }).join('')
+    }</tbody></table>`;
+  };
+
+  window.jumpToSupplierCreditV64 = async function (supplierName) {
+    await nav('purchreturns');
+    const el = document.getElementById('pr64-credit-list');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
 
   // ── Sidebar (both modes, both languages) ──────────────────────────
