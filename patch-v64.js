@@ -189,6 +189,29 @@
       return `<option value="${p.id}" data-cost="${p.cost_price || 0}" data-name="${esc(p.name)}" data-sku="${esc(p.sku || '')}">${esc(p.name)}</option>`;
     }).join('');
   }
+  // A row's dropdown is only built once, at the moment "+ Add Item" is
+  // clicked. If that happens BEFORE a new product's stock receipt has
+  // finished posting (and reloaded RETAIL_PRODUCTS from the server),
+  // that row's <select> is a snapshot from before the product existed —
+  // it never updates on its own. Fix: refresh every currently-open row's
+  // options (preserving whatever's selected) any time the app's own
+  // product list reloads — same pattern as the base app's own
+  // refreshUdocProductDropdowns()/refreshManualIntakeProductDropdowns().
+  function refreshPR64ProductDropdowns() {
+    document.querySelectorAll('.pr64-line-product').forEach(function (sel) {
+      const prev = sel.value;
+      sel.innerHTML = productPickerOptionsV64();
+      if (prev && (RETAIL_PRODUCTS || []).some(function (p) { return String(p.id) === String(prev); })) sel.value = prev;
+    });
+  }
+  const _origLoadRetailProductsV64 = window.loadRetailProducts;
+  if (typeof _origLoadRetailProductsV64 === 'function') {
+    window.loadRetailProducts = async function () {
+      const result = await _origLoadRetailProductsV64.apply(this, arguments);
+      refreshPR64ProductDropdowns();
+      return result;
+    };
+  }
   window.addPRLineV64 = function () {
     const wrap = document.getElementById('pr64-lines'); if (!wrap) return;
     const rowId = 'prline64-' + (++_prLineSeq);
@@ -701,6 +724,8 @@
     }
     #pr-print-content-v64 table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px}
     #pr-print-content-v64 th,#pr-print-content-v64 td{border:1px solid #999;padding:6px 8px;text-align:left}
+    #pr-print-content-v64 td, #pr-print-content-v64 th { color:#111 !important; }
+    #pr-print-content-v64 th { background:#eee; font-weight:700; }
   `;
   document.head.appendChild(_prPrintStyleV64);
 
