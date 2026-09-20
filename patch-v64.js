@@ -376,9 +376,16 @@
 
   window.onPRConfirmSettlementChangeV64 = function (id) {
     const method = (document.querySelector('input[name="pr64-settle-' + id + '"]:checked') || {}).value;
+    const panel = document.getElementById('pr64-confirm-' + id);
+    const isFxBillStatic = !!(panel && panel.dataset.isFxBill === '1');
+    const manualCb = document.getElementById('pr64-manual-fx-' + id);
+    const manualChecked = !!(manualCb && manualCb.checked);
+    const manualFieldsWrap = document.getElementById('pr64-manual-fx-fields-' + id);
+    if (manualFieldsWrap) manualFieldsWrap.style.display = manualChecked ? 'grid' : 'none';
+
     const fxWrap = document.getElementById('pr64-fx-wrap-' + id);
     const refundWrap = document.getElementById('pr64-refund-wrap-' + id);
-    const isFxDriven = fxWrap && fxWrap.querySelector('input') && (method === 'reduceInvoice' || method === 'refund');
+    const isFxDriven = (isFxBillStatic || manualChecked) && (method === 'reduceInvoice' || method === 'refund');
     if (fxWrap) fxWrap.style.display = isFxDriven ? 'block' : 'none';
     if (refundWrap) refundWrap.style.display = (method === 'refund') ? 'block' : 'none';
     const rateWrap = document.getElementById('pr64-fx-rate-wrap-' + id);
@@ -391,13 +398,33 @@
     }
   };
 
+  // Reads the manual FX override fields, when the checkbox is on — for a
+  // referenced purchase that has no refBill.fx at all because it was
+  // never tagged at the time (a real, pre-existing base-app gap: a cash-
+  // paid foreign-currency purchase never got its rate recorded — see
+  // patch-v66.js for the forward-looking fix to that). This lets an
+  // already-posted, untagged purchase still get correct FX gain/loss
+  // treatment on its return, as long as the person confirms what the
+  // original currency and rate actually were.
+  function readManualFxV64(id) {
+    const cb = document.getElementById('pr64-manual-fx-' + id);
+    if (!cb || !cb.checked) return null;
+    const curEl = document.getElementById('pr64-manual-fx-currency-' + id);
+    const rateEl = document.getElementById('pr64-manual-fx-origrate-' + id);
+    const currency = curEl ? curEl.value.trim().toUpperCase() : '';
+    const rate = rateEl ? parseFloat(rateEl.value) || 0 : 0;
+    if (!currency || !rate) return null;
+    return { currency: currency, rate: rate };
+  }
+
   function confirmPanelHtml(r) {
     const bills = r.supplierId ? allSupplierBillsV64(r.supplierId) : [];
     const refBill = r.refEntryId ? bills.find(function (b) { return b.id === r.refEntryId; }) : null;
     const canReduceInvoice = !!(refBill && refBill.remaining > 0.01);
     const isFxBill = !!(refBill && refBill.fx);
     const liveRate = (isFxBill && typeof fxCrossRate === 'function') ? fxCrossRate(refBill.fx.currency) : null;
-    return `<div class="pr64-confirm-panel" id="pr64-confirm-${r.id}" style="display:none;background:var(--bg3);border-radius:8px;padding:12px;margin-top:6px">
+    const baseCcy = esc((typeof BASE_CURRENCY !== 'undefined' && BASE_CURRENCY) || '');
+    return `<div class="pr64-confirm-panel" id="pr64-confirm-${r.id}" data-is-fx-bill="${isFxBill ? '1' : '0'}" style="display:none;background:var(--bg3);border-radius:8px;padding:12px;margin-top:6px">
       <div style="font-size:12px;font-weight:600;margin-bottom:8px">Supplier agreed — how is this settled?</div>
       <div style="display:flex;flex-direction:column;gap:6px;font-size:12px;margin-bottom:8px">
         <label style="display:flex;align-items:center;gap:6px;${canReduceInvoice ? '' : 'opacity:0.45'}">
@@ -413,13 +440,23 @@
           Stays as credit with supplier (apply to a future purchase)
         </label>
       </div>
+      ${(refBill && !isFxBill) ? `<div style="margin-bottom:8px;font-size:11px">
+        <label style="display:flex;align-items:center;gap:6px">
+          <input type="checkbox" id="pr64-manual-fx-${r.id}" onchange="onPRConfirmSettlementChangeV64(${r.id})"/>
+          This purchase was actually foreign-currency (its rate wasn't recorded at the time) — enter it manually
+        </label>
+        <div id="pr64-manual-fx-fields-${r.id}" style="display:none;grid-template-columns:110px 1fr;gap:8px;margin-top:6px">
+          <input id="pr64-manual-fx-currency-${r.id}" type="text" placeholder="e.g. USD" maxlength="6" style="background:var(--bg2);border:1px solid var(--border2);border-radius:6px;padding:7px 9px;font-size:12px;color:var(--text);outline:none;text-transform:uppercase"/>
+          <input id="pr64-manual-fx-origrate-${r.id}" type="number" min="0" step="0.0001" placeholder="Original rate at purchase time" style="background:var(--bg2);border:1px solid var(--border2);border-radius:6px;padding:7px 9px;font-size:12px;color:var(--text);outline:none"/>
+        </div>
+      </div>` : ''}
       <div id="pr64-fx-wrap-${r.id}" style="display:none;margin-bottom:8px">
-        ${isFxBill ? `<label style="font-size:10px">Return amount in the purchase's currency (${esc(refBill.fx.currency)}) — original rate was ${refBill.fx.rate}</label>
-          <input id="pr64-fx-amt-${r.id}" type="number" min="0" step="0.01" value="${+(r.amount / refBill.fx.rate).toFixed(2)}" style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;padding:7px 9px;font-size:12px;color:var(--text);outline:none"/>
-          <div id="pr64-fx-rate-wrap-${r.id}" style="display:none;margin-top:8px">
-            <label style="font-size:10px">Today's settlement rate (1 ${esc(refBill.fx.currency)} = ? ${esc((typeof BASE_CURRENCY !== 'undefined' && BASE_CURRENCY) || '')}) — the rate has likely moved since the original purchase; this decides the FX gain/loss on the refund</label>
-            <input id="pr64-fx-settle-rate-${r.id}" type="number" min="0" step="0.0001" value="${liveRate ? liveRate : refBill.fx.rate}" style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;padding:7px 9px;font-size:12px;color:var(--text);outline:none"/>
-          </div>` : ''}
+        <label style="font-size:10px" id="pr64-fx-amt-label-${r.id}">Return amount in the purchase's currency${isFxBill ? (' (' + esc(refBill.fx.currency) + ') — original rate was ' + refBill.fx.rate) : ''}</label>
+        <input id="pr64-fx-amt-${r.id}" type="number" min="0" step="0.01" value="${isFxBill ? (+(r.amount / refBill.fx.rate).toFixed(2)) : ''}" style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;padding:7px 9px;font-size:12px;color:var(--text);outline:none"/>
+        <div id="pr64-fx-rate-wrap-${r.id}" style="display:none;margin-top:8px">
+          <label style="font-size:10px">Today's settlement rate${isFxBill ? (' (1 ' + esc(refBill.fx.currency) + ' = ? ' + baseCcy + ')') : ''} — the rate has likely moved since the original purchase; this decides the FX gain/loss on the refund</label>
+          <input id="pr64-fx-settle-rate-${r.id}" type="number" min="0" step="0.0001" value="${isFxBill ? (liveRate ? liveRate : refBill.fx.rate) : ''}" style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:6px;padding:7px 9px;font-size:12px;color:var(--text);outline:none"/>
+        </div>
       </div>
       <div id="pr64-refund-wrap-${r.id}" style="display:none;margin-bottom:8px">
         <label style="font-size:10px">Refund into${isFxBill ? (' (pick Cash/Mobile/Bank, or a ' + esc(refBill.fx.currency) + ' account)') : ''}</label>
@@ -451,43 +488,51 @@
     const refBill = r.refEntryId ? bills.find(function (b) { return b.id === r.refEntryId; }) : null;
     const refEntry = r.refEntryId ? DB.entries.find(function (e) { return e.id === r.refEntryId; }) : null;
 
+    const manualFxCb = document.getElementById('pr64-manual-fx-' + id);
+    if (manualFxCb && manualFxCb.checked && !readManualFxV64(id)) { if (stEl) stEl.innerHTML = '<span style="color:var(--red3)">Enter both the currency and the original rate, or uncheck the manual override</span>'; return; }
+    const effectiveFx = (refBill && refBill.fx) ? refBill.fx : readManualFxV64(id);
+
     let returnBase, foreignAmt = null, foreignCurrency = null;
     let refundActualAmt = null; // only set for a refund referencing a foreign purchase — overrides the debit side
     let fxGainLoss = null;      // {type:'gain'|'loss', amt} — only for that same case
     if (method === 'reduceInvoice') {
       if (!refBill || refBill.remaining <= 0.01) { if (stEl) stEl.innerHTML = '<span style="color:var(--red3)">That invoice no longer has an open balance — use a refund or supplier credit instead</span>'; return; }
-      if (refBill.fx) {
+      if (effectiveFx) {
         const fxAmtEl = document.getElementById('pr64-fx-amt-' + id);
         const fxAmt = fxAmtEl ? parseFloat(fxAmtEl.value) || 0 : 0;
         if (fxAmt <= 0) { if (stEl) stEl.innerHTML = '<span style="color:var(--red3)">Enter the return amount in the invoice\'s currency</span>'; return; }
-        returnBase = +(fxAmt * refBill.fx.rate).toFixed(2);
-        foreignAmt = fxAmt; foreignCurrency = refBill.fx.currency;
+        returnBase = +(fxAmt * effectiveFx.rate).toFixed(2);
+        foreignAmt = fxAmt; foreignCurrency = effectiveFx.currency;
       } else {
         const amtEl = document.getElementById('pr64-amt-' + id);
         returnBase = amtEl ? parseFloat(amtEl.value) || 0 : 0;
       }
       if (returnBase > refBill.remaining + 0.01) { if (stEl) stEl.innerHTML = `<span style="color:var(--red3)">Amount (${fmtMoney(returnBase)}) is more than what's still open on that invoice (${fmtMoney(refBill.remaining)})</span>`; return; }
-    } else if (method === 'refund' && refBill && refBill.fx) {
+    } else if (method === 'refund' && effectiveFx) {
       // The scenario this branch exists for: bought cash, foreign currency
-      // (possibly from a foreign account), damaged goods returned, supplier
-      // refunds — but the FX rate has moved between the original purchase
-      // and the refund landing. The return is still valued at the ORIGINAL
-      // rate (same principle as every other return in this app — a return
-      // is a partial reversal, not a new transaction) for what comes OFF
-      // the books (returnBase, below). But the CASH actually received today
-      // is valued at TODAY's rate — the difference between those two is a
-      // genuine Realized FX Gain/Loss, posted exactly the way Pay Supplier
-      // already does it for the payment side (patch-v36), just mirrored for
-      // money coming IN instead of going out.
+      // (possibly from a foreign account, or a plain Cash account with the
+      // invoice itself priced in a foreign currency — see patch-v66.js for
+      // why that second case previously lost its rate entirely), damaged
+      // goods returned, supplier refunds — but the FX rate has moved
+      // between the original purchase and the refund landing. The return
+      // is still valued at the ORIGINAL rate (same principle as every
+      // other return in this app — a return is a partial reversal, not a
+      // new transaction) for what comes OFF the books (returnBase, below).
+      // But the CASH actually received today is valued at TODAY's rate —
+      // the difference between those two is a genuine Realized FX
+      // Gain/Loss, posted exactly the way Pay Supplier already does it for
+      // the payment side (patch-v36), just mirrored for money coming IN.
+      // effectiveFx may come from refBill.fx (tagged automatically) OR
+      // from the manual override fields (for an older, untagged entry).
       const fxAmtEl = document.getElementById('pr64-fx-amt-' + id);
       const fxAmt = fxAmtEl ? parseFloat(fxAmtEl.value) || 0 : 0;
       if (fxAmt <= 0) { if (stEl) stEl.innerHTML = '<span style="color:var(--red3)">Enter the return amount in the purchase\'s currency</span>'; return; }
       const rateEl = document.getElementById('pr64-fx-settle-rate-' + id);
       const settleRate = rateEl ? parseFloat(rateEl.value) || 0 : 0;
       if (!settleRate) { if (stEl) stEl.innerHTML = '<span style="color:var(--red3)">Enter today\'s settlement rate</span>'; return; }
-      returnBase = +(fxAmt * refBill.fx.rate).toFixed(2);       // off the books at the ORIGINAL rate
-      refundActualAmt = +(fxAmt * settleRate).toFixed(2);       // actually received today, at TODAY's rate
-      foreignAmt = fxAmt; foreignCurrency = refBill.fx.currency;
+      returnBase = +(fxAmt * effectiveFx.rate).toFixed(2);       // off the books at the ORIGINAL rate
+      refundActualAmt = +(fxAmt * settleRate).toFixed(2);        // actually received today, at TODAY's rate
+      foreignAmt = fxAmt; foreignCurrency = effectiveFx.currency;
       const net = +(refundActualAmt - returnBase).toFixed(2);
       if (Math.abs(net) > 0.01) fxGainLoss = { type: net > 0 ? 'gain' : 'loss', amt: Math.abs(net) };
     } else {
@@ -560,7 +605,7 @@
       party: { type: 'supplier', id: r.supplierId, name: r.supplierName },
       drNumber: r.drNumber, settlementMethod: method, creditNoteRef: creditNoteRef
     };
-    if (foreignAmt != null) returnEntry.fx = { currency: foreignCurrency, rate: refBill.fx.rate, originalAmount: foreignAmt };
+    if (foreignAmt != null) returnEntry.fx = { currency: foreignCurrency, rate: effectiveFx.rate, originalAmount: foreignAmt };
     DB.entries.push(returnEntry);
 
     if (method === 'reduceInvoice' && refEntry) {
