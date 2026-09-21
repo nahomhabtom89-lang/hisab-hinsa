@@ -31,7 +31,7 @@
   async function fetchPOSSaleRecordV68(saleId) {
     try {
       const r = await dbApi({ action: 'listPOSSales', companyId: SESSION.companyId, limit: 1000 });
-      return (r.sales || []).find(function (s) { return String(s.journalEntryId) === String(saleId); }) || null;
+      return (r.sales || []).find(function (s) { return String(s.journal_entry_id) === String(saleId); }) || null;
     } catch (e) { console.error('fetchPOSSaleRecordV68', e); return null; }
   }
   function saleItemsV68(s) { return Array.isArray(s.items) ? s.items : (JSON.parse(s.items || '[]')); }
@@ -74,7 +74,7 @@
     const content = document.getElementById('pos-receipt-content-v68');
     if (!content) return;
 
-    const isCredit = record.paymentMethod === 'credit';
+    const isCredit = record.payment_method === 'credit';
     const docTitle = isCredit ? 'INVOICE' : 'CASH RECEIPT';
     const items = saleItemsV68(record);
     const itemsHtml = items.map(function (it) {
@@ -92,7 +92,7 @@
       <div style="font-size:12px;margin-bottom:10px">
         ${customerLine}
         <div><b>Cashier:</b> ${esc(record.cashier || '—')}</div>
-        <div><b>Payment:</b> ${esc(PAY_LABEL_V68[record.paymentMethod] || record.paymentMethod)}</div>
+        <div><b>Payment:</b> ${esc(PAY_LABEL_V68[record.payment_method] || record.payment_method)}</div>
       </div>
       <table><thead><tr><th>Item</th><th style="text-align:center">Qty</th><th style="text-align:right">Price</th><th style="text-align:right">Total</th></tr></thead>
         <tbody>${itemsHtml}</tbody></table>
