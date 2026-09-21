@@ -59,7 +59,7 @@
     return null; // 'all' — no filtering
   }
 
-  function saleDateV65(s) { return String(s.sale_date).split('T')[0]; }
+  function saleDateV65(s) { return String(s.created_at).split('T')[0]; }
   function saleItemsV65(s) { return Array.isArray(s.items) ? s.items : (JSON.parse(s.items || '[]')); }
 
   async function fetchSalesV65() {
