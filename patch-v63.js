@@ -139,8 +139,47 @@
     return null;
   }
 
+  // Resolves a reference DIRECTLY by entry id — deliberately NOT filtered
+  // through a customer's own invoice list. This is what makes "find by
+  // receipt/sale #" work: a cash sale never gets party:{type:'customer'}
+  // attached (see the note at the top of this file), so it could never
+  // appear in allCustomerInvoicesV63(customerId) no matter which
+  // customer was selected on the return. Looking the entry up directly
+  // by its id sidesteps that entirely — the customer picked on the
+  // return request is then just who the credit note is filed under, not
+  // a constraint on which original sale can be referenced.
+  function resolveRefInvoiceV63(entryId) {
+    if (!entryId) return null;
+    const e = (DB.entries || []).find(function (x) { return x.id === entryId; });
+    if (!e) return null;
+    const booked = bookedAmountV63(e);
+    const settled = (typeof getSettledAmountForInvoice === 'function') ? getSettledAmountForInvoice(e.id) : 0;
+    const isAR = (e.debits || []).some(function (l) { return l.acct === 'Accounts Receivable'; });
+    return { id: e.id, date: e.date, desc: e.desc, booked: booked, remaining: +(booked - settled).toFixed(2), fx: entryForeignInfoV63(e), isAR: isAR, party: e.party || null };
+  }
+
+  window.findByReceiptNumberV63 = function () {
+    const input = document.getElementById('sr63-receipt-search');
+    const st = document.getElementById('sr63-receipt-search-st');
+    const num = input ? parseInt(input.value, 10) : null;
+    if (!num) { if (st) st.innerHTML = '<span style="color:var(--red3)">Enter a receipt/sale number</span>'; return; }
+    const e = (DB.entries || []).find(function (x) { return x.id === num && (x.type === 'POS Sale' || x.type === 'Invoice'); });
+    if (!e) { if (st) st.innerHTML = '<span style="color:var(--red3)">No sale/invoice found with that number</span>'; return; }
+    const refSel = document.getElementById('sr63-ref-invoice');
+    if (refSel) {
+      const already = Array.prototype.some.call(refSel.options, function (o) { return o.value === String(e.id); });
+      if (!already) {
+        const opt = document.createElement('option');
+        opt.value = String(e.id);
+        opt.textContent = '#' + e.id + ' · ' + e.desc + (e.party ? '' : ' · walk-in / cash sale');
+        refSel.appendChild(opt);
+      }
+      refSel.value = String(e.id);
+    }
+    if (st) st.innerHTML = `<span style="color:var(--green3)">✅ Found: #${e.id} — ${esc(e.desc)}${e.party ? (' — ' + esc(e.party.name)) : ' — walk-in / cash sale, no customer on file'}</span>`;
+  };
+
   // Every sales entry for a customer — credit (AR) or cash. In practice
-  // this mostly finds credit sales, since a cash POS sale never gets
   // party:{type:'customer',...} attached at all in the base app (see the
   // note at the top of this file) — a stated, honest limitation, not
   // something this function can work around.
@@ -305,6 +344,8 @@
     const refSel = document.getElementById('sr63-ref-invoice'); if (refSel) refSel.innerHTML = '<option value="">— no matching invoice / not sure —</option>';
     const notesEl = document.getElementById('sr63-notes'); if (notesEl) notesEl.value = '';
     const linesEl = document.getElementById('sr63-lines'); if (linesEl) linesEl.innerHTML = '';
+    const searchEl = document.getElementById('sr63-receipt-search'); if (searchEl) searchEl.value = '';
+    const searchSt = document.getElementById('sr63-receipt-search-st'); if (searchSt) searchSt.innerHTML = '';
     const st = document.getElementById('sr63-st'); if (st) st.innerHTML = '';
   }
 
@@ -375,8 +416,7 @@
   }
 
   function confirmPanelHtmlV63(r) {
-    const invoices = r.customerId ? allCustomerInvoicesV63(r.customerId) : [];
-    const refInv = r.refEntryId ? invoices.find(function (b) { return b.id === r.refEntryId; }) : null;
+    const refInv = resolveRefInvoiceV63(r.refEntryId);
     const canReduceInvoice = !!(refInv && refInv.remaining > 0.01);
     const isFxBill = !!(refInv && refInv.fx);
     const liveRate = (isFxBill && typeof fxCrossRate === 'function') ? fxCrossRate(refInv.fx.currency) : null;
@@ -441,8 +481,7 @@
     const method = (document.querySelector('input[name="sr63-settle-' + id + '"]:checked') || {}).value;
     if (!method) { if (stEl) stEl.innerHTML = '<span style="color:var(--red3)">Choose a settlement</span>'; return; }
 
-    const invoices = r.customerId ? allCustomerInvoicesV63(r.customerId) : [];
-    const refInv = r.refEntryId ? invoices.find(function (b) { return b.id === r.refEntryId; }) : null;
+    const refInv = resolveRefInvoiceV63(r.refEntryId);
     const refEntry = r.refEntryId ? DB.entries.find(function (e) { return e.id === r.refEntryId; }) : null;
 
     const manualFxCb = document.getElementById('sr63-manual-fx-' + id);
@@ -787,6 +826,14 @@
               <option value="">— no matching invoice / not sure —</option>
             </select>
           </div>
+        </div>
+        <div class="fg" style="margin-bottom:8px">
+          <label style="font-size:10px">Or find by receipt / sale # printed on their receipt — works for cash sales too, no customer needed</label>
+          <div style="display:flex;gap:8px">
+            <input id="sr63-receipt-search" type="number" placeholder="e.g. 1234" style="flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--text);outline:none"/>
+            <button type="button" class="btn btn-outline" style="padding:8px 14px;font-size:11px;white-space:nowrap" onclick="findByReceiptNumberV63()">🔎 Find</button>
+          </div>
+          <div id="sr63-receipt-search-st" style="margin-top:4px;font-size:11px"></div>
         </div>
         <div style="font-size:10px;color:var(--text3);margin-bottom:4px">Items being returned:</div>
         <div id="sr63-lines"></div>
