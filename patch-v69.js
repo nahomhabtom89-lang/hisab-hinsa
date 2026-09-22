@@ -101,6 +101,84 @@
   `;
   document.head.appendChild(_poPrintStyleV69);
 
+  // ── Signature storage — Purchase Orders live in their own SQL table
+  // (hh_purchase_orders) with no signature column, and per instruction
+  // the PO process/table itself isn't touched. So signatures are kept
+  // separately, in the SAME generic key-value store the return requests
+  // already use (DB.poSignaturesV69, keyed by PO id) — zero backend
+  // change, and the PO record itself is never written to. Same drawable
+  // canvas pattern as the Delivery Note (patch-v55) and the Debit/Credit
+  // Notes (patch-v64/v63): mouse or touch, saved as a PNG on every
+  // stroke release, redrawn on reopen, with a printed-name field
+  // underneath. Duplicated locally rather than reused — those aren't
+  // window-exposed beyond their own top-level helpers, and it's small
+  // enough that a local copy is the safe move (Lesson 3). ──
+  const _dbKeysV69 = (typeof DB_KEYS !== 'undefined') ? DB_KEYS : null;
+  if (Array.isArray(_dbKeysV69) && _dbKeysV69.indexOf('poSignaturesV69') === -1) _dbKeysV69.push('poSignaturesV69');
+  function ensurePOSigStoreV69() { if (!DB.poSignaturesV69 || typeof DB.poSignaturesV69 !== 'object') DB.poSignaturesV69 = {}; }
+  function persistPOSignatureV69(poId, field, value) {
+    ensurePOSigStoreV69();
+    DB.poSignaturesV69[poId] = DB.poSignaturesV69[poId] || {};
+    DB.poSignaturesV69[poId][field] = value;
+    if (typeof saveData === 'function') saveData();
+  }
+  window.persistPOSignatureV69 = persistPOSignatureV69;
+
+  window._poSigPadsV69 = window._poSigPadsV69 || {};
+  function initSignaturePadV69(canvas, poId, field, existingDataUrl) {
+    const ctx = canvas.getContext('2d');
+    ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#1a1a1a';
+    let drawing = false, lastX = 0, lastY = 0;
+    function getPos(e) {
+      const rect = canvas.getBoundingClientRect();
+      const t = e.touches && e.touches[0];
+      const clientX = t ? t.clientX : e.clientX, clientY = t ? t.clientY : e.clientY;
+      return { x: (clientX - rect.left) * (canvas.width / rect.width), y: (clientY - rect.top) * (canvas.height / rect.height) };
+    }
+    function start(e) { drawing = true; const p = getPos(e); lastX = p.x; lastY = p.y; e.preventDefault(); }
+    function move(e) {
+      if (!drawing) return;
+      const p = getPos(e);
+      ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(p.x, p.y); ctx.stroke();
+      lastX = p.x; lastY = p.y;
+      e.preventDefault();
+    }
+    function end() {
+      if (!drawing) return;
+      drawing = false;
+      persistPOSignatureV69(poId, field, canvas.toDataURL('image/png'));
+    }
+    canvas.addEventListener('mousedown', start);
+    canvas.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', end);
+    canvas.addEventListener('touchstart', start, { passive: false });
+    canvas.addEventListener('touchmove', move, { passive: false });
+    canvas.addEventListener('touchend', end);
+    if (existingDataUrl) {
+      const img = new Image();
+      img.onload = function () { ctx.drawImage(img, 0, 0, canvas.width, canvas.height); };
+      img.src = existingDataUrl;
+    }
+    return { clear: function () { ctx.clearRect(0, 0, canvas.width, canvas.height); persistPOSignatureV69(poId, field, ''); } };
+  }
+  window.clearPOSignatureV69 = function (role, poId) {
+    const pad = window._poSigPadsV69[role + '-' + poId];
+    if (pad) pad.clear();
+  };
+  function poSignatureBlockHtmlV69(role, poId, label, printedNameVal, nameField) {
+    const canvasId = 'po-sig-canvas-' + role + '-' + poId;
+    return `<div style="flex:1">
+      <canvas id="${canvasId}" width="300" height="90" style="width:100%;max-width:300px;height:90px;border-bottom:1px solid #333;background:#fff;touch-action:none;cursor:crosshair;display:block"></canvas>
+      <div class="no-print" style="text-align:right;margin-top:2px">
+        <button type="button" onclick="clearPOSignatureV69('${role}',${poId})" style="font-size:10px;padding:2px 9px;border:1px solid #999;background:#fff;color:#333;border-radius:3px;cursor:pointer">Clear</button>
+      </div>
+      <input type="text" value="${esc(printedNameVal)}" placeholder="Printed name"
+        oninput="persistPOSignatureV69(${poId},'${nameField}',this.value)"
+        style="width:100%;border:none;border-bottom:1px dotted #999;background:transparent;font-family:inherit;font-size:11px;padding:3px 2px;outline:none;margin-top:2px"/>
+      <div style="font-size:11px;color:#555;margin-top:2px">${label}</div>
+    </div>`;
+  }
+
   window.printPurchaseOrderV69 = async function (poId) {
     const po = await findPOV69(poId);
     if (!po) { if (typeof showToast === 'function') showToast('⚠️ PO #' + poId + ' not found'); return; }
@@ -114,6 +192,8 @@
     const status = po.status || 'pending';
     const statusLabel = (typeof PO_STATUS_LABEL !== 'undefined' && PO_STATUS_LABEL[status]) || status;
     const currencyNote = po.currency ? `<div style="font-size:11px;color:#555;margin-top:2px">Invoice currency: ${esc(po.currency)}${po.fx_rate ? (' @ rate ' + po.fx_rate) : ''}</div>` : '';
+    ensurePOSigStoreV69();
+    const sig = DB.poSignaturesV69[po.id] || {};
     content.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #333;padding-bottom:12px;margin-bottom:14px">
         <div><div style="font-size:20px;font-weight:700">${esc((typeof BIZ_NAME !== 'undefined' && BIZ_NAME) || 'Company')}</div></div>
@@ -129,11 +209,15 @@
       <table><thead><tr><th>Description</th><th>Qty</th><th>Unit Cost</th><th>Line Total</th></tr></thead><tbody>${linesHtml}</tbody>
         <tfoot><tr><td colspan="3" style="text-align:right;font-weight:700">Total</td><td style="text-align:right;font-weight:700">${fmtMoney(po.total)}</td></tr></tfoot></table>
       ${po.notes ? `<div style="font-size:12px;margin-top:10px"><b>Notes:</b> ${esc(po.notes)}</div>` : ''}
-      <div style="display:flex;justify-content:space-between;gap:30px;margin-top:50px;font-size:12px">
-        <div style="flex:1"><div style="border-top:1px solid #333;margin-top:40px;padding-top:4px">Authorized By (Us)</div></div>
-        <div style="flex:1"><div style="border-top:1px solid #333;margin-top:40px;padding-top:4px">Acknowledged By (Supplier)</div></div>
+      <div class="po-sig-row" style="display:flex;justify-content:space-between;gap:30px;margin-top:40px">
+        ${poSignatureBlockHtmlV69('us', po.id, 'Authorized By (Us)', sig.usSignatureName || '', 'usSignatureName')}
+        ${poSignatureBlockHtmlV69('supplier', po.id, 'Acknowledged By (Supplier)', sig.supplierSignatureName || '', 'supplierSignatureName')}
       </div>
     `;
+    const usCanvas = document.getElementById('po-sig-canvas-us-' + po.id);
+    const supplierCanvas = document.getElementById('po-sig-canvas-supplier-' + po.id);
+    if (usCanvas) window._poSigPadsV69['us-' + po.id] = initSignaturePadV69(usCanvas, po.id, 'usSignatureImg', sig.usSignatureImg);
+    if (supplierCanvas) window._poSigPadsV69['supplier-' + po.id] = initSignaturePadV69(supplierCanvas, po.id, 'supplierSignatureImg', sig.supplierSignatureImg);
     document.body.classList.add('po-printing-v69');
     nav('po-print-v69');
   };
