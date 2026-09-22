@@ -300,9 +300,17 @@
   window.createSalesReturnRequestV63 = async function () {
     const st = document.getElementById('sr63-st');
     const custSel = document.getElementById('sr63-customer');
-    const customerId = custSel ? custSel.value : '';
-    if (!customerId) { if (st) st.innerHTML = '<span style="color:var(--red3)">Select a customer</span>'; return; }
-    const customer = (typeof CUSTOMERS !== 'undefined' ? CUSTOMERS : []).find(function (c) { return String(c.id) === String(customerId); });
+    const customerIdRaw = custSel ? custSel.value : '';
+    const customer = customerIdRaw ? (typeof CUSTOMERS !== 'undefined' ? CUSTOMERS : []).find(function (c) { return String(c.id) === String(customerIdRaw); }) : null;
+    const walkInEl = document.getElementById('sr63-walkin-note');
+    const walkInNote = walkInEl ? walkInEl.value.trim() : '';
+    // No customer selected is fine — a walk-in with no name on file is a
+    // completely normal, real scenario. customerId stays null (not ''),
+    // so it's never confused with a real customer elsewhere (e.g. when
+    // deciding whether "store credit" can be offered at confirm time —
+    // there'd be no reliable identity to file a store credit against).
+    const customerId = customer ? customer.id : null;
+    const customerName = customer ? customer.name : (walkInNote || 'Walk-in Customer');
 
     const lines = readSRLinesV63();
     if (!lines.length) { if (st) st.innerHTML = '<span style="color:var(--red3)">Add at least one item (qty and unit price required)</span>'; return; }
@@ -322,7 +330,7 @@
 
     const request = {
       id: DB.nextId++, crNumber: nextCrNumberV63(), date: todayStr(),
-      customerId: customerId, customerName: customer ? customer.name : '',
+      customerId: customerId, customerName: customerName,
       refEntryId: refEntryId, refDesc: refEntry ? refEntry.desc : '',
       reason: reason, reasonNotes: reasonNotes, freightBorneBy: freightBorneBy,
       lines: lines, amount: amount,
@@ -342,6 +350,7 @@
   function resetSRRequestFormV63() {
     const custSel = document.getElementById('sr63-customer'); if (custSel) custSel.value = '';
     const refSel = document.getElementById('sr63-ref-invoice'); if (refSel) refSel.innerHTML = '<option value="">— no matching invoice / not sure —</option>';
+    const walkInEl = document.getElementById('sr63-walkin-note'); if (walkInEl) walkInEl.value = '';
     const notesEl = document.getElementById('sr63-notes'); if (notesEl) notesEl.value = '';
     const linesEl = document.getElementById('sr63-lines'); if (linesEl) linesEl.innerHTML = '';
     const searchEl = document.getElementById('sr63-receipt-search'); if (searchEl) searchEl.value = '';
@@ -432,11 +441,12 @@
           <input type="radio" name="sr63-settle-${r.id}" value="refund" onchange="onSRConfirmSettlementChangeV63(${r.id})" ${canReduceInvoice ? '' : 'checked'}/>
           Cash refund to the customer
         </label>
-        <label style="display:flex;align-items:center;gap:6px">
-          <input type="radio" name="sr63-settle-${r.id}" value="credit" onchange="onSRConfirmSettlementChangeV63(${r.id})"/>
-          Store credit for the customer (apply to a future purchase)
+        <label style="display:flex;align-items:center;gap:6px;${r.customerId ? '' : 'opacity:0.45'}">
+          <input type="radio" name="sr63-settle-${r.id}" value="credit" onchange="onSRConfirmSettlementChangeV63(${r.id})" ${r.customerId ? '' : 'disabled'}/>
+          Store credit for the customer (apply to a future purchase)${r.customerId ? '' : ' — needs a known customer on file, not a walk-in'}
         </label>
       </div>
+      ${!r.customerId ? '<div style="font-size:10px;color:var(--text3);margin-bottom:8px">🚶 Walk-in — no customer on file, so this can only be settled by reducing the invoice or a cash refund.</div>' : ''}
       ${(refInv && !isFxBill) ? `<div style="margin-bottom:8px;font-size:11px">
         <label style="display:flex;align-items:center;gap:6px">
           <input type="checkbox" id="sr63-manual-fx-${r.id}" onchange="onSRConfirmSettlementChangeV63(${r.id})"/>
@@ -480,6 +490,7 @@
 
     const method = (document.querySelector('input[name="sr63-settle-' + id + '"]:checked') || {}).value;
     if (!method) { if (stEl) stEl.innerHTML = '<span style="color:var(--red3)">Choose a settlement</span>'; return; }
+    if (method === 'credit' && !r.customerId) { if (stEl) stEl.innerHTML = '<span style="color:var(--red3)">Store credit needs a known customer on file — this request is a walk-in. Use refund or reduce the invoice instead.</span>'; return; }
 
     const refInv = resolveRefInvoiceV63(r.refEntryId);
     const refEntry = r.refEntryId ? DB.entries.find(function (e) { return e.id === r.refEntryId; }) : null;
@@ -816,9 +827,9 @@
       <div class="card" style="margin-bottom:14px">
         <div class="card-hdr">🆕 New Return Request</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-          <div class="fg" style="margin:0"><label style="font-size:10px">Customer</label>
+          <div class="fg" style="margin:0"><label style="font-size:10px">Customer (optional — leave as walk-in if unknown)</label>
             <select id="sr63-customer" onchange="onSRCustomerChangeV63()" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--text);outline:none">
-              <option value="">— select customer —</option>
+              <option value="">— walk-in / unknown customer —</option>
             </select>
           </div>
           <div class="fg" style="margin:0"><label style="font-size:10px">Reference Invoice (optional — leave blank if not sure/not on file)</label>
@@ -826,6 +837,10 @@
               <option value="">— no matching invoice / not sure —</option>
             </select>
           </div>
+        </div>
+        <div id="sr63-walkin-wrap" class="fg" style="margin-bottom:8px">
+          <label style="font-size:10px">Walk-in name / phone (optional, just for your own reference on the printed Credit Note)</label>
+          <input id="sr63-walkin-note" type="text" placeholder="e.g. 'John, 0700 123456' — leave blank if you don't know" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:8px 10px;font-size:12px;color:var(--text);outline:none"/>
         </div>
         <div class="fg" style="margin-bottom:8px">
           <label style="font-size:10px">Or find by receipt / sale # printed on their receipt — works for cash sales too, no customer needed</label>
