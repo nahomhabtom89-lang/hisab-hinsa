@@ -920,6 +920,80 @@
   `;
   document.head.appendChild(_prPrintStyleV64);
 
+  // ── Signature pads — same drawable canvas pattern as the Delivery
+  // Note's (patch-v55): mouse or touch, saved as a PNG data URL on every
+  // stroke release, redrawn on reopen, with a printed-name field
+  // underneath (a signature alone is hard to read back later). Stored
+  // directly on the request object (DB.purchaseReturnRequests), since
+  // that's what still exists even in draft/sent state, before any
+  // journal entry does. Duplicated here rather than reused from v55 —
+  // that one isn't window-exposed beyond initSignaturePadV55 itself
+  // being private to its own closure, and it's small enough that a
+  // local copy is the safe move (same reasoning as Lesson 3). ──
+  function persistPRRequestFieldV64(requestId, field, value) {
+    ensureRequestsArray();
+    const r = DB.purchaseReturnRequests.find(function (x) { return x.id === requestId; });
+    if (!r) return;
+    r[field] = value;
+    if (typeof saveData === 'function') saveData();
+  }
+  window.persistPRSignatureV64 = persistPRRequestFieldV64;
+
+  window._prSigPadsV64 = window._prSigPadsV64 || {};
+  function initSignaturePadV64(canvas, requestId, field, existingDataUrl) {
+    const ctx = canvas.getContext('2d');
+    ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#1a1a1a';
+    let drawing = false, lastX = 0, lastY = 0;
+    function getPos(e) {
+      const rect = canvas.getBoundingClientRect();
+      const t = e.touches && e.touches[0];
+      const clientX = t ? t.clientX : e.clientX, clientY = t ? t.clientY : e.clientY;
+      return { x: (clientX - rect.left) * (canvas.width / rect.width), y: (clientY - rect.top) * (canvas.height / rect.height) };
+    }
+    function start(e) { drawing = true; const p = getPos(e); lastX = p.x; lastY = p.y; e.preventDefault(); }
+    function move(e) {
+      if (!drawing) return;
+      const p = getPos(e);
+      ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(p.x, p.y); ctx.stroke();
+      lastX = p.x; lastY = p.y;
+      e.preventDefault();
+    }
+    function end() {
+      if (!drawing) return;
+      drawing = false;
+      persistPRRequestFieldV64(requestId, field, canvas.toDataURL('image/png'));
+    }
+    canvas.addEventListener('mousedown', start);
+    canvas.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', end);
+    canvas.addEventListener('touchstart', start, { passive: false });
+    canvas.addEventListener('touchmove', move, { passive: false });
+    canvas.addEventListener('touchend', end);
+    if (existingDataUrl) {
+      const img = new Image();
+      img.onload = function () { ctx.drawImage(img, 0, 0, canvas.width, canvas.height); };
+      img.src = existingDataUrl;
+    }
+    return { clear: function () { ctx.clearRect(0, 0, canvas.width, canvas.height); persistPRRequestFieldV64(requestId, field, ''); } };
+  }
+  window.clearPRSignatureV64 = function (role, requestId) {
+    const pad = window._prSigPadsV64[role + '-' + requestId];
+    if (pad) pad.clear();
+  };
+  function prSignatureBlockHtmlV64(role, requestId, label, printedNameVal, nameField) {
+    const canvasId = 'pr-sig-canvas-' + role + '-' + requestId;
+    return `<div style="flex:1">
+      <canvas id="${canvasId}" width="300" height="90" style="width:100%;max-width:300px;height:90px;border-bottom:1px solid #333;background:#fff;touch-action:none;cursor:crosshair;display:block"></canvas>
+      <div class="no-print" style="text-align:right;margin-top:2px">
+        <button type="button" onclick="clearPRSignatureV64('${role}',${requestId})" style="font-size:10px;padding:2px 9px;border:1px solid #999;background:#fff;color:#333;border-radius:3px;cursor:pointer">Clear</button>
+      </div>
+      <input type="text" value="${esc(printedNameVal)}" placeholder="Printed name"
+        oninput="persistPRSignatureV64(${requestId},'${nameField}',this.value)"
+        style="width:100%;border:none;border-bottom:1px dotted #999;background:transparent;font-family:inherit;font-size:11px;padding:3px 2px;outline:none;margin-top:2px"/>
+      <div style="font-size:11px;color:#555;margin-top:2px">${label}</div>
+    </div>`;
+  }
+
   window.printDebitNoteV64 = function (requestId) {
     ensureRequestsArray();
     const r = DB.purchaseReturnRequests.find(function (x) { return x.id === requestId; });
@@ -948,11 +1022,15 @@
       <table><thead><tr><th>Description</th><th>SKU</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead><tbody>${linesHtml}</tbody>
         <tfoot><tr><td colspan="4" style="text-align:right;font-weight:700">Total</td><td style="text-align:right;font-weight:700">${fmtMoney(r.amount)}</td></tr></tfoot></table>
       <div style="font-size:12px;margin-top:10px"><b>Return freight borne by:</b> ${r.freightBorneBy === 'supplier' ? 'Supplier' : 'Us'}</div>
-      <div style="display:flex;justify-content:space-between;gap:30px;margin-top:50px;font-size:12px">
-        <div style="flex:1"><div style="border-top:1px solid #333;margin-top:40px;padding-top:4px">Authorized Signature (Us)</div></div>
-        <div style="flex:1"><div style="border-top:1px solid #333;margin-top:40px;padding-top:4px">Acknowledged By (Supplier)</div></div>
+      <div class="pr-sig-row" style="display:flex;justify-content:space-between;gap:30px;margin-top:40px">
+        ${prSignatureBlockHtmlV64('us', r.id, 'Authorized Signature (Us)', r.usSignatureName || '', 'usSignatureName')}
+        ${prSignatureBlockHtmlV64('supplier', r.id, 'Acknowledged By (Supplier)', r.supplierSignatureName || '', 'supplierSignatureName')}
       </div>
     `;
+    const usCanvas = document.getElementById('pr-sig-canvas-us-' + r.id);
+    const supplierCanvas = document.getElementById('pr-sig-canvas-supplier-' + r.id);
+    if (usCanvas) window._prSigPadsV64['us-' + r.id] = initSignaturePadV64(usCanvas, r.id, 'usSignatureImg', r.usSignatureImg);
+    if (supplierCanvas) window._prSigPadsV64['supplier-' + r.id] = initSignaturePadV64(supplierCanvas, r.id, 'supplierSignatureImg', r.supplierSignatureImg);
     document.body.classList.add('pr-printing-v64');
     nav('pr-print-v64');
   };
