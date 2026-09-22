@@ -48,7 +48,7 @@
         <button class="btn btn-outline" onclick="nav('pos')">← Back</button>
         <button class="btn btn-gold" onclick="window.print()">🖨️ Print</button>
       </div>
-      <div id="pos-receipt-content-v68" style="background:#fff;color:#111;padding:28px;max-width:520px;margin:0 auto;font-family:Arial,sans-serif;border-radius:4px"></div>`;
+      <div id="pos-receipt-content-v68" style="background:#fff;color:#111;padding:14px 10px;width:300px;margin:0 auto;font-family:'Courier New',Courier,monospace;border-radius:2px;box-shadow:0 0 8px rgba(0,0,0,0.15)"></div>`;
     main.appendChild(page);
   }
   const _posReceiptStyleV68 = document.createElement('style');
@@ -56,11 +56,13 @@
     @media print{
       body.pos-receipt-printing-v68 .page{display:none!important}
       body.pos-receipt-printing-v68 #pg-pos-receipt-print-v68{display:block!important}
+      #pos-receipt-content-v68{box-shadow:none!important;width:100%!important;max-width:80mm}
+      @page{margin:4mm}
     }
-    #pos-receipt-content-v68 table{width:100%;border-collapse:collapse;margin:12px 0;font-size:12px}
-    #pos-receipt-content-v68 th,#pos-receipt-content-v68 td{border:1px solid #999;padding:5px 7px;text-align:left}
-    #pos-receipt-content-v68 td,#pos-receipt-content-v68 th{color:#111!important}
-    #pos-receipt-content-v68 th{background:#eee;font-weight:700}
+    #pos-receipt-content-v68 *{color:#111!important;box-sizing:border-box}
+    #pos-receipt-content-v68 .r68-dash{border-top:1px dashed #333;margin:8px 0}
+    #pos-receipt-content-v68 .r68-row{display:flex;justify-content:space-between;font-size:11.5px;line-height:1.5}
+    #pos-receipt-content-v68 .r68-item-name{font-size:11.5px;line-height:1.4}
   `;
   document.head.appendChild(_posReceiptStyleV68);
 
@@ -75,35 +77,52 @@
     if (!content) return;
 
     const isCredit = record.payment_method === 'credit';
-    const docTitle = isCredit ? 'INVOICE' : 'CASH RECEIPT';
+    const docTitle = isCredit ? 'INVOICE' : 'SALES RECEIPT';
     const items = saleItemsV68(record);
+    const ts = record.created_at ? new Date(record.created_at) : new Date();
+    const dateStr = ts.toLocaleDateString();
+    const timeStr = ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    // Real-receipt style: item name on its own line, qty × unit price and
+    // the line total on the next — this is what a thermal-printer receipt
+    // actually looks like (narrow paper can't fit a 4-column table), not
+    // a formal document table.
     const itemsHtml = items.map(function (it) {
       const qty = parseFloat(it.qty) || 0, price = parseFloat(it.sale_price) || 0;
-      return `<tr><td>${esc(it.name)}</td><td style="text-align:center">${qty}</td><td style="text-align:right">${fmtMoney(price)}</td><td style="text-align:right">${fmtMoney(qty * price)}</td></tr>`;
+      return `<div style="margin-bottom:5px">
+        <div class="r68-item-name">${esc(it.name)}</div>
+        <div class="r68-row"><span>${qty} x ${fmtMoney(price)}</span><span>${fmtMoney(qty * price)}</span></div>
+      </div>`;
     }).join('');
-    const customerLine = entry.party ? ('<div><b>Customer:</b> ' + esc(entry.party.name) + '</div>') : '<div style="color:#777">Walk-in customer</div>';
+    const customerLine = entry.party ? entry.party.name : 'Walk-in Customer';
 
     content.innerHTML = `
-      <div style="text-align:center;border-bottom:2px solid #333;padding-bottom:12px;margin-bottom:14px">
-        <div style="font-size:20px;font-weight:700">${esc((typeof BIZ_NAME !== 'undefined' && BIZ_NAME) || 'Company')}</div>
-        <div style="font-size:16px;font-weight:700;letter-spacing:1px;margin-top:6px">${docTitle}</div>
-        <div style="font-size:12px;margin-top:4px">No: <b>#${saleId}</b> &nbsp;·&nbsp; ${esc(entry.date)}</div>
+      <div style="text-align:center">
+        <div style="font-size:16px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px">${esc((typeof BIZ_NAME !== 'undefined' && BIZ_NAME) || 'Company')}</div>
+        <div style="font-size:11px;margin-top:2px">${docTitle}</div>
       </div>
-      <div style="font-size:12px;margin-bottom:10px">
-        ${customerLine}
-        <div><b>Cashier:</b> ${esc(record.cashier || '—')}</div>
-        <div><b>Payment:</b> ${esc(PAY_LABEL_V68[record.payment_method] || record.payment_method)}</div>
+      <div class="r68-dash"></div>
+      <div style="font-size:11px">
+        <div class="r68-row"><span>Receipt #</span><span>${saleId}</span></div>
+        <div class="r68-row"><span>Date</span><span>${esc(dateStr)} ${esc(timeStr)}</span></div>
+        <div class="r68-row"><span>Cashier</span><span>${esc(record.cashier || '—')}</span></div>
+        <div class="r68-row"><span>Customer</span><span>${esc(customerLine)}</span></div>
       </div>
-      <table><thead><tr><th>Item</th><th style="text-align:center">Qty</th><th style="text-align:right">Price</th><th style="text-align:right">Total</th></tr></thead>
-        <tbody>${itemsHtml}</tbody></table>
-      <div style="font-size:12px;margin-top:10px;text-align:right">
-        <div>Subtotal: ${fmtMoney(record.subtotal)}</div>
-        ${record.discount > 0.001 ? ('<div>Discount: -' + fmtMoney(record.discount) + '</div>') : ''}
-        <div style="font-size:15px;font-weight:700;margin-top:4px">Total: ${fmtMoney(record.total)}</div>
+      <div class="r68-dash"></div>
+      ${itemsHtml}
+      <div class="r68-dash"></div>
+      <div style="font-size:11.5px">
+        <div class="r68-row"><span>Subtotal</span><span>${fmtMoney(record.subtotal)}</span></div>
+        ${record.discount > 0.001 ? (`<div class="r68-row"><span>Discount</span><span>-${fmtMoney(record.discount)}</span></div>`) : ''}
       </div>
-      <div style="text-align:center;font-size:11px;color:#555;margin-top:20px">
-        ${isCredit ? 'Keep this invoice for your records — payment is due per your account terms.' : 'Thank you for your purchase. Keep this receipt — it\'s needed for any return.'}
+      <div class="r68-dash"></div>
+      <div class="r68-row" style="font-size:15px;font-weight:700"><span>TOTAL</span><span>${fmtMoney(record.total)}</span></div>
+      <div class="r68-row" style="font-size:11px;margin-top:4px;color:#333"><span>Paid via</span><span>${esc(PAY_LABEL_V68[record.payment_method] || record.payment_method)}</span></div>
+      <div class="r68-dash"></div>
+      <div style="text-align:center;font-size:11px;margin-top:6px">
+        ${isCredit ? 'Payment due per your account terms.<br/>Keep this invoice for your records.' : 'Thank you for shopping with us!<br/>Please keep this receipt for any return.'}
       </div>
+      <div style="text-align:center;font-size:10px;color:#777;margin-top:10px">*** #${saleId} ***</div>
     `;
     document.body.classList.add('pos-receipt-printing-v68');
     await nav('pos-receipt-print-v68');
