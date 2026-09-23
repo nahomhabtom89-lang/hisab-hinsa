@@ -16,7 +16,7 @@
 ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:var(--bg2)}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
 #loginScreen,#companyScreen{position:fixed;inset:0;background:var(--bg);z-index:999;display:flex;align-items:center;justify-content:center;padding:20px}
 #companyScreen{display:none}
-.login-wrap{width:100%;max-width:440px}.login-brand{text-align:center;margin-bottom:28px}.login-brand .logo-icon{font-size:52px;display:block;margin-bottom:10px}.login-brand h1{font-family:'Noto Sans Ethiopic',sans-serif;font-size:28px;font-weight:700;color:var(--gold3);margin-bottom:4px}.login-brand .sub{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text3);letter-spacing:.15em;text-transform:uppercase}
+.login-wrap{width:100%;max-width:440px}.login-brand{text-align:center;margin-bottom:28px}.login-brand .logo-icon{font-size:52px;display:block;margin-bottom:10px}.login-brand img{width:150px;max-width:70%;display:block;margin:0 auto 10px}.login-brand h1{font-family:'Noto Sans Ethiopic',sans-serif;font-size:28px;font-weight:700;color:var(--gold3);margin-bottom:4px}.login-brand .sub{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text3);letter-spacing:.15em;text-transform:uppercase}
 .login-card{background:var(--bg2);border:1px solid var(--border2);border-radius:14px;padding:28px;box-shadow:var(--shadow)}.login-card h2{font-family:'Noto Sans Ethiopic',sans-serif;font-size:15px;color:var(--text);margin-bottom:18px;padding-bottom:12px;border-bottom:1px solid var(--border)}
 .lf{margin-bottom:13px}.lf label{display:block;font-family:'Noto Sans Ethiopic',sans-serif;font-size:11px;color:var(--text2);margin-bottom:5px}.lf input,.lf select{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:10px 13px;font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text);outline:none;transition:border-color .2s}.lf input:focus,.lf select:focus{border-color:var(--gold2)}.lf select option{background:var(--bg3)}
 .login-btn{width:100%;padding:13px;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#0a0e17;border:none;border-radius:6px;font-family:'Noto Sans Ethiopic',sans-serif;font-size:15px;font-weight:700;cursor:pointer;margin-top:4px}.login-btn:hover{opacity:.9}
@@ -57,7 +57,7 @@
 <!-- LOGIN -->
 <div id="loginScreen">
   <div class="login-wrap">
-    <div class="login-brand"><span class="logo-icon">🏗️</span><h1>ሒሳቢ ሃንሲ</h1><div class="sub">Hisabi Hensi · Construction Accounting AI</div></div>
+    <div class="login-brand"><img src="jenga-ledger-logo.png" alt="Jenga Ledger"><div class="sub">Jenga Ledger · Construction &amp; Retail Accounting AI</div></div>
     <div class="login-card">
       <h2 id="loginTitle">ኣቱ — Login</h2>
       <div class="lf"><label>ስም ተጠቃሚ</label><input id="lu" type="text" placeholder="username" autocomplete="username"/></div>
@@ -73,7 +73,7 @@
 <!-- COMPANY SELECTION -->
 <div id="companyScreen">
   <div class="login-wrap" style="max-width:500px">
-    <div class="login-brand"><span class="logo-icon">🏗️</span><h1>ሒሳቢ ሃንሲ</h1><div class="sub">Select a Company Workspace</div></div>
+    <div class="login-brand"><img src="jenga-ledger-logo.png" alt="Jenga Ledger"><div class="sub">Select a Company Workspace</div></div>
     <div class="login-card">
       <h2>ኩባንያ ምረጽ — Choose Company</h2>
       <div class="company-grid" id="companyList"></div>
