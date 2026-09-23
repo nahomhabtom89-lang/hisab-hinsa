@@ -1,15 +1,59 @@
 {
   "version": 2,
   "builds": [
-    { "src": "api/db.js", "use": "@vercel/node" },
-    { "src": "api/ai.js", "use": "@vercel/node" },
-    { "src": "index.html", "use": "@vercel/static" },
-    { "src": "patch-*.js", "use": "@vercel/static" }
+    {
+      "src": "api/db.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/ai.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "index.html",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "patch-*.js",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "*.png",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "*.jpg",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "*.jpeg",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "*.svg",
+      "use": "@vercel/static"
+    }
   ],
   "routes": [
-    { "src": "/api/db", "dest": "/api/db.js" },
-    { "src": "/api/ai", "dest": "/api/ai.js" },
-    { "src": "/(patch-.*\\.js)", "dest": "/$1" },
-    { "src": "/(.*)", "dest": "/index.html" }
+    {
+      "src": "/api/db",
+      "dest": "/api/db.js"
+    },
+    {
+      "src": "/api/ai",
+      "dest": "/api/ai.js"
+    },
+    {
+      "src": "/(patch-.*\\.js)",
+      "dest": "/$1"
+    },
+    {
+      "src": "/(.*\\.(png|jpg|jpeg|svg))",
+      "dest": "/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
   ]
 }
